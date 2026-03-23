@@ -137,18 +137,6 @@ utopia-content/         ← Separate GitHub repo for all content
 
 ---
 
-## Known Issues & Fixes
-
-| Issue | Fix |
-|---|---|
-| Gradle daemon crash | `org.gradle.jvmargs=-Xmx2048m` in `android/gradle.properties` |
-| AUR Android SDK broken | Ignore `/opt/android-sdk`. Use `/home/john/Android/Sdk` only |
-| flutter config reset | Run `flutter config --android-sdk /home/john/Android/Sdk` from `~/utopia_app` |
-| Fish path missing | `fish_add_path ~/flutter/bin && fish_add_path ~/.pub-cache/bin` |
-| Indian mirrors 404 | Use `jdk21-openjdk` instead of `jdk-openjdk` for AUR Java |
-
----
-
 ## Target Users
 
 - **~60 students** — readers (browse notes, get notifications, check attendance)
