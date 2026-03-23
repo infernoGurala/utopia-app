@@ -12,7 +12,7 @@
 
 ## What is UTOPIA?
 
-UTOPIA is a cross-platform student productivity app built for **Aditya University, Visakhapatnam**. It replaces every scattered academic tool — Telegram bots, college portals, attendance trackers, note-sharing groups — with a single offline-first app that just works.
+UTOPIA is a cross-platform student productivity app built for **college students**. It replaces every scattered academic tool — college portals, attendance trackers, note-sharing groups — with a single offline-first app that just works.
 
 Built by a first-year mechanical engineering student with zero prior coding experience, using Flutter and a fully free infrastructure stack.
 
