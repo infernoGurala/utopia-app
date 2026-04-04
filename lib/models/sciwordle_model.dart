@@ -1,0 +1,166 @@
+// lib/models/sciwordle_model.dart
+//
+// Data models for SciWordle.
+// These are plain Dart classes — no Firebase imports here.
+// The service file handles all Firestore conversion.
+
+/// Represents today's science question fetched from Firestore.
+class SciwordleQuestion {
+  const SciwordleQuestion({
+    required this.dateKey,
+    required this.question,
+    required this.answer,
+    required this.category,
+  });
+
+  /// The Firestore document ID, e.g. "2026-04-01"
+  final String dateKey;
+
+  /// The full question text, e.g. "Q. I am the force that pulls objects..."
+  final String question;
+
+  /// The single-word answer in lowercase, e.g. "gravity"
+  final String answer;
+
+  /// Science category tag, e.g. "Physics"
+  final String category;
+
+  factory SciwordleQuestion.fromFirestore(
+    Map<String, dynamic> data,
+    String dateKey,
+  ) {
+    return SciwordleQuestion(
+      dateKey: dateKey,
+      question: (data['question'] as String? ?? '').trim(),
+      answer: (data['answer'] as String? ?? '').trim().toLowerCase(),
+      category: (data['category'] as String? ?? 'Science').trim(),
+    );
+  }
+}
+
+/// Represents a player's all-time score data stored in sciwordle_scores/{uid}.
+class SciwordlePlayerScore {
+  const SciwordlePlayerScore({
+    required this.uid,
+    required this.name,
+    required this.totalScore,
+    required this.streak,
+    required this.bestStreak,
+    required this.lastScore,
+    required this.lastPlayedDate,
+    required this.gamesPlayed,
+    this.scoreTimestamp,
+    this.streakTimestamp,
+  });
+
+  final String uid;
+  final String name;
+  final int totalScore;
+  final int streak;
+  final int bestStreak;
+  final int lastScore;
+
+  /// "YYYY-MM-DD" string of the last day they played, or empty string.
+  final String lastPlayedDate;
+  final int gamesPlayed;
+
+  /// Timestamp when the current totalScore was achieved (for tiebreaker)
+  final int? scoreTimestamp;
+
+  /// Timestamp when the current streak was achieved (for tiebreaker)
+  final int? streakTimestamp;
+
+  /// Returns a zeroed-out score for a brand-new player.
+  factory SciwordlePlayerScore.empty(String uid) {
+    return SciwordlePlayerScore(
+      uid: uid,
+      name: '',
+      totalScore: 0,
+      streak: 0,
+      bestStreak: 0,
+      lastScore: 0,
+      lastPlayedDate: '',
+      gamesPlayed: 0,
+      scoreTimestamp: null,
+      streakTimestamp: null,
+    );
+  }
+
+  factory SciwordlePlayerScore.fromFirestore(
+    Map<String, dynamic> data,
+    String uid,
+  ) {
+    return SciwordlePlayerScore(
+      uid: uid,
+      name: (data['name'] as String? ?? '').trim(),
+      totalScore: (data['totalScore'] as num?)?.toInt() ?? 0,
+      streak: (data['streak'] as num?)?.toInt() ?? 0,
+      bestStreak: (data['bestStreak'] as num?)?.toInt() ?? 0,
+      lastScore: (data['lastScore'] as num?)?.toInt() ?? 0,
+      lastPlayedDate: (data['lastPlayedDate'] as String? ?? '').trim(),
+      gamesPlayed: (data['gamesPlayed'] as num?)?.toInt() ?? 0,
+      scoreTimestamp: (data['scoreTimestamp'] as num?)?.toInt(),
+      streakTimestamp: (data['streakTimestamp'] as num?)?.toInt(),
+    );
+  }
+}
+
+/// Represents one row in the leaderboard — fetched from all sciwordle_scores docs.
+class SciwordleLeaderboardEntry {
+  const SciwordleLeaderboardEntry({
+    required this.uid,
+    required this.name,
+    required this.totalScore,
+    required this.streak,
+    required this.bestStreak,
+    required this.gamesPlayed,
+  });
+
+  final String uid;
+  final String name;
+  final int totalScore;
+  final int streak;
+  final int bestStreak;
+  final int gamesPlayed;
+
+  factory SciwordleLeaderboardEntry.fromFirestore(
+    Map<String, dynamic> data,
+    String uid,
+  ) {
+    return SciwordleLeaderboardEntry(
+      uid: uid,
+      name: (data['name'] as String? ?? 'Student').trim(),
+      totalScore: (data['totalScore'] as num?)?.toInt() ?? 0,
+      streak: (data['streak'] as num?)?.toInt() ?? 0,
+      bestStreak: (data['bestStreak'] as num?)?.toInt() ?? 0,
+      gamesPlayed: (data['gamesPlayed'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// The letter-by-letter result of one guess attempt.
+class SciwordleGuessResult {
+  const SciwordleGuessResult({required this.letters});
+
+  /// One [LetterResult] per character in the guessed word.
+  final List<LetterResult> letters;
+}
+
+/// The status of a single guessed letter.
+class LetterResult {
+  const LetterResult({required this.letter, required this.status});
+
+  final String letter;
+  final LetterStatus status;
+}
+
+enum LetterStatus {
+  /// Correct letter, correct position — show green
+  correct,
+
+  /// Correct letter, wrong position — show yellow
+  present,
+
+  /// Letter not in the answer — show grey
+  absent,
+}

@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "402670858978",
+    "firebase_url": "https://utopia-app-33cf8-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "utopia-app-33cf8",
+    "storage_bucket": "utopia-app-33cf8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:402670858978:android:200c4504814ccd9ffea4bb",
+        "android_client_info": {
+          "package_name": "com.example.utopia_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "402670858978-6be59l7ke07fj6akdp8t1k7fls4dfj14.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.utopia_app",
+            "certificate_hash": "5e8140e2453cbab4f94c8bee5af449d9f51b9cca"
+          }
+        },
+        {
+          "client_id": "402670858978-m7r6hb5ar51jrk73qal32p44o438v5ur.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.utopia_app",
+            "certificate_hash": "a7306e5c656609eca5299211e7916d1ff0a1c02a"
+          }
+        },
+        {
+          "client_id": "402670858978-94eqn0qvvrtv59ijne3hn1g5flr4ahve.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGslt8X1GGuIsqlIhwSxEi7iCNf-N6DN4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "402670858978-94eqn0qvvrtv59ijne3hn1g5flr4ahve.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

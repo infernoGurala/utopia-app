@@ -1,0 +1,293 @@
+name: Chat Notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      chat_id:
+        description: 'Chat document ID'
+        required: true
+      sender_id:
+        description: 'Sender UID'
+        required: true
+      sender_name:
+        description: 'Sender display name'
+        required: true
+      recipient_id:
+        description: 'Recipient UID'
+        required: true
+      message_text:
+        description: 'Message preview'
+        required: true
+
+jobs:
+  send_chat_notification:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.3.0
+        with:
+          node-version: '24'
+
+      - name: Send chat notification
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          PROJECT_ID: utopia-app-33cf8
+          CHAT_ID: ${{ github.event.inputs.chat_id }}
+          SENDER_ID: ${{ github.event.inputs.sender_id }}
+          SENDER_NAME: ${{ github.event.inputs.sender_name }}
+          RECIPIENT_ID: ${{ github.event.inputs.recipient_id }}
+          MESSAGE_TEXT: ${{ github.event.inputs.message_text }}
+        run: |
+          node << 'EOF_NODE'
+          const crypto = require('crypto');
+
+          function base64url(input) {
+            return Buffer.from(input)
+              .toString('base64')
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+              .replace(/=+$/g, '');
+          }
+
+          function signJwt(serviceAccount) {
+            const now = Math.floor(Date.now() / 1000);
+            const header = {
+              alg: 'RS256',
+              typ: 'JWT',
+            };
+            const payload = {
+              iss: serviceAccount.client_email,
+              sub: serviceAccount.client_email,
+              aud: 'https://oauth2.googleapis.com/token',
+              iat: now,
+              exp: now + 3600,
+              scope: [
+                'https://www.googleapis.com/auth/datastore',
+                'https://www.googleapis.com/auth/firebase.messaging',
+              ].join(' '),
+            };
+
+            const unsignedToken = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(payload))}`;
+            const signer = crypto.createSign('RSA-SHA256');
+            signer.update(unsignedToken);
+            signer.end();
+            const signature = signer.sign(serviceAccount.private_key);
+            return `${unsignedToken}.${base64url(signature)}`;
+          }
+
+          async function getAccessToken(serviceAccount) {
+            const jwt = signJwt(serviceAccount);
+            const response = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                assertion: jwt,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error(
+                `OAuth token request failed: ${response.status} ${await response.text()}`,
+              );
+            }
+
+            const data = await response.json();
+            if (!data.access_token) {
+              throw new Error('OAuth token response did not include access_token.');
+            }
+            return data.access_token;
+          }
+
+          async function clearInvalidToken({projectId, recipientId, accessToken}) {
+            await clearInvalidTokens({
+              projectId,
+              recipientId,
+              accessToken,
+              tokens: [],
+            });
+          }
+
+          async function clearInvalidTokens({
+            projectId,
+            recipientId,
+            accessToken,
+            tokens,
+          }) {
+            const clearTokenResponse = await fetch(
+              `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${recipientId}?updateMask.fieldPaths=fcmToken&updateMask.fieldPaths=fcmTokens`,
+              {
+                method: 'PATCH',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  fields: {
+                    fcmToken: {nullValue: null},
+                    fcmTokens: {
+                      arrayValue: {
+                        values: tokens.map((token) => ({
+                          stringValue: token,
+                        })),
+                      },
+                    },
+                  },
+                }),
+              },
+            );
+
+            if (!clearTokenResponse.ok) {
+              throw new Error(
+                `Failed to clear invalid FCM token: ${clearTokenResponse.status} ${await clearTokenResponse.text()}`,
+              );
+            }
+          }
+
+          async function sendChatNotification() {
+            try {
+              const serviceAccountJson =
+                process.env.FIREBASE_SERVICE_ACCOUNT ||
+                process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+              if (!serviceAccountJson) {
+                throw new Error('Missing Firebase service account secret.');
+              }
+
+              const serviceAccount = JSON.parse(serviceAccountJson);
+              const projectId =
+                process.env.FIREBASE_PROJECT_ID || process.env.PROJECT_ID;
+              const recipientId = process.env.RECIPIENT_ID;
+              const senderId = process.env.SENDER_ID;
+              const senderName = process.env.SENDER_NAME || 'New message';
+              const messageText = process.env.MESSAGE_TEXT || '';
+              const chatId = process.env.CHAT_ID;
+              const accessToken = await getAccessToken(serviceAccount);
+
+              const userResponse = await fetch(
+                `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${recipientId}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                },
+              );
+
+              if (userResponse.status === 404) {
+                console.log('Recipient user document not found. Skipping send.');
+                return;
+              }
+              if (!userResponse.ok) {
+                throw new Error(
+                  `Failed to load recipient user: ${userResponse.status} ${await userResponse.text()}`,
+                );
+              }
+
+              const userDoc = await userResponse.json();
+              const singleToken = userDoc.fields?.fcmToken?.stringValue;
+              const tokenList =
+                userDoc.fields?.fcmTokens?.arrayValue?.values
+                  ?.map((entry) => entry?.stringValue)
+                  .filter((token) => typeof token === 'string' && token.length > 0) ?? [];
+              const tokens = [...new Set([
+                ...tokenList,
+                ...(singleToken ? [singleToken] : []),
+              ])];
+
+              if (tokens.length === 0) {
+                console.log('Recipient has no FCM token. Skipping send.');
+                return;
+              }
+
+              const validTokens = [];
+              let delivered = false;
+
+              for (const token of tokens) {
+                const fcmResponse = await fetch(
+                  `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      message: {
+                        token,
+                        notification: {
+                          title: senderName,
+                          body: messageText,
+                        },
+                        data: {
+                          type: 'chat',
+                          chatId,
+                          senderId,
+                          senderName,
+                          body: messageText,
+                        },
+                        android: {
+                          priority: 'HIGH',
+                          notification: {
+                            channel_id: 'utopia_high_importance',
+                            icon: 'ic_notification',
+                          },
+                        },
+                      },
+                    }),
+                  },
+                );
+
+                if (fcmResponse.ok) {
+                  validTokens.push(token);
+                  delivered = true;
+                  continue;
+                }
+
+                const errorText = await fcmResponse.text();
+                let parsedError = null;
+                try {
+                  parsedError = JSON.parse(errorText);
+                } catch (_) {}
+
+                const errorCode =
+                  parsedError?.error?.details?.find(
+                    (detail) =>
+                      detail?.['@type'] ===
+                      'type.googleapis.com/google.firebase.fcm.v1.FcmError',
+                  )?.errorCode ?? '';
+
+                if (fcmResponse.status === 404 && errorCode === 'UNREGISTERED') {
+                  console.log(`Skipping unregistered token for ${recipientId}.`);
+                  continue;
+                }
+
+                throw new Error(`FCM send failed: ${fcmResponse.status} ${errorText}`);
+              }
+
+              if (validTokens.length != tokens.length || !singleToken || !validTokens.includes(singleToken)) {
+                await clearInvalidTokens({
+                  projectId,
+                  recipientId,
+                  accessToken,
+                  tokens: validTokens,
+                });
+              }
+
+              if (!delivered) {
+                console.log('No valid tokens delivered. Waiting for app to refresh token.');
+                return;
+              }
+
+              console.log(`Chat notification sent successfully to ${validTokens.length} token(s).`);
+            } catch (err) {
+              console.error('Error:', err);
+              process.exit(1);
+            }
+          }
+
+          sendChatNotification();
+          EOF_NODE
