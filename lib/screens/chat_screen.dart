@@ -422,6 +422,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               ChampionAvatarBadge(
                                 scoreRank: scoreRank,
                                 streakRank: streakRank,
+                                email: widget.email,
                                 showGlow: false,
                                 child: CircleAvatar(
                                   radius: 18,
@@ -460,6 +461,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       name: widget.displayName,
                                       scoreRank: scoreRank,
                                       streakRank: streakRank,
+                                      email: widget.email,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.outfit(

@@ -125,13 +125,15 @@ class SciwordleLeaderboardEntry {
 
   factory SciwordleLeaderboardEntry.fromFirestore(
     Map<String, dynamic> data,
-    String uid,
-  ) {
+    String uid, {
+    bool isStreakActive = true,
+  }) {
+    final rawStreak = (data['streak'] as num?)?.toInt() ?? 0;
     return SciwordleLeaderboardEntry(
       uid: uid,
       name: (data['name'] as String? ?? 'Student').trim(),
       totalScore: (data['totalScore'] as num?)?.toInt() ?? 0,
-      streak: (data['streak'] as num?)?.toInt() ?? 0,
+      streak: isStreakActive ? rawStreak : 0,
       bestStreak: (data['bestStreak'] as num?)?.toInt() ?? 0,
       gamesPlayed: (data['gamesPlayed'] as num?)?.toInt() ?? 0,
     );

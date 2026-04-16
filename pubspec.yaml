@@ -1,7 +1,7 @@
 name: utopia_app
 description: UTOPIA student notes app.
 publish_to: 'none'
-version: 2.2.2+12
+version: 2.2.4+14
 
 environment:
   sdk: ^3.11.3
@@ -38,6 +38,8 @@ dependencies:
   shared_preferences: ^2.3.2
   google_generative_ai: ^0.4.7
   confetti: ^0.8.0
+  uuid: ^4.3.3
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

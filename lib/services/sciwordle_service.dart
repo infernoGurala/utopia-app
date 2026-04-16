@@ -13,6 +13,7 @@ class SciwordleService {
 
   static const String _dailyCol = 'sciwordle_daily';
   static const String _scoresCol = 'sciwordle_scores';
+  static const String _progressCol = 'sciwordle_progress';
   static const int _playedGameStreakBonus = 2;
 
   String getTodayDateIST() {
@@ -69,8 +70,12 @@ class SciwordleService {
 
       if (lastPlayed == today) {
         return;
+      } else if (lastPlayed == getYesterdayDateIST()) {
+        // Played yesterday → continue the streak
+        streak = streak + 1;
       } else {
-        streak = gamesPlayed > 0 ? streak + 1 : 1;
+        // Missed at least one day → reset streak
+        streak = 1;
       }
 
       if (streak > bestStreak) {
@@ -110,7 +115,25 @@ class SciwordleService {
   }
 
   int _nextStreakForPlayedGame(SciwordlePlayerScore existing) {
-    return existing.gamesPlayed > 0 ? existing.streak + 1 : 1;
+    if (existing.gamesPlayed == 0) return 1;
+    // Only continue the streak if they played yesterday
+    if (existing.lastPlayedDate == getYesterdayDateIST()) {
+      return existing.streak + 1;
+    }
+    // If they already played today (shouldn't reach here due to guard), keep same
+    if (existing.lastPlayedDate == todayKey) {
+      return existing.streak;
+    }
+    // Missed a day or more → reset
+    return 1;
+  }
+
+  /// Returns true if the user's streak is still active (played today or yesterday).
+  /// Use this to decide whether to show the fire icon.
+  bool isStreakActive(String? lastPlayedDate) {
+    if (lastPlayedDate == null || lastPlayedDate.isEmpty) return false;
+    return lastPlayedDate == todayKey ||
+        lastPlayedDate == getYesterdayDateIST();
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -235,6 +258,52 @@ class SciwordleService {
     }
   }
 
+  // ─── In-progress guess persistence ────────────────────────────────────────
+
+  /// Saves the current list of guesses so the user can't cheat by backing out.
+  Future<void> saveGuessProgress({
+    required List<String> guesses,
+    required String answer,
+  }) async {
+    try {
+      await _db.collection(_progressCol).doc(_uid).set({
+        'dateKey': todayKey,
+        'guesses': guesses,
+        'answer': answer,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Silently fail — worst case the user gets a fresh start
+    }
+  }
+
+  /// Fetches saved in-progress guesses for today, if any.
+  /// Returns null if there's no progress for today.
+  Future<SciwordleProgressData?> fetchGuessProgress() async {
+    try {
+      final doc = await _db.collection(_progressCol).doc(_uid).get();
+      if (!doc.exists || doc.data() == null) return null;
+      final data = doc.data()!;
+      final dateKey = data['dateKey'] as String? ?? '';
+      if (dateKey != todayKey) return null;
+      final guesses = (data['guesses'] as List<dynamic>? ?? [])
+          .map((e) => (e as String).toLowerCase())
+          .toList();
+      final answer = (data['answer'] as String? ?? '').toLowerCase();
+      if (guesses.isEmpty || answer.isEmpty) return null;
+      return SciwordleProgressData(guesses: guesses, answer: answer);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Clears in-progress data (called when the game finishes).
+  Future<void> clearGuessProgress() async {
+    try {
+      await _db.collection(_progressCol).doc(_uid).delete();
+    } catch (_) {}
+  }
+
   // ─── Leaderboard ──────────────────────────────────────────────────────────
 
   /// Fetches all player scores sorted by totalScore descending.
@@ -272,7 +341,13 @@ class SciwordleService {
         });
 
       return docs
-          .map((doc) => SciwordleLeaderboardEntry.fromFirestore(doc.data(), doc.id))
+          .map((doc) => SciwordleLeaderboardEntry.fromFirestore(
+                doc.data(),
+                doc.id,
+                isStreakActive: isStreakActive(
+                  doc.data()['lastPlayedDate'] as String?,
+                ),
+              ))
           .take(50)
           .toList();
     } on FirebaseException catch (e) {
@@ -289,7 +364,12 @@ class SciwordleService {
       final snapshot = await _db.collection(_scoresCol).get();
       for (final doc in snapshot.docs) {
         if (uids.contains(doc.id)) {
-          result[doc.id] = (doc.data()['streak'] as num?)?.toInt() ?? 0;
+          final lastPlayed = doc.data()['lastPlayedDate'] as String?;
+          if (isStreakActive(lastPlayed)) {
+            result[doc.id] = (doc.data()['streak'] as num?)?.toInt() ?? 0;
+          } else {
+            result[doc.id] = 0;
+          }
         }
       }
     } catch (_) {}
@@ -337,4 +417,18 @@ class SciwordleService {
       ),
     );
   }
+}
+
+/// Represents saved in-progress guesses for the current day.
+class SciwordleProgressData {
+  const SciwordleProgressData({
+    required this.guesses,
+    required this.answer,
+  });
+
+  /// The list of guess words the user has submitted so far.
+  final List<String> guesses;
+
+  /// The answer word (to verify it matches today's question).
+  final String answer;
 }

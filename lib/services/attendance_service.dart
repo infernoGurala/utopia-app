@@ -7,9 +7,9 @@ class AttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
   static const String _loginPath = '/aus/default.aspx';
   static const String _attendancePath =
-      '/aus/ajax/StudentAttendance,App_Web_studentattendance.aspx.a2a1b31c.ashx?_method=ShowAttendance&_session=rw';
+      '/aus/Academics/studentattendance.aspx/ShowAttendance';
   static const String _attendancePagePath =
-      '/aus/Academics/StudentAttendance.aspx?scrid=3&showtype=SA';
+      '/aus/Academics/studentattendance.aspx?scrid=3&showtype=SA';
   static const String _aesSecret = '8701661282118308';
   static const Duration _timeout = Duration(seconds: 20);
   static const String _userAgent =
@@ -135,11 +135,11 @@ class AttendanceService {
     final cookies = <String, String>{};
     try {
       await _login(client, rollNumber, password, cookies);
-      final attendanceBody =
-          'rollNo=${rollNumber.trim()}\r\n'
-          'fromDate=$fromDate\r\n'
-          'toDate=$toDate\r\n'
-          'excludeothersubjects=false';
+      final attendanceBody = jsonEncode({
+        'fromDate': fromDate,
+        'toDate': toDate,
+        'excludeothersubjects': false,
+      });
       // ignore: avoid_print
       print('Attendance request url: https://$_portalHost$_attendancePath');
       // ignore: avoid_print
@@ -150,7 +150,7 @@ class AttendanceService {
         path: _attendancePath,
         cookies: cookies,
         followRedirects: false,
-        contentType: 'application/x-www-form-urlencoded; charset=UTF-8',
+        contentType: 'application/json; charset=UTF-8',
         body: attendanceBody,
         extraHeaders: {
           'origin': 'https://$_portalHost',
@@ -159,14 +159,24 @@ class AttendanceService {
         },
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
-      // ignore: avoid_print
-      print('Attendance raw HTML:\n${response.body}');
 
       if (response.statusCode != HttpStatus.ok) {
         throw Exception('Could not fetch attendance right now');
       }
 
-      final parsed = _parseAttendanceHtml(response.body);
+      // Response is now JSON: {"d": "<HTML>"}
+      String attendanceHtml;
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        attendanceHtml = decoded['d'] as String? ?? '';
+      } catch (_) {
+        // Fallback: treat as raw HTML for backwards compatibility
+        attendanceHtml = response.body;
+      }
+      // ignore: avoid_print
+      print('Attendance extracted HTML:\n$attendanceHtml');
+
+      final parsed = _parseAttendanceHtml(attendanceHtml);
       final hasReport = parsed['hasReport'] as bool? ?? false;
       if ((parsed['subjects'] as List).isEmpty && !hasReport) {
         throw Exception('Attendance data was not found in the portal response');

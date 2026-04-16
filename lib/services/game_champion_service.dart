@@ -33,12 +33,47 @@ class GameChampionService {
     return result;
   }
 
+  static String _todayDateIST() {
+    final now = DateTime.now().toUtc().add(
+      const Duration(hours: 5, minutes: 30),
+    );
+    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  static String _yesterdayDateIST() {
+    final yesterday = DateTime.now()
+        .toUtc()
+        .subtract(const Duration(days: 1))
+        .add(const Duration(hours: 5, minutes: 30));
+    return '${yesterday.year.toString().padLeft(4, '0')}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Returns true if lastPlayedDate is today or yesterday (streak is alive).
+  static bool _isStreakActive(String? lastPlayedDate) {
+    if (lastPlayedDate == null || lastPlayedDate.isEmpty) return false;
+    return lastPlayedDate == _todayDateIST() ||
+        lastPlayedDate == _yesterdayDateIST();
+  }
+
+  /// Returns the effective streak for a Firestore score doc.
+  /// If the user hasn't played today or yesterday, their streak is 0 (expired).
+  static int getEffectiveStreak(Map<String, dynamic> data) {
+    final lastPlayed = data['lastPlayedDate'] as String?;
+    if (!_isStreakActive(lastPlayed)) return 0;
+    return (data['streak'] as num?)?.toInt() ?? 0;
+  }
+
   static Map<String, int> _topStreakRanksFromSnapshot(
     QuerySnapshot<Map<String, dynamic>> snapshot,
   ) {
     final rankedDocs =
         snapshot.docs
-            .where((doc) => (doc.data()['streak'] as num?)?.toInt() != null)
+            .where((doc) {
+              final streak = (doc.data()['streak'] as num?)?.toInt() ?? 0;
+              if (streak <= 0) return false;
+              // Only count streaks that are still active
+              return _isStreakActive(doc.data()['lastPlayedDate'] as String?);
+            })
             .toList()
           ..sort((a, b) {
             final streakA = (a.data()['streak'] as num?)?.toInt() ?? 0;
@@ -52,8 +87,6 @@ class GameChampionService {
     final result = <String, int>{};
     var nextRank = 1;
     for (final doc in rankedDocs) {
-      final streak = (doc.data()['streak'] as num?)?.toInt() ?? 0;
-      if (streak <= 0) continue;
       result[doc.id] = nextRank;
       nextRank += 1;
       if (nextRank > 3) break;

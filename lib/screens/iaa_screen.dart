@@ -28,13 +28,6 @@ class IAAScreen extends StatefulWidget {
 
 class _IAAScreenState extends State<IAAScreen> {
   Color get _backgroundColor => U.bg;
-  Color get _surfaceColor => U.surface;
-  Color get _surfaceElevatedColor => U.card;
-  Color get _primaryColor => U.primary;
-  Color get _secondaryGlowColor => U.primary.withValues(alpha: 0.8);
-  Color get _accentMintColor => U.teal;
-  Color get _textPrimaryColor => U.text;
-  Color get _textMutedColor => U.sub;
   Color get _errorColor => U.red;
   static const List<String> _suggestions = <String>[
     'What classes today?',
@@ -390,44 +383,49 @@ class _IAAScreenState extends State<IAAScreen> {
         title: Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [U.primary.withValues(alpha: 0.3), U.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: U.card,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: U.primary.withValues(alpha: 0.22),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                border: Border.all(color: U.border.withValues(alpha: 0.5)),
               ),
-              child: Icon(Icons.auto_awesome_rounded, color: U.bg, size: 20),
+              child: Center(
+                child: Icon(Icons.auto_awesome_rounded, color: U.teal, size: 20),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'IAA',
+                  'IAA Assistant',
                   style: GoogleFonts.outfit(
                     color: U.text,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
-                  'Intelligent Academic Assistant',
-                  style: GoogleFonts.outfit(
-                    color: U.sub,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.greenAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Online',
+                      style: GoogleFonts.outfit(
+                        color: Colors.greenAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -445,40 +443,6 @@ class _IAAScreenState extends State<IAAScreen> {
         top: false,
         child: Stack(
           children: [
-            Positioned(
-              top: 14,
-              left: -20,
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      U.primary.withValues(alpha: 0.22),
-                      _backgroundColor.withValues(alpha: 0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 110,
-              right: -36,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      U.teal.withValues(alpha: 0.09),
-                      _backgroundColor.withValues(alpha: 0),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             Column(
               children: [
                 Expanded(
@@ -488,36 +452,74 @@ class _IAAScreenState extends State<IAAScreen> {
                       ? _buildLoadingState(textTheme)
                       : Column(
                           children: [
-                            if (_messages.isEmpty) _buildWelcomePanel(),
-                            Expanded(
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                padding: EdgeInsets.fromLTRB(
-                                  16,
-                                  _messages.isEmpty ? 18 : 12,
-                                  16,
-                                  20,
+                            if (_messages.isEmpty)
+                              Expanded(
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 80,
+                                        height: 80,
+                                        decoration: BoxDecoration(
+                                          color: U.card,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(Icons.auto_awesome_rounded, color: U.teal, size: 36),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'Start a conversation',
+                                        style: GoogleFonts.outfit(
+                                          color: U.text,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                                        child: Text(
+                                          'Ask IAA for academic insights, notes summaries, and attendance info.',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.outfit(
+                                            color: U.sub,
+                                            fontSize: 14,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                itemCount:
-                                    _messages.length + (_isLoading ? 1 : 0),
-                                itemBuilder: (context, index) {
-                                  if (index >= _messages.length) {
-                                    return _TypingBubble(
-                                      text:
-                                          'IAA is thinking${'.' * (_typingStep + 1)}',
-                                    );
-                                  }
-                                  final message = _messages[index];
-                                  return _AnimatedMessageBubble(
-                                    message: message,
-                                    index: index,
-                                  );
-                                },
                               ),
-                            ),
+                            if (_messages.isNotEmpty)
+                              Expanded(
+                                child: ListView.builder(
+                                  controller: _scrollController,
+                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                                  itemCount:
+                                      _messages.length + (_isLoading ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (index >= _messages.length) {
+                                      return _TypingBubble(
+                                        text:
+                                            'IAA is thinking${'.' * (_typingStep + 1)}',
+                                      );
+                                    }
+                                    final message = _messages[index];
+                                    return _AnimatedMessageBubble(
+                                      message: message,
+                                      index: index,
+                                    );
+                                  },
+                                ),
+                              ),
                           ],
                         ),
                 ),
+                if (_initialized && !_isLoading && _messages.isEmpty)
+                  _buildSuggestionChips(),
                 _buildComposer(textTheme),
               ],
             ),
@@ -527,94 +529,27 @@ class _IAAScreenState extends State<IAAScreen> {
     );
   }
 
-  Widget _buildWelcomePanel() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [U.bg, U.primary.withValues(alpha: 0.18), U.bg],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: U.border.withValues(alpha: 0.08)),
-              boxShadow: [
-                BoxShadow(
-                  color: U.primary.withValues(alpha: 0.12),
-                  blurRadius: 28,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    'Study smarter',
-                    style: GoogleFonts.outfit(
-                      color: U.text,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Ask better. Learn faster.',
-                  style: GoogleFonts.playfairDisplay(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    height: 1.05,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'IAA can read your timetable, attendance context, and notes to answer with better academic guidance.',
-                  style: GoogleFonts.outfit(
-                    color: U.sub,
-                    fontSize: 13.5,
-                    height: 1.45,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 112,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _suggestions.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final suggestion = _suggestions[index];
-                return _SuggestionCard(
-                  label: suggestion,
-                  onTap: () => _sendMessage(suggestion),
-                  primaryColor: U.primary,
-                  accentMintColor: U.teal,
-                  textPrimaryColor: U.text,
-                );
-              },
-            ),
-          ),
-        ],
+  Widget _buildSuggestionChips() {
+    return Container(
+      height: 48,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: _suggestions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final suggestion = _suggestions[index];
+          return ActionChip(
+            label: Text(suggestion),
+            backgroundColor: U.card,
+            side: BorderSide(color: U.border.withValues(alpha: 0.3)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            labelStyle: GoogleFonts.outfit(color: U.text, fontSize: 13, fontWeight: FontWeight.w500),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            onPressed: () => _sendMessage(suggestion),
+          );
+        },
       ),
     );
   }
@@ -626,7 +561,7 @@ class _IAAScreenState extends State<IAAScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: _surfaceColor.withValues(alpha: 0.88),
+            color: U.surface.withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
           ),
@@ -718,10 +653,9 @@ class _IAAScreenState extends State<IAAScreen> {
 
   Widget _buildComposer(TextTheme textTheme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
       decoration: BoxDecoration(
-        color: _surfaceColor.withValues(alpha: 0.94),
-        border: Border(top: BorderSide(color: U.card)),
+        color: _backgroundColor,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -729,16 +663,9 @@ class _IAAScreenState extends State<IAAScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    U.card.withValues(alpha: 0.94),
-                    const Color(0xFF26283B),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                color: U.card,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: U.border.withValues(alpha: 0.5)),
               ),
               child: TextField(
                 controller: _controller,
@@ -747,56 +674,30 @@ class _IAAScreenState extends State<IAAScreen> {
                 maxLines: 5,
                 style: textTheme.bodyLarge?.copyWith(color: U.text),
                 decoration: InputDecoration(
-                  hintText:
-                      'Ask about classes, notes, attendance, or study plans...',
+                  hintText: 'Message...',
                   hintStyle: textTheme.bodyMedium?.copyWith(color: U.sub),
                   filled: true,
                   fillColor: Colors.transparent,
                   prefixIcon: Icon(Icons.bolt_rounded, color: U.teal, size: 20),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 16,
+                    vertical: 12,
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide(color: U.primary),
-                  ),
+                  border: InputBorder.none,
                 ),
                 onSubmitted: _sendMessage,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           Container(
-            width: 56,
-            height: 56,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: _initialized && !_isLoading
-                    ? const [Color(0xFF7F77DD), Color(0xFF9C90FF)]
-                    : [
-                        U.card.withValues(alpha: 0.8),
-                        U.card.withValues(alpha: 0.8),
-                      ],
-              ),
+              color: _initialized && !_isLoading
+                  ? U.primary
+                  : U.card,
               shape: BoxShape.circle,
-              boxShadow: _initialized && !_isLoading
-                  ? [
-                      BoxShadow(
-                        color: U.primary.withValues(alpha: 0.25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ]
-                  : null,
             ),
             child: IconButton(
               onPressed: _initialized && !_isLoading
@@ -804,9 +705,10 @@ class _IAAScreenState extends State<IAAScreen> {
                   : null,
               icon: Icon(
                 _isLoading
-                    ? Icons.hourglass_top_rounded
-                    : Icons.north_east_rounded,
+                    ? Icons.more_horiz_rounded
+                    : Icons.send_rounded,
                 color: Colors.white,
+                size: 20,
               ),
             ),
           ),
@@ -911,13 +813,13 @@ class _AnimatedMessageBubbleState extends State<_AnimatedMessageBubble>
       vsync: this,
     );
     _slideAnimation = Tween<double>(
-      begin: 20.0,
+      begin: 15.0,
       end: 0.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     Future.delayed(Duration(milliseconds: widget.index * 50), () {
       if (mounted) {
@@ -982,20 +884,7 @@ class _MessageBubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            gradient: message.isUser
-                ? LinearGradient(
-                    colors: [
-                      U.primary.withValues(alpha: 0.92),
-                      const Color(0xFF5F58C9),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : const LinearGradient(
-                    colors: [Color(0xFF191B28), Color(0xFF151723)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+            color: message.isUser ? U.primary : U.card,
             borderRadius: borderRadius,
             border: Border.all(
               color: message.isUser
@@ -1004,11 +893,9 @@ class _MessageBubble extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: message.isUser
-                    ? U.primary.withValues(alpha: 0.16)
-                    : Colors.black.withValues(alpha: 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
             ],
           ),

@@ -15,6 +15,7 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/platform_support.dart';
 import 'screens/app_shell.dart';
+import 'screens/university_selection_screen.dart';
 import 'widgets/app_update_prompt.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -395,6 +396,8 @@ final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
   _orchidTheme,
 );
 
+final ValueNotifier<bool> iaaEnabledNotifier = ValueNotifier<bool>(true);
+
 final ValueNotifier<int> appLoadingCounter = ValueNotifier<int>(0);
 
 void showAppLoading() {
@@ -518,10 +521,18 @@ Future<String?> _loadInitialAccent() async {
   return cached;
 }
 
+Future<void> _loadIAASetting() async {
+  final cached = await CacheService().getAppSetting('iaa_enabled');
+  if (cached != null) {
+    iaaEnabledNotifier.value = cached == 'true';
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _initialAccentKey = await _loadInitialAccent();
   U.applyTheme(_initialAccentKey);
+  await _loadIAASetting();
   appInitialization = _initializeApp();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -569,6 +580,8 @@ class U {
   static String get mermaidLine => appThemeNotifier.value.mermaidLine;
 
   static String get currentThemeKey => appThemeNotifier.value.key;
+
+  static bool get iaaEnabled => iaaEnabledNotifier.value;
 
   static AppTheme themeForKey(String? key) {
     for (final theme in appThemes) {
@@ -782,6 +795,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                       ),
                     );
                   }
+
+                  final selectedUniversityId = 
+                      userSnapshot.data?.data()?['selectedUniversityId'] as String?;
+
+                  if (userSnapshot.connectionState == ConnectionState.active && 
+                      selectedUniversityId == null) {
+                    return const UniversitySelectionScreen();
+                  }
+
                   return const AppShell();
                 },
               );

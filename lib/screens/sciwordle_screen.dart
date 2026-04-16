@@ -67,10 +67,12 @@ class _SciwordleScreenState extends State<SciwordleScreen>
         _service.fetchTodaysQuestion(),
         _service.fetchPlayerScore(),
         _service.hasPlayedToday(),
+        _service.fetchGuessProgress(),
       ]);
       final question = results[0] as SciwordleQuestion?;
       final playerScore = results[1] as SciwordlePlayerScore;
       final alreadyPlayed = results[2] as bool;
+      final savedProgress = results[3] as SciwordleProgressData?;
 
       setState(() {
         _question = question;
@@ -79,6 +81,35 @@ class _SciwordleScreenState extends State<SciwordleScreen>
         if (alreadyPlayed) _gameOver = true;
         _loading = false;
       });
+
+      // Restore in-progress guesses if the user backed out mid-game
+      if (!alreadyPlayed &&
+          question != null &&
+          savedProgress != null &&
+          savedProgress.answer == question.answer) {
+        final restoredGuesses = <SciwordleGuessResult>[];
+        for (final word in savedProgress.guesses) {
+          restoredGuesses.add(
+            _service.checkGuess(guess: word, answer: question.answer),
+          );
+        }
+        final lastCorrect = restoredGuesses.isNotEmpty &&
+            restoredGuesses.last.letters.every(
+              (l) => l.status == LetterStatus.correct,
+            );
+        final usedAll = restoredGuesses.length >= _maxAttempts;
+        setState(() {
+          _guesses.clear();
+          _guesses.addAll(restoredGuesses);
+          if (lastCorrect || usedAll) {
+            // The game had actually ended but progress wasn't cleared.
+            // Mark as game over and let saveGameResult handle the rest.
+            _gameOver = true;
+            _won = lastCorrect;
+            _alreadyPlayedToday = true;
+          }
+        });
+      }
     } catch (e) {
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
@@ -147,9 +178,20 @@ class _SciwordleScreenState extends State<SciwordleScreen>
           attemptNumber: isCorrect ? attemptNumber : null,
         );
         refreshedScore = await _service.fetchPlayerScore();
+        // Clear in-progress data since the game is finished
+        await _service.clearGuessProgress();
       } catch (_) {
         pointsEarned = 0;
       }
+    } else {
+      // Game still in progress — persist the guesses so they can't cheat
+      final guessWords = newGuesses
+          .map((g) => g.letters.map((l) => l.letter).join())
+          .toList();
+      await _service.saveGuessProgress(
+        guesses: guessWords,
+        answer: _question!.answer,
+      );
     }
 
     setState(() {

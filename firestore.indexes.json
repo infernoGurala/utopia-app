@@ -55,16 +55,6 @@
           "order": "DESCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "sciwordle_scores",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "totalScore",
-          "order": "DESCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []

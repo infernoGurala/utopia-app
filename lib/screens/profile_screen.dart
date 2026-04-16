@@ -14,6 +14,7 @@ import '../services/role_service.dart';
 import '../services/game_champion_service.dart';
 import 'developer_panel_screen.dart';
 import 'sciwordle_screen.dart';
+import 'university_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -212,6 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ChampionAvatarBadge(
                                 scoreRank: scoreRank,
                                 streakRank: streakRank,
+                                email: user?.email,
                                 child: CircleAvatar(
                                   radius: 28,
                                   backgroundColor: U.primary.withValues(
@@ -243,6 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       name: user?.displayName ?? 'Student',
                                       scoreRank: scoreRank,
                                       streakRank: streakRank,
+                                      email: user?.email,
                                       style: GoogleFonts.outfit(
                                         color: U.text,
                                         fontSize: 16,
@@ -344,22 +347,109 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                _tile(
-                  icon: Icons.palette_outlined,
-                  label: 'Color Style',
-                  sub: _updatingTheme
-                      ? 'Updating theme...'
-                      : '$styleLabel theme',
-                  color: U.primary,
-                  onTap: _selectThemeStyle,
+                // ── Settings Section ──
+                Text(
+                  'Settings',
+                  style: GoogleFonts.outfit(
+                    color: U.sub,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.4,
+                  ),
                 ),
                 const SizedBox(height: 10),
-                _tile(
-                  icon: Icons.logout_outlined,
-                  label: 'Sign out',
-                  sub: 'Sign out of your account',
-                  color: U.red,
-                  onTap: _signOut,
+                Container(
+                  decoration: BoxDecoration(
+                    color: U.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: U.border),
+                  ),
+                  child: Column(
+                    children: [
+                      // Color Style
+                      _groupedTile(
+                        icon: Icons.palette_outlined,
+                        label: 'Color Style',
+                        sub: _updatingTheme
+                            ? 'Updating theme...'
+                            : '$styleLabel theme',
+                        color: U.primary,
+                        onTap: _selectThemeStyle,
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // Change University
+                      _groupedTile(
+                        icon: Icons.school_outlined,
+                        label: 'Change University',
+                        sub: 'Switch to a different university',
+                        color: U.primary,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const UniversitySelectionScreen(),
+                          ),
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // IAA Assistant Toggle
+                      ValueListenableBuilder<bool>(
+                        valueListenable: iaaEnabledNotifier,
+                        builder: (context, iaaEnabled, _) {
+                          return _groupedToggleTile(
+                            icon: Icons.auto_awesome_rounded,
+                            label: 'IAA Assistant',
+                            sub: iaaEnabled
+                                ? 'Enabled · Shows in bottom navigation'
+                                : 'Disabled · Hidden from bottom navigation',
+                            color: iaaEnabled ? U.primary : U.dim,
+                            value: iaaEnabled,
+                            onChanged: (v) async {
+                              iaaEnabledNotifier.value = v;
+                              unawaited(
+                                CacheService().saveAppSetting(
+                                  'iaa_enabled',
+                                  v.toString(),
+                                ),
+                              );
+                              final uid =
+                                  FirebaseAuth.instance.currentUser?.uid;
+                              if (uid != null) {
+                                unawaited(
+                                  FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(uid)
+                                      .set({
+                                        'iaaEnabled': v,
+                                      }, SetOptions(merge: true)),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // Sign out
+                      _groupedTile(
+                        icon: Icons.logout_outlined,
+                        label: 'Sign out',
+                        sub: 'Sign out of your account',
+                        color: U.red,
+                        onTap: _signOut,
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Center(
@@ -426,6 +516,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(Icons.chevron_right, color: U.dim, size: 18),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _groupedTile({
+    required IconData icon,
+    required String label,
+    required String sub,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      color: U.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    sub,
+                    style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: U.dim, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _groupedToggleTile({
+    required IconData icon,
+    required String label,
+    required String sub,
+    required Color color,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    color: U.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  sub,
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: U.primary,
+            activeTrackColor: U.primary.withValues(alpha: 0.35),
+            inactiveThumbColor: U.dim,
+            inactiveTrackColor: U.border,
+          ),
+        ],
       ),
     );
   }

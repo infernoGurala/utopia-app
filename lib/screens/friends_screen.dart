@@ -25,13 +25,11 @@ class FriendsScreen extends StatefulWidget {
 class _FriendsScreenState extends State<FriendsScreen> {
   final ChatService _chatService = ChatService();
   final SciwordleService _sciService = SciwordleService();
-  final TextEditingController _searchController = TextEditingController();
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _usersStream;
   StreamSubscription<Map<String, Map<String, dynamic>>>?
   _recentChatsSubscription;
   Map<String, Map<String, dynamic>> _recentChats = const {};
   Map<String, int> _streaks = {};
-  String _query = '';
 
   @override
   void initState() {
@@ -56,7 +54,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
   @override
   void dispose() {
     _recentChatsSubscription?.cancel();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -86,6 +83,19 @@ class _FriendsScreenState extends State<FriendsScreen> {
                   ),
                   IconButton(
                     onPressed: () {
+                      // TODO: Implement search functionality or screen
+                    },
+                    icon: Icon(
+                      Icons.search_rounded,
+                      color: U.primary,
+                      size: 20,
+                    ),
+                    tooltip: 'Search',
+                    splashRadius: 20,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  IconButton(
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const MapScreen()),
@@ -102,34 +112,20 @@ class _FriendsScreenState extends State<FriendsScreen> {
             const SizedBox(height: 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Everyone using UTOPIA',
-                style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: U.card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: U.border),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (value) =>
-                      setState(() => _query = value.trim().toLowerCase()),
-                  style: GoogleFonts.outfit(color: U.text, fontSize: 13),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    prefixIcon: Icon(Icons.search_rounded, color: U.sub, size: 20),
-                    hintText: 'Search people',
-                    hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
-                  ),
-                ),
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _usersStream,
+                builder: (context, snapshot) {
+                  final total = snapshot.data?.docs
+                      .where((doc) => doc.id != currentUid)
+                      .length;
+                  final countText = total != null && total > 0
+                      ? '  •  $total people'
+                      : '';
+                  return Text(
+                    'Everyone using UTOPIA$countText',
+                    style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 12),
@@ -161,13 +157,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               usersSnapshot.data?.docs
                                   .map((doc) => {'uid': doc.id, ...doc.data()})
                                   .where((user) => user['uid'] != currentUid)
-                                  .where((user) {
-                                    if (_query.isEmpty) return true;
-                                    final name = (user['displayName'] ?? '')
-                                        .toString()
-                                        .toLowerCase();
-                                    return name.contains(_query);
-                                  })
                                   .toList() ??
                               <Map<String, dynamic>>[];
 
@@ -307,6 +296,7 @@ class _FriendRow extends StatelessWidget {
                 ChampionAvatarBadge(
                   scoreRank: scoreRank,
                   streakRank: streakRank,
+                  email: email,
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: U.primary.withValues(alpha: 0.16),
@@ -352,6 +342,7 @@ class _FriendRow extends StatelessWidget {
                     name: displayName,
                     scoreRank: scoreRank,
                     streakRank: streakRank,
+                    email: email,
                     style: GoogleFonts.outfit(
                       color: U.text,
                       fontSize: 15,

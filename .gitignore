@@ -3,6 +3,10 @@
 *.log
 *.pyc
 *.swp
+*.bak
+*.new
+*.tmp
+*.temp
 .DS_Store
 .atom/
 .build/
@@ -32,6 +36,16 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/macos/Flutter/Generated.xcconfig
+**/macos/Flutter/flutter_export_environment.sh
+**/lib/generated_plugin_registrant.dart
+**/GeneratedPluginRegistrant.*
+**/generated_plugin_registrant.*
+**/generated_plugins.*
 
 # Symbolication related
 app.*.symbols
@@ -45,7 +59,10 @@ app.*.map.json
 /android/app/release
 functions/node_modules/
 android/local.properties
+**/android/build/
 _transfer_backup/
 *.jks
 *.keystore
 key.properties
+**/*.g.dart
+**/*.freezed.dart

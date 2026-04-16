@@ -4,6 +4,7 @@ import '../main.dart';
 import 'attendance_screen.dart';
 import 'university_screen.dart';
 import 'home_screen.dart';
+import 'library_home_screen.dart';
 import 'iaa_screen.dart';
 import 'profile_screen.dart';
 
@@ -17,12 +18,29 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   int _index = 0;
   late final AnimationController _tabAnimationController;
 
-  final _screens = [
-    const HomeScreen(),
-    const AttendanceScreen(),
-    const UniversityScreen(),
-    const ProfileScreen(),
+  final List<Widget?> _screens = [
+    const LibraryHomeScreen(),
+    null,
+    null,
+    null,
   ];
+
+  Widget _getScreen(int index) {
+    if (_screens[index] == null) {
+      switch (index) {
+        case 1:
+          _screens[index] = const AttendanceScreen();
+          break;
+        case 2:
+          _screens[index] = const UniversityScreen();
+          break;
+        case 3:
+          _screens[index] = const ProfileScreen();
+          break;
+      }
+    }
+    return _screens[index]!;
+  }
 
   @override
   void initState() {
@@ -74,7 +92,15 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                 opacity: opacity,
                 child: Transform.scale(
                   scale: scale,
-                  child: IndexedStack(index: _index, children: _screens),
+                  child: IndexedStack(
+                    index: _index,
+                    children: [
+                      _index == 0 ? _getScreen(0) : (_screens[0] ?? const SizedBox.shrink()),
+                      _index == 1 ? _getScreen(1) : (_screens[1] ?? const SizedBox.shrink()),
+                      _index == 2 ? _getScreen(2) : (_screens[2] ?? const SizedBox.shrink()),
+                      _index == 3 ? _getScreen(3) : (_screens[3] ?? const SizedBox.shrink()),
+                    ],
+                  ),
                 ),
               );
             },
@@ -101,53 +127,59 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                   horizontal: 10,
                   vertical: 8,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _BottomNavItem(
-                        icon: Icons.auto_stories_outlined,
-                        selectedIcon: Icons.auto_stories,
-                        label: 'Library',
-                        selected: _index == 0,
-                        onTap: () => _setIndex(0),
-                      ),
-                    ),
-                    Expanded(
-                      child: _BottomNavItem(
-                        icon: Icons.fact_check_outlined,
-                        selectedIcon: Icons.fact_check,
-                        label: 'Attendance',
-                        selected: _index == 1,
-                        onTap: () => _setIndex(1),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 68,
-                      child: _FeaturedAIDestinationIcon(
-                        active: true,
-                        onTap: () =>
-                            Navigator.of(context).push(IAAScreen.route()),
-                      ),
-                    ),
-                    Expanded(
-                      child: _BottomNavItem(
-                        icon: Icons.school_outlined,
-                        selectedIcon: Icons.school,
-                        label: 'University',
-                        selected: _index == 2,
-                        onTap: () => _setIndex(2),
-                      ),
-                    ),
-                    Expanded(
-                      child: _BottomNavItem(
-                        icon: Icons.person_outline,
-                        selectedIcon: Icons.person,
-                        label: 'Profile',
-                        selected: _index == 3,
-                        onTap: () => _setIndex(3),
-                      ),
-                    ),
-                  ],
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: iaaEnabledNotifier,
+                  builder: (context, iaaEnabled, _) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: _BottomNavItem(
+                            icon: Icons.auto_stories_outlined,
+                            selectedIcon: Icons.auto_stories,
+                            label: 'Library',
+                            selected: _index == 0,
+                            onTap: () => _setIndex(0),
+                          ),
+                        ),
+                        Expanded(
+                          child: _BottomNavItem(
+                            icon: Icons.fact_check_outlined,
+                            selectedIcon: Icons.fact_check,
+                            label: 'Attendance',
+                            selected: _index == 1,
+                            onTap: () => _setIndex(1),
+                          ),
+                        ),
+                        if (iaaEnabled)
+                          SizedBox(
+                            width: 68,
+                            child: _FeaturedAIDestinationIcon(
+                              active: true,
+                              onTap: () =>
+                                  Navigator.of(context).push(IAAScreen.route()),
+                            ),
+                          ),
+                        Expanded(
+                          child: _BottomNavItem(
+                            icon: Icons.school_outlined,
+                            selectedIcon: Icons.school,
+                            label: 'University',
+                            selected: _index == 2,
+                            onTap: () => _setIndex(2),
+                          ),
+                        ),
+                        Expanded(
+                          child: _BottomNavItem(
+                            icon: Icons.person_outline,
+                            selectedIcon: Icons.person,
+                            label: 'Profile',
+                            selected: _index == 3,
+                            onTap: () => _setIndex(3),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),

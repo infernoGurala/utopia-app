@@ -662,7 +662,11 @@ class _SubjectRow extends StatelessWidget {
                             width: 18,
                             height: 18,
                             child: Center(
-                              child: Icon(Icons.more_vert, color: U.dim, size: 14),
+                              child: Icon(
+                                Icons.more_vert,
+                                color: U.dim,
+                                size: 14,
+                              ),
                             ),
                           ),
                           splashRadius: 18,
@@ -707,7 +711,11 @@ class _SubjectRow extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.delete_outline, color: U.red, size: 14),
+                                  Icon(
+                                    Icons.delete_outline,
+                                    color: U.red,
+                                    size: 14,
+                                  ),
                                   const SizedBox(width: 6),
                                   Text(
                                     'Delete',

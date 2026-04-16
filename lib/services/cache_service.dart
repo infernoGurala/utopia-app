@@ -19,7 +19,7 @@ class CacheService {
     final path = join(dbPath, 'utopia_cache.db');
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE folders (
@@ -96,6 +96,15 @@ class CacheService {
           await db.execute(
             'ALTER TABLE folders ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0',
           );
+        }
+        if (oldVersion < 6) {
+          await db.execute('''
+            CREATE TABLE github_cache (
+              path TEXT PRIMARY KEY,
+              data TEXT NOT NULL,
+              updated_at INTEGER NOT NULL
+            )
+          ''');
         }
       },
     );
