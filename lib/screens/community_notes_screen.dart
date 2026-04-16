@@ -7,6 +7,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'note_viewer_screen.dart';
 
+/// Number of approvals required before a community deletion is executed.
+const int kDeletionApprovalsRequired = 3;
+
 class CommunityNotesScreen extends StatefulWidget {
   final String universityFolderName;
   const CommunityNotesScreen({super.key, required this.universityFolderName});
@@ -46,20 +49,25 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         .snapshots()
         .listen(
           (snapshot) {
-            final pendingDocs = snapshot.docs
-                .where((d) => d['isDeleted'] == false)
-                .toList();
+            // Show docs that are active: pending/executing/failed (new-style)
+            // or legacy docs where isDeleted == false.
+            final activeDocs = snapshot.docs.where((d) {
+              final data = d.data() as Map<String, dynamic>;
+              final status = data['status'] as String?;
+              if (status != null) {
+                return status == 'pending' ||
+                    status == 'executing' ||
+                    status == 'failed';
+              }
+              // Legacy doc without status field: use isDeleted flag
+              return data['isDeleted'] == false;
+            }).toList();
             debugPrint(
-              'LISTEN: Got ${snapshot.docs.length} total, ${pendingDocs.length} pending deletions for ${widget.universityFolderName}',
+              'LISTEN: Got ${snapshot.docs.length} total, ${activeDocs.length} active deletions for ${widget.universityFolderName}',
             );
-            for (var doc in pendingDocs) {
-              debugPrint(
-                'LISTEN: Deletion doc - path=${doc['path']}, name=${doc['name']}, approvals=${doc['approvals']}, isDeleted=${doc['isDeleted']}',
-              );
-            }
             if (mounted) {
               setState(() {
-                _pendingDeletions = pendingDocs;
+                _pendingDeletions = activeDocs;
                 _sortItems();
               });
             }
@@ -592,13 +600,29 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               ? List<String>.from(
                                   deletionDoc['approvals'] ?? [],
                                 )
-                              : [];
+                              : <String>[];
                           final user = FirebaseAuth.instance.currentUser;
                           final hasApproved =
                               user != null && approvals.contains(user.uid);
+                          final isRequester =
+                              isPendingDeletion &&
+                              user != null &&
+                              (deletionDoc!.data()
+                                      as Map<String, dynamic>)['requesterUid'] ==
+                                  user.uid;
+                          final effectiveStatus = isPendingDeletion
+                              ? _effectiveStatus(deletionDoc!)
+                              : 'none';
+                          final isExecuting = effectiveStatus == 'executing';
+                          final isFailed = effectiveStatus == 'failed';
+
+                          String pendingSubtitle() {
+                            if (isExecuting) return 'Deletion in progress...';
+                            if (isFailed) return 'Deletion failed — tap for details';
+                            return 'Pending Deletion (${approvals.length}/$kDeletionApprovalsRequired approvals)';
+                          }
 
                           return ListTile(
-                            enabled: !isPendingDeletion,
                             leading: Icon(
                               isFolder
                                   ? Icons.folder_rounded
@@ -619,7 +643,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                     !name.toLowerCase().endsWith('.md')
                                 ? Text(
                                     isPendingDeletion
-                                        ? 'Pending Deletion (${approvals.length}/3 approvals)'
+                                        ? pendingSubtitle()
                                         : _formatFileSize(item['size'] as int),
                                     style: GoogleFonts.outfit(
                                       color: U.sub,
@@ -628,7 +652,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                   )
                                 : (isPendingDeletion
                                       ? Text(
-                                          'Pending Deletion (${approvals.length}/3 approvals)',
+                                          pendingSubtitle(),
                                           style: GoogleFonts.outfit(
                                             color: U.sub,
                                             fontSize: 12,
@@ -636,24 +660,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                         )
                                       : null),
                             trailing: isPendingDeletion
-                                ? (hasApproved
-                                      ? Icon(
-                                          Icons.check_circle,
-                                          color: U.green,
-                                          size: 20,
-                                        )
-                                      : TextButton(
-                                          onPressed: () =>
-                                              _approveDeletion(deletionDoc!),
-                                          child: Text(
-                                            'Approve',
-                                            style: GoogleFonts.outfit(
-                                              color: U.red,
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ))
+                                ? _buildPendingTrailing(
+                                    deletionDoc!,
+                                    hasApproved,
+                                    isRequester,
+                                    isExecuting,
+                                    isFailed,
+                                  )
                                 : (_isEditMode
                                       ? IconButton(
                                           icon: Icon(
@@ -666,7 +679,31 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                         )
                                       : null),
                             onTap: () async {
-                              if (isPendingDeletion) return;
+                              if (isPendingDeletion) {
+                                if (isFailed) {
+                                  _showFailedInfo(deletionDoc!);
+                                  return;
+                                }
+                                // Allow read-only viewing of pending files
+                                if (!isFolder) {
+                                  final downloadUrl =
+                                      item['download_url'] as String?;
+                                  if (downloadUrl != null &&
+                                      downloadUrl.isNotEmpty) {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => NoteViewerScreen(
+                                          title: name.replaceAll('.md', ''),
+                                          filePath: path,
+                                          isEditable: false,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                                return;
+                              }
                               if (isFolder) {
                                 _navigateToFolder(name);
                               } else {
@@ -719,6 +756,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         'requesterUid': user.uid,
         'approvals': <String>[],
         'isDeleted': false,
+        'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -727,7 +765,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Deletion requested. Needs 3 approvals.'),
+            content: Text('Deletion requested. Needs $kDeletionApprovalsRequired approvals.'),
             backgroundColor: U.primary,
           ),
         );
@@ -863,37 +901,89 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final approvals = List<String>.from(deletionDoc['approvals'] ?? []);
-    if (!approvals.contains(user.uid)) {
-      approvals.add(user.uid);
+    bool shouldExecuteDelete = false;
+    String? targetPath;
+    int newApprovalCount = 0;
 
-      if (approvals.length >= 3) {
-        // Trigger actual deletion!
-        await deletionDoc.reference.update({
-          'approvals': approvals,
-          'isDeleted': true,
-        });
-        await _github.deleteItem(deletionDoc['path']);
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final freshSnap = await txn.get(deletionDoc.reference);
+        if (!freshSnap.exists) return;
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('File deleted successfully.'),
-              backgroundColor: U.green,
-            ),
-          );
-          _load();
+        final data = freshSnap.data() as Map<String, dynamic>;
+        final effectiveStatus = data['status'] as String? ?? 'pending';
+
+        // Only allow approving if still in pending state
+        if (effectiveStatus != 'pending') return;
+
+        final approvals = List<String>.from(data['approvals'] ?? []);
+        if (approvals.contains(user.uid)) return;
+
+        approvals.add(user.uid);
+        newApprovalCount = approvals.length;
+
+        if (approvals.length >= kDeletionApprovalsRequired) {
+          // This client wins the race — transition to executing
+          txn.update(deletionDoc.reference, {
+            'approvals': approvals,
+            'status': 'executing',
+          });
+          shouldExecuteDelete = true;
+          targetPath = data['path'] as String?;
+        } else {
+          txn.update(deletionDoc.reference, {'approvals': approvals});
         }
-      } else {
-        await deletionDoc.reference.update({'approvals': approvals});
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Deletion approved (${approvals.length}/3).'),
-              backgroundColor: U.primary,
-            ),
-          );
+      });
+
+      if (shouldExecuteDelete && targetPath != null) {
+        try {
+          await _github.deleteItem(targetPath);
+          await deletionDoc.reference.update({
+            'isDeleted': true,
+            'status': 'executed',
+            'executedAt': FieldValue.serverTimestamp(),
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('File deleted successfully.'),
+                backgroundColor: U.green,
+              ),
+            );
+            _load();
+          }
+        } catch (e) {
+          await deletionDoc.reference.update({
+            'status': 'failed',
+            'failureReason': e.toString(),
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Deletion failed. Please try again.'),
+                backgroundColor: U.red,
+              ),
+            );
+          }
         }
+      } else if (newApprovalCount > 0 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Deletion approved ($newApprovalCount/$kDeletionApprovalsRequired).',
+            ),
+            backgroundColor: U.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: U.red,
+          ),
+        );
       }
     }
   }
@@ -935,6 +1025,202 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             },
           ),
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  /// Returns the effective deletion status for a doc.
+  /// Handles legacy docs that lack the [status] field by falling back to [isDeleted].
+  String _effectiveStatus(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final status = data['status'] as String?;
+    if (status != null) return status;
+    return (data['isDeleted'] == true) ? 'executed' : 'pending';
+  }
+
+  /// Builds the trailing action widget for a pending-deletion list item.
+  Widget _buildPendingTrailing(
+    QueryDocumentSnapshot deletionDoc,
+    bool hasApproved,
+    bool isRequester,
+    bool isExecuting,
+    bool isFailed,
+  ) {
+    if (isExecuting) {
+      return SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(color: U.sub, strokeWidth: 2),
+      );
+    }
+    if (isFailed) {
+      return Icon(Icons.error_outline, color: U.red, size: 22);
+    }
+
+    // Status is pending — show approve/undo and optional cancel for requester
+    if (isRequester) {
+      return PopupMenuButton<String>(
+        icon: Icon(Icons.more_vert, color: U.sub, size: 20),
+        color: U.surface,
+        onSelected: (value) {
+          if (value == 'approve') _approveDeletion(deletionDoc);
+          if (value == 'undo') _undoApproval(deletionDoc);
+          if (value == 'cancel') _cancelDeletion(deletionDoc);
+        },
+        itemBuilder: (ctx) => [
+          if (!hasApproved)
+            PopupMenuItem(
+              value: 'approve',
+              child: Text(
+                'Approve',
+                style: GoogleFonts.outfit(color: U.text),
+              ),
+            ),
+          if (hasApproved)
+            PopupMenuItem(
+              value: 'undo',
+              child: Text(
+                'Undo approval',
+                style: GoogleFonts.outfit(color: U.text),
+              ),
+            ),
+          PopupMenuItem(
+            value: 'cancel',
+            child: Text(
+              'Cancel request',
+              style: GoogleFonts.outfit(color: U.red),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return hasApproved
+        ? TextButton(
+            onPressed: () => _undoApproval(deletionDoc),
+            child: Text(
+              'Undo',
+              style: GoogleFonts.outfit(
+                color: U.sub,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          )
+        : TextButton(
+            onPressed: () => _approveDeletion(deletionDoc),
+            child: Text(
+              'Approve',
+              style: GoogleFonts.outfit(
+                color: U.red,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          );
+  }
+
+  void _undoApproval(QueryDocumentSnapshot deletionDoc) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final freshSnap = await txn.get(deletionDoc.reference);
+        if (!freshSnap.exists) return;
+
+        final data = freshSnap.data() as Map<String, dynamic>;
+        final effectiveStatus = data['status'] as String? ?? 'pending';
+
+        // Can only undo while still pending
+        if (effectiveStatus != 'pending') return;
+
+        final approvals = List<String>.from(data['approvals'] ?? []);
+        if (!approvals.contains(user.uid)) return;
+
+        approvals.remove(user.uid);
+        txn.update(deletionDoc.reference, {'approvals': approvals});
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Approval withdrawn.'),
+            backgroundColor: U.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: U.red),
+        );
+      }
+    }
+  }
+
+  void _cancelDeletion(QueryDocumentSnapshot deletionDoc) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final data = deletionDoc.data() as Map<String, dynamic>;
+    if (data['requesterUid'] != user.uid) return;
+
+    try {
+      await FirebaseFirestore.instance.runTransaction((txn) async {
+        final freshSnap = await txn.get(deletionDoc.reference);
+        if (!freshSnap.exists) return;
+
+        final freshData = freshSnap.data() as Map<String, dynamic>;
+        final effectiveStatus = freshData['status'] as String? ?? 'pending';
+
+        // Can only cancel while still pending
+        if (effectiveStatus != 'pending') return;
+
+        txn.update(deletionDoc.reference, {
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Deletion request cancelled.'),
+            backgroundColor: U.primary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: U.red),
+        );
+      }
+    }
+  }
+
+  void _showFailedInfo(QueryDocumentSnapshot deletionDoc) {
+    final data = deletionDoc.data() as Map<String, dynamic>;
+    final reason = data['failureReason'] as String? ?? 'Unknown error';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.surface,
+        title: Text(
+          'Deletion Failed',
+          style: GoogleFonts.outfit(
+            color: U.text,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(reason, style: GoogleFonts.outfit(color: U.sub)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('OK', style: GoogleFonts.outfit(color: U.primary)),
+          ),
         ],
       ),
     );

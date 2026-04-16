@@ -35,7 +35,7 @@
 - [x] donot show the file size for markdown
 - [x] change the university community notes of just the programs which is university notes->folders displayed to be in a similar way of the boxes in library by more cooler and easy to find the program, at most there will be 15 program folders here.
 - [x] the edit mode tooggle should work for all cases, currently iy works for folders, but if i went inside a file even without edit mode turned on, it just gives me free write access, it must be changed.
-- [ ] Delete option, must work with 2 people permission for now. in community notes. and the delete requested file must appear at the top. with a grey change bar to progress of 2 people, and people can undo the delete option and progress can reach to 0 then file is alive again. and people can still view the file. 
+- [x] Delete option: 3 approvals required (`kDeletionApprovalsRequired = 3`). Delete-requested file appears at top, greyed out. People can still view the file (read-only). Progress shown (n/3). Undo approval and cancel request supported. Concurrency-safe via Firestore transaction lock (status: pending→executing→executed/failed/cancelled).
 - [x] as already mentioned, the changes must be displaed instantly in the app, there should be no loading screen shown when modifiying the files/folders. all the loading should be background work not foreground.
 - [ ] sort folders--> alphabetical order.
 - [x] when the user changes his university the app must restart and his library must change accordingly, now, only the university notes are working per university. classes joined/created must also change according to the university.
