@@ -937,7 +937,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
       if (shouldExecuteDelete && targetPath != null) {
         try {
-          await _github.deleteItem(targetPath);
+          final path = targetPath?.trim();
+          if (path == null || path.isEmpty) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Unable to delete item: missing target path.')),
+            );
+            return;
+          }
+          await _github.deleteItem(path);
           await deletionDoc.reference.update({
             'isDeleted': true,
             'status': 'executed',

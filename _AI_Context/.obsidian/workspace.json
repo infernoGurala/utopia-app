@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "3.0 MAIN.md",
+                "file": "Stage Manager.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "3.0 MAIN"
+              "title": "Stage Manager"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "3.0 MAIN.md",
+                "file": "Stage Manager.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for 3.0 MAIN"
+              "title": "Backlinks for Stage Manager"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "3.0 MAIN.md",
+                "file": "Stage Manager.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from 3.0 MAIN"
+              "title": "Outgoing links from Stage Manager"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "3.0 MAIN.md",
+                "file": "Stage Manager.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of 3.0 MAIN"
+              "title": "Outline of Stage Manager"
             }
           }
         ]
@@ -184,5 +184,8 @@
     }
   },
   "active": "c0db544de3e637f1",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "handover.md",
+    "3.0 MAIN.md"
+  ]
 }
