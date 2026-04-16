@@ -1,0 +1,1 @@
+a super user is a person who is simply the ADMIN/MODERATOR.

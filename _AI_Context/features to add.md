@@ -1,0 +1,26 @@
+- add the feature... Learn markdown in the edit tab..
+- add the feature add editor/ writers in profile section.
+- broadcast message restricted to groups only.
+- super users have more University features..
+- currently anyone can add the events.. and links and images also.. all...with all kinds of features like dates, links, title, description etc...
+- add a Global Question fourm, and let people ask questions and big Bros/sis answer them..
+- Add a global notes.. feature.. like anyone can edit them and anyone can view them. Global contribution. 
+- contribution rewards, like names.. say.. 200 contributions= Oracle, 10= scholar, 40=Guide, 100 = Expert, 150= Sage.
+- contribution points, 5 Points per Answering in community, 5 points for every addition of adding the solution, big or small .
+- add a thankyou for the contribution indicator.
+- check what happens if name is too big and title is fluctuating in chats.
+- add like sections.. in notes editor, seperate blocks for downloadable and clickable links.
+- every class has their own morning notification system.
+- make the Sciworldle answer more general, don't use highly complicated words. 
+- color sync change if not fixed.
+- developer options not fetching sometimes. 
+- contact feature to me..
+- add a sign that, everything in this app runs freely. And doesn't require any amount of money, that's the best part. And due to this, some features have limitations. Please ignore, and adjust 🥲
+- Delete your account feature.
+- add a setting feature. And add configuration and everything inside it. 
+- make chats encrypted and add terms/conditions/ policy etc.. and add end-to-end encrypted chats features.
+- add a Suggestion/Collab /report abug/feature/collab feature in contact tab. Or message me for fun.
+- mission: I really don't care about this mission ideology, what I need is an app to check my attandance and be organised, and I made it possible (maybe) ☠️
+- this app works by the community
+- add University docs files list... Block linked via website.
+- deleted class, leave class.. etc.. features 
