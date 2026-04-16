@@ -8,7 +8,6 @@ import 'package:markdown/markdown.dart' as md;
 import '../main.dart';
 import '../services/github_service.dart';
 import '../services/writer_github_service.dart';
-import '../services/github_global_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class EditorScreen extends StatefulWidget {
@@ -147,42 +146,44 @@ class _EditorScreenState extends State<EditorScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final updatedContent = _controller.text;
-    final originalContent = widget.initialContent;
+    setState(() => _saving = true);
 
-    // Pop immediately and return the new content for instant display
-    Navigator.pop(context, updatedContent);
-
-    // Continue save in background
-    _performBackgroundSave(updatedContent, originalContent, user);
-  }
-
-  Future<void> _performBackgroundSave(String content, String originalContent, User user) async {
     try {
-      final isCommunityNote = widget.filePath.contains('/Community/');
-      
-      if (isCommunityNote) {
-        final success = await GitHubGlobalService().updateFile(
-          path: widget.filePath,
-          content: content,
-          message: 'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
-        );
-        if (!success) throw Exception('Sync failed');
-      } else {
-        await WriterGitHubService.updateTextFile(
-          filename: widget.filePath,
-          content: content,
-          commitMessage: 'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+      await WriterGitHubService.updateTextFile(
+        filename: widget.filePath,
+        content: _controller.text,
+        commitMessage:
+            'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+      );
+      await GitHubService.primeFileContentCache(
+        widget.filePath,
+        _controller.text,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _saving = false;
+        _hasChanges = false;
+      });
+      showUtopiaSnackBar(
+        context,
+        message: 'Saved and pushed to GitHub',
+        tone: UtopiaSnackBarTone.success,
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        showUtopiaSnackBar(
+          context,
+          message: e.toString().replaceFirst('Exception: ', ''),
+          tone: UtopiaSnackBarTone.error,
         );
       }
-      
-      await GitHubService.primeFileContentCache(widget.filePath, content);
-    } catch (e) {
-      // Background failure - maybe notify via global snackbar service if available
-      // For now, we've updated the cache so it will stay "optimistic" locally
     }
   }
-  
+
   void _insertText(String text) {
     final selection = _controller.selection;
     final currentText = _controller.text;

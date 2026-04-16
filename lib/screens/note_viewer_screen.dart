@@ -16,7 +16,6 @@ import '../services/cache_service.dart';
 import '../services/chat_service.dart';
 import '../services/file_cache_service.dart';
 import '../services/github_service.dart';
-import '../services/github_global_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
 import 'editor_screen.dart';
@@ -28,7 +27,6 @@ class NoteViewerScreen extends StatefulWidget {
   final String? highlightQuery;
   final List<String>? wikiCandidates;
   final String? initialSegmentId;
-  final bool isEditable;
   const NoteViewerScreen({
     super.key,
     required this.title,
@@ -37,7 +35,6 @@ class NoteViewerScreen extends StatefulWidget {
     this.highlightQuery,
     this.wikiCandidates,
     this.initialSegmentId,
-    this.isEditable = false,
   });
   @override
   State<NoteViewerScreen> createState() => _NoteViewerScreenState();
@@ -61,13 +58,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     super.initState();
     _load();
     RoleService().isWriter().then((v) {
-      if (mounted) {
-        setState(() {
-          // If it's a community note, we consider the user a writer if isEditable is passed as true
-          // but we still check global writer role for overall permission.
-          _isWriter = v;
-        });
-      }
+      if (mounted) setState(() => _isWriter = v);
     });
   }
 
@@ -87,15 +78,8 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       }
     }
 
-    final isCommunityNote = widget.filePath.contains('/Community/');
-    final globalGitHub = GitHubGlobalService();
-
     for (final candidate in allCandidates) {
-      if (isCommunityNote) {
-        raw = await globalGitHub.getFileContentRaw(candidate);
-      } else {
-        raw = await _github.getFileContent(candidate);
-      }
+      raw = await _github.getFileContent(candidate);
       if (raw.isNotEmpty) break;
     }
 
@@ -864,7 +848,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (widget.isEditable && (widget.filePath.contains('/Community/') || _isWriter))
+                  if (_isWriter)
                     IconButton(
                       icon: Icon(
                         Icons.edit_outlined,
@@ -882,13 +866,8 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                             ),
                           ),
                         );
-                        if (result is String) {
-                          setState(() {
-                            _rawContent = result;
-                            _segments = _parseSegments(result);
-                            _loading = false;
-                          });
-                        } else if (result == true) {
+                        if (result == true) {
+                          setState(() => _loading = true);
                           _load();
                         }
                       },

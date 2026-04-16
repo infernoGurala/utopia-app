@@ -8,8 +8,7 @@
     <application
         android:label="Utopia"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:icon="@mipmap/ic_launcher">
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyAzbfbhLiWzynYWCvIyr3cx6UcwCWcCzcY"/>

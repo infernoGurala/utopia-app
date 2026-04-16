@@ -14,7 +14,6 @@ import '../services/role_service.dart';
 import '../services/game_champion_service.dart';
 import 'developer_panel_screen.dart';
 import 'sciwordle_screen.dart';
-import 'university_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -375,24 +374,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             : '$styleLabel theme',
                         color: U.primary,
                         onTap: _selectThemeStyle,
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
-                      // Change University
-                      _groupedTile(
-                        icon: Icons.school_outlined,
-                        label: 'Change University',
-                        sub: 'Switch to a different university',
-                        color: U.primary,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const UniversitySelectionScreen(),
-                          ),
-                        ),
                       ),
                       Divider(
                         height: 1,

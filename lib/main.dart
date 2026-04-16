@@ -15,7 +15,6 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/platform_support.dart';
 import 'screens/app_shell.dart';
-import 'screens/university_selection_screen.dart';
 import 'widgets/app_update_prompt.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -795,15 +794,6 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                       ),
                     );
                   }
-
-                  final selectedUniversityId = 
-                      userSnapshot.data?.data()?['selectedUniversityId'] as String?;
-
-                  if (userSnapshot.connectionState == ConnectionState.active && 
-                      selectedUniversityId == null) {
-                    return const UniversitySelectionScreen();
-                  }
-
                   return const AppShell();
                 },
               );

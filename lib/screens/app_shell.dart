@@ -4,7 +4,6 @@ import '../main.dart';
 import 'attendance_screen.dart';
 import 'university_screen.dart';
 import 'home_screen.dart';
-import 'library_home_screen.dart';
 import 'iaa_screen.dart';
 import 'profile_screen.dart';
 
@@ -18,29 +17,12 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   int _index = 0;
   late final AnimationController _tabAnimationController;
 
-  final List<Widget?> _screens = [
-    const LibraryHomeScreen(),
-    null,
-    null,
-    null,
+  final _screens = [
+    const HomeScreen(),
+    const AttendanceScreen(),
+    const UniversityScreen(),
+    const ProfileScreen(),
   ];
-
-  Widget _getScreen(int index) {
-    if (_screens[index] == null) {
-      switch (index) {
-        case 1:
-          _screens[index] = const AttendanceScreen();
-          break;
-        case 2:
-          _screens[index] = const UniversityScreen();
-          break;
-        case 3:
-          _screens[index] = const ProfileScreen();
-          break;
-      }
-    }
-    return _screens[index]!;
-  }
 
   @override
   void initState() {
@@ -92,15 +74,7 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                 opacity: opacity,
                 child: Transform.scale(
                   scale: scale,
-                  child: IndexedStack(
-                    index: _index,
-                    children: [
-                      _index == 0 ? _getScreen(0) : (_screens[0] ?? const SizedBox.shrink()),
-                      _index == 1 ? _getScreen(1) : (_screens[1] ?? const SizedBox.shrink()),
-                      _index == 2 ? _getScreen(2) : (_screens[2] ?? const SizedBox.shrink()),
-                      _index == 3 ? _getScreen(3) : (_screens[3] ?? const SizedBox.shrink()),
-                    ],
-                  ),
+                  child: IndexedStack(index: _index, children: _screens),
                 ),
               );
             },
