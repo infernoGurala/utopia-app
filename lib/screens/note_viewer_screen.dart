@@ -63,8 +63,10 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     RoleService().isWriter().then((v) {
       if (mounted) {
         setState(() {
-          // If it's a community note, we consider the user a writer if isEditable is passed as true
-          // but we still check global writer role for overall permission.
+          // For community notes, editing is gated solely by isEditable (the Edit Mode
+          // toggle in CommunityNotesScreen). For non-community notes, editing requires
+          // the global writer role (_isWriter). isEditable has no effect for non-community
+          // notes because it defaults to false and is never set true outside community context.
           _isWriter = v;
         });
       }
@@ -864,7 +866,11 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (widget.isEditable && (widget.filePath.contains('/Community/') || _isWriter))
+                  // Community notes: only show edit when Edit Mode is active (isEditable).
+                  // Non-community notes: only show edit if the user has the writer role.
+                  if (widget.filePath.contains('/Community/')
+                      ? widget.isEditable
+                      : _isWriter)
                     IconButton(
                       icon: Icon(
                         Icons.edit_outlined,
