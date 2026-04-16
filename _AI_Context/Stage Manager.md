@@ -18,7 +18,7 @@
 - [x] Recursive folder traversal natively inside the app
 - [x] Full document rendering functionality via `NoteViewerScreen`
 
-### **Stage 4 — Community Notes**
+### **Stage 4 — Community Notes** (ACTIVE)
 - [x] Implemented the massive `CommunityNotesScreen` tree view 
 - [x] Auto-generation block constructing the entire `Semester -> Course -> Unit` tree structure
 - [x] Built a real-time `rename` / `add files + folders` REST controller logic into the UI menus.
@@ -41,12 +41,20 @@
 - [x] when the user changes his university the app must restart and his library must change accordingly, now, only the university notes are working per university. classes joined/created must also change according to the university.
 - [ ] add a loading name in university loading, as please wait while loading the list.
 - [ ] university root folder inside option the remove the view programm text that is showing up on the folder..
-- [ ] Remove the name "View Program" inside the University Notes folder view, and rename the "university notes" to "community notes".
-- [ ] Add a delete option in university root folder also. 
-
+- [x] Remove the name "View Program" inside the University Notes folder view, and rename the "university notes" to "community notes".
+- [ ] Add a delete option in university root folder also. CURRENTLY NOT ADDED, BECAUSE THIS SCREEN USES DIFFERNT UI THAN REST. ADD SUITABLE WAY TO DELETE THE WORKFLOW. AND THIS DELETION CONSISTS ALSO 23 APPROVALS.
+- [ ] edit mode, the add new files/folder icon appears inside the community notes. which it should not appear.
+- [ ] auto add one approval, for the file/folder deletion on the account of the user who first deleted the item.
+- [ ] when the file is in active state of deletion give two options, approval/unapprove by icons coloured red and green. 
+- [ ] in active delete mode, in case of folder in active deletion pending mode. it is not opening. the folder should be opened.
+- [ ] KEYBOARD TEXT EDITOR IS BROKEN FROM THE INITIAL V1.0 THE "|" IN THE TYPING IS NOT WOKRING, INSTEAD OF SLIDING THROUGH LETTERS IT SELECTS THE TEXTS. BUG FIX NEEDED.
+- [ ] ADD A CLEAR PATH ON TOP OF THE SCREEN TO INDICATE WHERE THE USER IS. AND THE PATHS MUST BE CLICKABLE AND CLEAR AND NOT VERY DISTRACTING. -- ADD FOR UNIVERSITY FOLDER AFTER MAIN ROOT FOLDER ONLY. LEAVE THE MAIN, ADD FOR REMAINIG. UNIVERSITY(MAIN)(LEAVE)-->CSE(LEAVE)-->SEM-1,SEM2,SEM3(ADD FROM HERE). THIS WILL BE THE FOLDER STRUCTURE ADD THIS WAY.
+- [ ] ADD ALPHABETICAL SORTING IN ROOT UNIVERISTY FOLDER ALSO. AND ENSURE IT IS SAME EVERYWHERE.
+- [ ] “University Notes” is renamed to “Community Notes”
+- [ ] 
 ---
 
-## 🚀 Active / Next Up
+## Next Up
 
 ### **Stage 5 — Class Settings (Complete)**
 - [ ] Add Settings Cog to `ClassDetailScreen`
