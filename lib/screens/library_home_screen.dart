@@ -186,7 +186,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         childAspectRatio: 1.0,
                         children: [
                           _buildCard(
-                            title: 'University Notes',
+                            title: 'Community Notes',
                             icon: Icons.groups_rounded,
                             backgroundColor: U.card,
                             iconColor: U.teal,
