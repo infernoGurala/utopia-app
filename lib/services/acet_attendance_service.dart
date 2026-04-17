@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter/foundation.dart';
 
 class AcetAttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
@@ -20,7 +21,7 @@ class AcetAttendanceService {
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/123.0.0.0 Mobile Safari/537.36';
-  static const bool _isReleaseBuild = bool.fromEnvironment('dart.vm.product');
+  static const bool _isReleaseBuild = kReleaseMode;
   static final RegExp _loginUserFieldPattern = RegExp(
     r'(id|name)\s*=\s*["\'](txtid2|txtuserid)["\']',
   );
