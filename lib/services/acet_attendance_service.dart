@@ -82,8 +82,6 @@ class AcetAttendanceService {
         'userType': 'rbtStudent',
         'txtId2': rollNumber.trim(),
         'txtPwd2': encryptedPassword,
-        'txtUserId': rollNumber.trim(),
-        'txtPassword': encryptedPassword,
         'hdnpwd': encryptedPassword,
         'btnLogin': 'LOGIN',
       };
@@ -191,7 +189,7 @@ class AcetAttendanceService {
         frmAuth: cookies['frmAuth'],
       );
       if (webMethodToken == null || webMethodToken.trim().isEmpty) {
-        throw Exception('Could not fetch attendance right now');
+        throw Exception('Missing authentication token for attendance request');
       }
 
       await _sendRequest(
@@ -260,7 +258,8 @@ class AcetAttendanceService {
       if (e is Exception &&
           (e.toString().contains('Invalid credentials') ||
               e.toString().contains('Attendance data was not found') ||
-              e.toString().contains('Could not fetch attendance'))) {
+              e.toString().contains('Could not fetch attendance') ||
+              e.toString().contains('Missing authentication token'))) {
         rethrow;
       }
       throw Exception('Unable to load attendance right now');
