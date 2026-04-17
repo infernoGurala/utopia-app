@@ -623,11 +623,18 @@ class AcetAttendanceService {
 
   static bool _looksLikeLoginPage(String body) {
     final lower = body.toLowerCase();
-    return lower.contains('txtid2') ||
-        lower.contains('txtpwd2') ||
-        lower.contains('txtuserid') ||
-        lower.contains('txtpassword') ||
-        lower.contains('__eventvalidation');
+    final hasUserField =
+        RegExp(r'(id|name)\s*=\s*["' "'" r'](txtid2|txtuserid)["' "'" r']')
+            .hasMatch(lower);
+    final hasPasswordField =
+        RegExp(r'(id|name)\s*=\s*["' "'" r'](txtpwd2|txtpassword)["' "'" r']')
+            .hasMatch(lower);
+    final hasLoginButton = lower.contains('btnlogin') || lower.contains('>login<');
+    final hasLoginFormAction = lower.contains('default.aspx') && lower.contains('<form');
+
+    return hasUserField &&
+        hasPasswordField &&
+        (hasLoginButton || hasLoginFormAction);
   }
 
   static void _debugLoginState({
