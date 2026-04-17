@@ -10,7 +10,7 @@ class AcetAttendanceService {
   static const String _loginPath = '$_prefix/default.aspx';
   static const String _studentMasterPath = '$_prefix/StudentMaster.aspx';
   static const String _attendancePagePath =
-      '$_prefix/Academics/studentattendance.aspx?scrid=3&showtype=SA';
+      '$_prefix/Academics/StudentAttendance.aspx?scrid=3&showtype=SA';
   static const String _attendancePath =
       '$_prefix/Academics/studentattendance.aspx/ShowAttendance';
   static const String _ajaxJsPath = '$_prefix/JSFiles/AjaxMethods.js';
@@ -39,7 +39,7 @@ class AcetAttendanceService {
       method: 'GET',
       path: _loginPath,
       cookies: cookies,
-      followRedirects: true,
+      followRedirects: false,
     );
     _debugResponse('GET login page', response.statusCode, response.body);
 
@@ -74,6 +74,8 @@ class AcetAttendanceService {
         '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
         '__EVENTVALIDATION': tokens['__EVENTVALIDATION'] ?? '',
         'userType': 'rbtStudent',
+        'txtId2': rollNumber.trim(),
+        'txtPwd2': encryptedPassword,
         'txtUserId': rollNumber.trim(),
         'txtPassword': encryptedPassword,
         'hdnpwd': encryptedPassword,
@@ -85,20 +87,40 @@ class AcetAttendanceService {
         method: 'POST',
         path: _loginPath,
         cookies: cookies,
-        followRedirects: false,
+        followRedirects: true,
         contentType: 'application/x-www-form-urlencoded',
         body: Uri(queryParameters: formBody).query,
         extraHeaders: {
           'origin': 'https://$_portalHost',
           HttpHeaders.refererHeader: 'https://$_portalHost$_loginPath',
+          HttpHeaders.acceptHeader:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
       );
       _debugResponse('POST login', response.statusCode, response.body);
 
       final sessionId = cookies['ASP.NET_SessionId'];
-      final loginFailed =
-          response.body.contains('txtId2') || response.body.contains('txtPwd2');
-      if (sessionId == null || sessionId.isEmpty || loginFailed) {
+      final frmAuth = cookies['frmAuth'];
+      final bodyLooksLikeLoginPage = _looksLikeLoginPage(response.body);
+      if (sessionId == null ||
+          sessionId.isEmpty ||
+          frmAuth == null ||
+          frmAuth.isEmpty ||
+          bodyLooksLikeLoginPage) {
+        throw Exception('Invalid credentials');
+      }
+
+      final studentMaster = await _sendRequest(
+        client,
+        method: 'GET',
+        path: _studentMasterPath,
+        cookies: cookies,
+        followRedirects: true,
+        extraHeaders: {
+          HttpHeaders.refererHeader: 'https://$_portalHost$_loginPath',
+        },
+      );
+      if (_looksLikeLoginPage(studentMaster.body)) {
         throw Exception('Invalid credentials');
       }
     } on FormatException {
@@ -141,6 +163,9 @@ class AcetAttendanceService {
       final webMethodToken = _extractWebMethodToken(
         attendancePageResponse.body,
       );
+      if (webMethodToken == null || webMethodToken.trim().isEmpty) {
+        throw Exception('Could not fetch attendance right now');
+      }
 
       await _sendRequest(
         client,
@@ -169,10 +194,10 @@ class AcetAttendanceService {
           HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
           'x-requested-with': 'XMLHttpRequest',
           HttpHeaders.acceptHeader:
-              'application/json, text/javascript, */*; q=0.01',
+              'application/json, text/javascript, */*',
           'cache-control': 'no-cache',
           'pragma': 'no-cache',
-          if (webMethodToken != null) 'x-auth-token': webMethodToken,
+          'x-auth-token': webMethodToken,
         },
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
@@ -551,11 +576,30 @@ class AcetAttendanceService {
   }
 
   static String? _extractWebMethodToken(String html) {
-    final match = RegExp(
-      r"var\s+_tkn\s*=\s*'([^']+)'",
-      caseSensitive: true,
-    ).firstMatch(html);
-    return match?.group(1);
+    final patterns = [
+      RegExp(r"var\s+_tkn\s*=\s*'([^']+)'"),
+      RegExp(r'var\s+_tkn\s*=\s*"([^"]+)"'),
+      RegExp(r"['_\"]_tkn['_\"]\s*:\s*'([^']+)'"),
+      RegExp(r'["_\']_tkn["_\']\s*:\s*"([^"]+)"'),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(html);
+      final token = match?.group(1)?.trim();
+      if (token != null && token.isNotEmpty) {
+        return token;
+      }
+    }
+    return null;
+  }
+
+  static bool _looksLikeLoginPage(String body) {
+    final lower = body.toLowerCase();
+    return lower.contains('txtid2') ||
+        lower.contains('txtpwd2') ||
+        lower.contains('txtuserid') ||
+        lower.contains('txtpassword') ||
+        lower.contains('__eventvalidation');
   }
 
   static bool _looksLikeSubjectCell(String value) {
