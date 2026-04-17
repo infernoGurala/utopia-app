@@ -28,7 +28,6 @@ class SecureStorageService {
       'rollNumber': rollNumber,
       'password': password,
       'college': resolvedCollege,
-      'campus': resolvedCollege,
     };
   }
 

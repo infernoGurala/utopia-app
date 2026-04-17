@@ -107,7 +107,7 @@ class AttendanceService {
       final location = response.location ?? '';
       final sessionId = cookies['ASP.NET_SessionId'];
       final frmAuth = cookies['frmAuth'];
-      final isAnyRedirectStatus =
+      final hasRedirectStatusCode =
           response.statusCode >= 300 && response.statusCode < 400;
       final hasSession = sessionId != null && sessionId.isNotEmpty;
       final hasFrmAuth = frmAuth != null && frmAuth.isNotEmpty;
@@ -122,11 +122,14 @@ class AttendanceService {
           lowerBody.contains('txtid2') ||
           loginFormAction.hasMatch(lowerBody);
 
+      final isAcetLoginValid =
+          hasSession &&
+          (response.statusCode == HttpStatus.ok || hasRedirectStatusCode) &&
+          !returnedLoginForm;
+      final isAusLoginValid = redirectedToStudentMaster && hasFrmAuth && hasSession;
       final loginSucceeded = normalizedCollege == Campus.acet.name
-          ? hasSession &&
-                (response.statusCode == HttpStatus.ok || isAnyRedirectStatus) &&
-                !returnedLoginForm
-          : redirectedToStudentMaster && hasFrmAuth && hasSession;
+          ? isAcetLoginValid
+          : isAusLoginValid;
 
       if (!loginSucceeded) {
         throw Exception('Invalid credentials');

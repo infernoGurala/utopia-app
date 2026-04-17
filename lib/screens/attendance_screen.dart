@@ -63,7 +63,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final restoredCollege = credentials['college'] ?? 'aus';
       _savedCredentials = {
         ...credentials,
-        'college': restoredCollege,
         'campus': restoredCollege,
       };
       _rollController.text = credentials['rollNumber'] ?? '';
@@ -125,7 +124,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _savedCredentials = {
         'rollNumber': trimmedRoll,
         'password': password,
-        'college': _selectedCollege,
         'campus': _selectedCollege,
       };
       if (!mounted) {
