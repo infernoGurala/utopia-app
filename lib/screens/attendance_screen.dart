@@ -10,6 +10,8 @@ import '../widgets/utopia_snackbar.dart';
 
 enum _AttendanceViewState { initial, loading, loaded, error }
 
+typedef _AttendanceRangeMode = AttendanceRangeMode;
+
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
 
@@ -89,6 +91,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     required String college,
     required bool saveCredentials,
     required bool keepFormOnFailure,
+    _AttendanceRangeMode mode = _AttendanceRangeMode.tillNow,
   }) async {
     final trimmedRoll = rollNumber.trim();
     if (trimmedRoll.isEmpty || password.isEmpty) {
@@ -106,10 +109,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     try {
+      final serviceMode = college == 'acet'
+          ? (mode == _AttendanceRangeMode.tillNow
+                ? AttendanceRangeMode.tillNow
+                : AttendanceRangeMode.period)
+          : AttendanceRangeMode.period;
+
       final result = await AttendanceService.fetchAttendance(
         trimmedRoll,
         password,
         college: college,
+        mode: serviceMode,
       );
       if (saveCredentials) {
         await SecureStorageService.saveCredentials(
@@ -164,6 +174,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       college: credentials['college'] ?? 'aus',
       saveCredentials: false,
       keepFormOnFailure: false,
+      mode: _AttendanceRangeMode.period,
     );
   }
 
@@ -297,12 +308,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   Future<void> _showTodaySheet() async {
+    debugPrint('[DEBUG][Attendance] _showTodaySheet called');
     final credentials = _savedCredentials;
+    debugPrint(
+      '[DEBUG][Attendance] credentials: ${credentials != null ? "found" : "null"}',
+    );
     if (credentials == null) {
       return;
     }
     final now = DateTime.now();
     final todayLabel = _formatPortalDate(now);
+    final portalDate = _formatPortalDateForPortal(now);
+    debugPrint(
+      '[DEBUG][Attendance] Today: label=$todayLabel, portalDate=$portalDate',
+    );
 
     await showModalBottomSheet<void>(
       context: context,
@@ -314,19 +333,29 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: now,
         credentials: credentials,
         onRefresh: _refresh,
-        portalDateLabel: _formatPortalDateForPortal(now),
+        portalDateLabel: portalDate,
+        mode: _AttendanceRangeMode.period,
       ),
     );
+    debugPrint('[DEBUG][Attendance] _showTodaySheet completed');
   }
 
   Future<void> _showYesterdaySheet() async {
+    debugPrint('[DEBUG][Attendance] _showYesterdaySheet called');
     final credentials = _savedCredentials;
+    debugPrint(
+      '[DEBUG][Attendance] credentials: ${credentials != null ? "found" : "null"}',
+    );
     if (credentials == null) {
       return;
     }
     final now = DateTime.now();
     final yesterday = now.subtract(const Duration(days: 1));
     final yesterdayLabel = _formatPortalDate(yesterday);
+    final portalDate = _formatPortalDateForPortal(yesterday);
+    debugPrint(
+      '[DEBUG][Attendance] Yesterday: label=$yesterdayLabel, portalDate=$portalDate',
+    );
 
     await showModalBottomSheet<void>(
       context: context,
@@ -338,13 +367,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: yesterday,
         credentials: credentials,
         onRefresh: _refresh,
-        portalDateLabel: _formatPortalDateForPortal(yesterday),
+        portalDateLabel: portalDate,
+        mode: _AttendanceRangeMode.period,
       ),
     );
+    debugPrint('[DEBUG][Attendance] _showYesterdaySheet completed');
   }
 
   Future<void> _showDatePickerSheet() async {
+    debugPrint('[DEBUG][Attendance] _showDatePickerSheet called');
     final credentials = _savedCredentials;
+    debugPrint(
+      '[DEBUG][Attendance] credentials: ${credentials != null ? "found" : "null"}',
+    );
     if (credentials == null) {
       return;
     }
@@ -368,12 +403,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         );
       },
     );
+    debugPrint('[DEBUG][Attendance] selectedDate: $selectedDate');
 
     if (selectedDate == null || !mounted) {
+      debugPrint(
+        '[DEBUG][Attendance] Date picker cancelled or widget unmounted',
+      );
       return;
     }
 
     final dateLabel = _formatPortalDate(selectedDate);
+    final portalDate = _formatPortalDateForPortal(selectedDate);
+    debugPrint(
+      '[DEBUG][Attendance] Calendar: label=$dateLabel, portalDate=$portalDate',
+    );
+
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -384,9 +428,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: selectedDate,
         credentials: credentials,
         onRefresh: _refresh,
-        portalDateLabel: _formatPortalDateForPortal(selectedDate),
+        portalDateLabel: portalDate,
+        mode: _AttendanceRangeMode.period,
       ),
     );
+    debugPrint('[DEBUG][Attendance] _showDatePickerSheet completed');
   }
 
   String _formatPortalDateForPortal(DateTime dt) {
@@ -594,7 +640,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   const SizedBox(height: 16),
                   _buildField(
                     controller: _rollController,
-                    hintText: 'e.g. 25B11ME001',
+                    hintText: _selectedCollege == 'aus'
+                        ? 'e.g. 25B11ME038'
+                        : 'e.g. 24P31A42F2',
                     labelText: 'Roll Number',
                     textInputAction: TextInputAction.next,
                   ),
@@ -728,10 +776,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         title: '${overall.toStringAsFixed(1)}%',
                         subtitle: _heroStatusText(belowTarget),
                         detail: studentName.isEmpty ? null : studentName,
-                        trailing: _InfoPill(
-                          icon: Icons.cloud_done_rounded,
-                          label: 'Till now',
-                        ),
                         accent: overallColor,
                         subtitleColor: belowTarget > 0 ? U.red : null,
                       ),
@@ -1050,7 +1094,6 @@ class _GradientHero extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     required this.subtitle,
-    this.trailing,
     this.accent,
     this.subtitleColor,
     this.detail,
@@ -1060,7 +1103,6 @@ class _GradientHero extends StatelessWidget {
   final String eyebrow;
   final String title;
   final String subtitle;
-  final Widget? trailing;
   final Color? accent;
   final Color? subtitleColor;
   final String? detail;
@@ -1094,7 +1136,6 @@ class _GradientHero extends StatelessWidget {
                 child: Icon(icon, color: accentColor, size: 24),
               ),
               const Spacer(),
-              ...?(trailing != null ? [trailing!] : null),
             ],
           ),
           const SizedBox(height: 18),
@@ -1149,41 +1190,6 @@ class _GradientHero extends StatelessWidget {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedTone = U.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: U.surface.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: resolvedTone.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: resolvedTone, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.outfit(
-              color: resolvedTone == U.primary ? U.text : resolvedTone,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ],
       ),
     );
@@ -1391,6 +1397,7 @@ class _AttendanceDateSheet extends StatefulWidget {
     required this.credentials,
     required this.onRefresh,
     this.portalDateLabel,
+    this.mode = _AttendanceRangeMode.period,
   });
 
   final String title;
@@ -1399,6 +1406,7 @@ class _AttendanceDateSheet extends StatefulWidget {
   final Map<String, String> credentials;
   final VoidCallback onRefresh;
   final String? portalDateLabel;
+  final _AttendanceRangeMode mode;
 
   @override
   State<_AttendanceDateSheet> createState() => _AttendanceDateSheetState();
@@ -1416,18 +1424,47 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[DEBUG][Sheet] initState called for: ${widget.title}');
     _loadData();
   }
 
   void _loadData() {
     final portalDate = widget.portalDateLabel ?? _formatPortalDate(widget.date);
-    _future = AttendanceService.fetchAttendance(
-      widget.credentials['rollNumber'] ?? '',
-      widget.credentials['password'] ?? '',
-      college: widget.credentials['college'] ?? 'aus',
-      fromDate: portalDate,
-      toDate: portalDate,
+    debugPrint(
+      '[DEBUG][Sheet] _loadData: title=${widget.title}, portalDate=$portalDate, mode=${widget.mode}',
     );
+
+    final serviceMode = widget.credentials['college'] == 'acet'
+        ? (widget.mode == _AttendanceRangeMode.tillNow
+              ? AttendanceRangeMode.tillNow
+              : AttendanceRangeMode.period)
+        : AttendanceRangeMode.period;
+
+    debugPrint(
+      '[DEBUG][Sheet] serviceMode=$serviceMode, college=${widget.credentials['college']}',
+    );
+
+    if (serviceMode == AttendanceRangeMode.tillNow) {
+      debugPrint('[DEBUG][Sheet] Calling fetchAttendance (tillNow mode)');
+      _future = AttendanceService.fetchAttendance(
+        widget.credentials['rollNumber'] ?? '',
+        widget.credentials['password'] ?? '',
+        college: widget.credentials['college'] ?? 'aus',
+        mode: serviceMode,
+      );
+    } else {
+      debugPrint(
+        '[DEBUG][Sheet] Calling fetchAttendance (period mode): fromDate=$portalDate, toDate=$portalDate',
+      );
+      _future = AttendanceService.fetchAttendance(
+        widget.credentials['rollNumber'] ?? '',
+        widget.credentials['password'] ?? '',
+        college: widget.credentials['college'] ?? 'aus',
+        fromDate: portalDate,
+        toDate: portalDate,
+        mode: serviceMode,
+      );
+    }
   }
 
   Color _percentageColor(double value) {
@@ -1508,7 +1545,12 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                 return FutureBuilder<Map<String, dynamic>>(
                   future: _future,
                   builder: (context, snapshot) {
+                    debugPrint(
+                      '[DEBUG][Sheet] FutureBuilder state: ${snapshot.connectionState}, hasError: ${snapshot.hasError}, hasData: ${snapshot.hasData}',
+                    );
+
                     if (snapshot.connectionState == ConnectionState.waiting) {
+                      debugPrint('[DEBUG][Sheet] Loading... showing spinner');
                       return const Padding(
                         padding: EdgeInsets.symmetric(vertical: 28),
                         child: Center(child: CircularProgressIndicator()),
@@ -1516,6 +1558,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                     }
 
                     if (snapshot.hasError) {
+                      debugPrint('[DEBUG][Sheet] Error: ${snapshot.error}');
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -1556,6 +1599,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                       );
                     }
 
+                    debugPrint('[DEBUG][Sheet] Data loaded successfully');
                     final dateData = snapshot.data ?? const <String, dynamic>{};
                     final totalClasses =
                         (dateData['totalClasses'] as num?)?.toInt() ?? 0;

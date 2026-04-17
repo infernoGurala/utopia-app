@@ -5,6 +5,8 @@ import 'dart:math';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/foundation.dart';
 
+import 'attendance_service.dart';
+
 class AcetAttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
   static const String _aesSecret = '8701661282118308';
@@ -1089,6 +1091,7 @@ class AcetAttendanceService {
     String password, {
     String fromDate = '',
     String toDate = '',
+    AttendanceRangeMode mode = AttendanceRangeMode.period,
   }) async {
     final traceId = _generateTraceId();
     final client = HttpClient()..connectionTimeout = _timeout;
@@ -1215,40 +1218,49 @@ class AcetAttendanceService {
         elapsedMs: ajaxSw.elapsedMilliseconds,
       );
 
-      DateTime fromDt;
-      DateTime toDt;
+      String formattedFromDate;
+      String formattedToDate;
 
-      if (fromDate.isEmpty || toDate.isEmpty) {
-        fromDt = todayLocal();
-        toDt = todayLocal();
+      if (mode == AttendanceRangeMode.tillNow) {
+        formattedFromDate = '';
+        formattedToDate = '';
+
+        if (!_isReleaseBuild) {
+          // ignore: avoid_print
+          print('[$traceId][MODE] mode=tillNow from= to= (empty for till now)');
+        }
       } else {
-        fromDt = parsePortalDate(fromDate);
-        toDt = parsePortalDate(toDate);
-      }
+        DateTime fromDt;
+        DateTime toDt;
 
-      if (fromDt.isAfter(toDt)) {
-        final temp = fromDt;
-        fromDt = toDt;
-        toDt = temp;
-      }
+        if (fromDate.isEmpty || toDate.isEmpty) {
+          fromDt = todayLocal();
+          toDt = todayLocal();
+        } else {
+          fromDt = parsePortalDate(fromDate);
+          toDt = parsePortalDate(toDate);
+        }
 
-      final today = todayLocal();
-      if (toDt.isAfter(today)) {
-        toDt = today;
-      }
+        if (fromDt.isAfter(toDt)) {
+          final temp = fromDt;
+          fromDt = toDt;
+          toDt = temp;
+        }
 
-      final formattedFromDate = formatPortalDate(fromDt);
-      final formattedToDate = formatPortalDate(toDt);
+        final today = todayLocal();
+        if (toDt.isAfter(today)) {
+          toDt = today;
+        }
 
-      if (!_isReleaseBuild) {
-        // ignore: avoid_print
-        print(
-          '[$traceId][DATES] '
-          'from=$formattedFromDate '
-          'to=$formattedToDate '
-          'fromInput=$fromDate '
-          'toInput=$toDate',
-        );
+        formattedFromDate = formatPortalDate(fromDt);
+        formattedToDate = formatPortalDate(toDt);
+
+        if (!_isReleaseBuild) {
+          // ignore: avoid_print
+          print(
+            '[$traceId][MODE] mode=period from=$formattedFromDate to=$formattedToDate',
+          );
+        }
       }
 
       final attendanceBody = jsonEncode({
