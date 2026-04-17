@@ -119,21 +119,20 @@ class AttendanceService {
           isAusRedirectStatus &&
           location.toLowerCase().contains('studentmaster.aspx');
       final lowerBody = response.body.toLowerCase();
-      final loginFormAction = RegExp(
+      final loginFormActionPattern = RegExp(
         r"action\s*=\s*['\"]default\.aspx",
       );
       final returnedLoginForm =
           lowerBody.contains('txtid2') ||
-          loginFormAction.hasMatch(lowerBody);
+          loginFormActionPattern.hasMatch(lowerBody);
 
+      final isAcetCollege = normalizedCollege == Campus.acet.name;
       final isAcetLoginValid =
           hasSession &&
           (response.statusCode == HttpStatus.ok || hasRedirectStatusCode) &&
           !returnedLoginForm;
       final isAusLoginValid = redirectedToStudentMaster && hasFrmAuth && hasSession;
-      final loginSucceeded = normalizedCollege == Campus.acet.name
-          ? isAcetLoginValid
-          : isAusLoginValid;
+      final loginSucceeded = isAcetCollege ? isAcetLoginValid : isAusLoginValid;
 
       if (!loginSucceeded) {
         throw Exception('Invalid credentials');
