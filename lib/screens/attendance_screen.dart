@@ -22,7 +22,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _rollController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  Campus _selectedCampus = Campus.aus;
+  String _selectedCollege = 'aus';
 
   late final AnimationController _glowController;
   _AttendanceViewState _state = _AttendanceViewState.loading;
@@ -60,16 +60,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return;
       }
 
-      _savedCredentials = credentials;
+      final restoredCollege = credentials['college'] ?? 'aus';
+      _savedCredentials = {
+        ...credentials,
+        'college': restoredCollege,
+        'campus': restoredCollege,
+      };
       _rollController.text = credentials['rollNumber'] ?? '';
       _passwordController.text = credentials['password'] ?? '';
       setState(() {
-        _selectedCampus = Campus.fromName(credentials['campus']);
+        _selectedCollege = restoredCollege;
       });
       await _fetchAttendance(
         rollNumber: _rollController.text,
         password: _passwordController.text,
-        campus: _selectedCampus,
         saveCredentials: false,
         keepFormOnFailure: false,
       );
@@ -87,7 +91,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Future<void> _fetchAttendance({
     required String rollNumber,
     required String password,
-    required Campus campus,
     required bool saveCredentials,
     required bool keepFormOnFailure,
   }) async {
@@ -110,19 +113,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final result = await AttendanceService.fetchAttendance(
         trimmedRoll,
         password,
-        campus: campus,
+        college: _selectedCollege,
       );
       if (saveCredentials) {
         await SecureStorageService.saveCredentials(
           trimmedRoll,
           password,
-          campus,
+          _selectedCollege,
         );
       }
       _savedCredentials = {
         'rollNumber': trimmedRoll,
         'password': password,
-        'campus': campus.name,
+        'college': _selectedCollege,
+        'campus': _selectedCollege,
       };
       if (!mounted) {
         return;
@@ -162,7 +166,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     await _fetchAttendance(
       rollNumber: credentials['rollNumber'] ?? '',
       password: credentials['password'] ?? '',
-      campus: Campus.fromName(credentials['campus']),
       saveCredentials: false,
       keepFormOnFailure: false,
     );
@@ -215,7 +218,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _errorMessage = null;
       _rollController.clear();
       _passwordController.clear();
-      _selectedCampus = Campus.aus;
+      _selectedCollege = 'aus';
       _state = _AttendanceViewState.initial;
     });
   }
@@ -481,23 +484,23 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Center(
             child: Container(
-              width: 72,
-              height: 72,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: U.primary,
+                color: U.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.fact_check_rounded,
-                color: U.bg,
-                size: 36,
+                color: U.primary,
+                size: 28,
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             'Connect Attendance',
             textAlign: TextAlign.center,
@@ -509,15 +512,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Connect once and track your attendance inside Utopia.',
+            'Your data stays on this device only',
             textAlign: TextAlign.center,
             style: GoogleFonts.outfit(
               color: U.sub,
               fontSize: 13,
-              height: 1.4,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Card(
             color: U.card,
             elevation: 0,
@@ -530,66 +532,56 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Custom campus segmented toggle
-                  Container(
-                    height: 46,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: U.border),
-                      color: U.surface,
-                    ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
                     child: Row(
                       children: [
                         Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedCampus = Campus.aus),
+                          child: InkWell(
+                            onTap: () => setState(() => _selectedCollege = 'aus'),
                             child: AnimatedContainer(
                               duration: _toggleAnimDuration,
+                              height: 44,
                               decoration: BoxDecoration(
-                                color: _selectedCampus == Campus.aus
+                                color: _selectedCollege == 'aus'
                                     ? U.primary
-                                    : Colors.transparent,
+                                    : U.surface,
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                Campus.aus.label,
+                                'AUS',
                                 style: GoogleFonts.outfit(
-                                  color: _selectedCampus == Campus.aus
-                                      ? U.bg
-                                      : U.sub,
-                                  fontWeight: FontWeight.w600,
+                                  color: _selectedCollege == 'aus' ? U.bg : U.sub,
+                                  fontWeight: _selectedCollege == 'aus'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                   fontSize: 14,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        VerticalDivider(
-                          width: 1,
-                          thickness: 1,
-                          color: U.border,
-                        ),
                         Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedCampus = Campus.acet),
+                          child: InkWell(
+                            onTap: () => setState(() => _selectedCollege = 'acet'),
                             child: AnimatedContainer(
                               duration: _toggleAnimDuration,
+                              height: 44,
                               decoration: BoxDecoration(
-                                color: _selectedCampus == Campus.acet
+                                color: _selectedCollege == 'acet'
                                     ? U.primary
-                                    : Colors.transparent,
+                                    : U.surface,
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                Campus.acet.label,
+                                'ACET',
                                 style: GoogleFonts.outfit(
-                                  color: _selectedCampus == Campus.acet
+                                  color: _selectedCollege == 'acet'
                                       ? U.bg
                                       : U.sub,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: _selectedCollege == 'acet'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                   fontSize: 14,
                                 ),
                               ),
@@ -606,7 +598,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     labelText: 'Roll Number',
                     textInputAction: TextInputAction.next,
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _buildField(
                     controller: _passwordController,
                     hintText: 'Your portal password',
@@ -626,19 +618,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     onSubmitted: (_) => _fetchAttendance(
                       rollNumber: _rollController.text,
                       password: _passwordController.text,
-                      campus: _selectedCampus,
                       saveCredentials: true,
                       keepFormOnFailure: true,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: () => _fetchAttendance(
                         rollNumber: _rollController.text,
                         password: _passwordController.text,
-                        campus: _selectedCampus,
                         saveCredentials: true,
                         keepFormOnFailure: true,
                       ),
@@ -650,12 +640,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           borderRadius: BorderRadius.circular(18),
                         ),
                       ),
-                      child: Text(
-                        'Connect',
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sync_lock_rounded, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Connect',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

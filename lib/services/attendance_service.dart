@@ -16,18 +16,6 @@ class AttendanceService {
   static String _loginPath(Campus campus) =>
       '${campus.basePath}/default.aspx';
 
-  static String _studentMasterPath(Campus campus) =>
-      '${campus.basePath}/StudentMaster.aspx';
-
-  static String _attendancePath(Campus campus) =>
-      '${campus.basePath}/Academics/studentattendance.aspx/ShowAttendance';
-
-  static String _attendancePagePath(Campus campus) =>
-      '${campus.basePath}/Academics/studentattendance.aspx?scrid=3&showtype=SA';
-
-  static String _ajaxMethodsPath(Campus campus) =>
-      '${campus.basePath}/JSFiles/AjaxMethods.js';
-
   static const Duration _timeout = Duration(seconds: 20);
   static const String _userAgent =
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
@@ -46,8 +34,9 @@ class AttendanceService {
   static Future<Map<String, String>> _getLoginTokens(
     HttpClient client,
     Map<String, String> cookies,
-    Campus campus,
+    String college,
   ) async {
+    final campus = Campus.fromName(college);
     final response = await _sendRequest(
       client,
       method: 'GET',
@@ -79,10 +68,12 @@ class AttendanceService {
     String rollNumber,
     String password,
     Map<String, String> cookies,
-    Campus campus,
+    String college,
   ) async {
     try {
-      final tokens = await _getLoginTokens(client, cookies, campus);
+      final campus = Campus.fromName(college);
+      final normalizedCollege = campus.name;
+      final tokens = await _getLoginTokens(client, cookies, normalizedCollege);
       final encryptedPassword = await _encryptPassword(password);
       final loginPath = _loginPath(campus);
       final formBody = <String, String>{
@@ -116,21 +107,32 @@ class AttendanceService {
       final location = response.location ?? '';
       final sessionId = cookies['ASP.NET_SessionId'];
       final frmAuth = cookies['frmAuth'];
+      final isAnyRedirectStatus =
+          response.statusCode >= 300 && response.statusCode < 400;
+      final hasSession = sessionId != null && sessionId.isNotEmpty;
+      final hasFrmAuth = frmAuth != null && frmAuth.isNotEmpty;
       final redirectedToStudentMaster =
-          (response.statusCode == HttpStatus.movedTemporarily ||
-              response.statusCode == HttpStatus.found ||
-              response.statusCode == HttpStatus.movedPermanently) &&
+          response.statusCode == HttpStatus.found &&
           location.toLowerCase().contains('studentmaster.aspx');
+      final lowerBody = response.body.toLowerCase();
+      final loginFormAction = RegExp(
+        r"action\s*=\s*['\"]default\.aspx",
+      );
+      final returnedLoginForm =
+          lowerBody.contains('txtid2') ||
+          loginFormAction.hasMatch(lowerBody);
 
-      if (!redirectedToStudentMaster ||
-          sessionId == null ||
-          frmAuth == null ||
-          sessionId.isEmpty ||
-          frmAuth.isEmpty) {
+      final loginSucceeded = normalizedCollege == Campus.acet.name
+          ? hasSession &&
+                (response.statusCode == HttpStatus.ok || isAnyRedirectStatus) &&
+                !returnedLoginForm
+          : redirectedToStudentMaster && hasFrmAuth && hasSession;
+
+      if (!loginSucceeded) {
         throw Exception('Invalid credentials');
       }
 
-      return {'sessionId': sessionId, 'frmAuth': frmAuth};
+      return Map<String, String>.from(cookies);
     } on FormatException {
       rethrow;
     } catch (e) {
@@ -144,24 +146,29 @@ class AttendanceService {
   static Future<Map<String, dynamic>> fetchAttendance(
     String rollNumber,
     String password, {
-    Campus campus = Campus.aus,
+    String college = 'aus',
+    Campus? campus,
     String fromDate = '',
     String toDate = '',
   }) async {
     final client = HttpClient()..connectionTimeout = _timeout;
     final cookies = <String, String>{};
     try {
-      await _login(client, rollNumber, password, cookies, campus);
+      final resolvedCampus = campus ?? Campus.fromName(college);
+      final prefix = resolvedCampus == Campus.acet ? '/acet' : '/aus';
+
+      await _login(client, rollNumber, password, cookies, resolvedCampus.name);
 
       await _sendRequest(
         client,
         method: 'GET',
-        path: _studentMasterPath(campus),
+        path: '$prefix/StudentMaster.aspx',
         cookies: cookies,
         followRedirects: true,
       );
 
-      final attendancePagePath = _attendancePagePath(campus);
+      final attendancePagePath =
+          '$prefix/Academics/studentattendance.aspx?scrid=3&showtype=SA';
       final attendancePageResponse = await _sendRequest(
         client,
         method: 'GET',
@@ -177,7 +184,7 @@ class AttendanceService {
       await _sendRequest(
         client,
         method: 'GET',
-        path: _ajaxMethodsPath(campus),
+        path: '$prefix/JSFiles/AjaxMethods.js',
         cookies: cookies,
         followRedirects: true,
       );
@@ -191,7 +198,7 @@ class AttendanceService {
       final response = await _sendRequest(
         client,
         method: 'POST',
-        path: _attendancePath(campus),
+        path: '$prefix/Academics/studentattendance.aspx/ShowAttendance',
         cookies: cookies,
         followRedirects: false,
         contentType: 'application/json; charset=UTF-8',
