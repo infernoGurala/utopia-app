@@ -434,44 +434,130 @@ class AttendanceService {
     // ignore: avoid_print
     print('Parsing attendance: found ${rowMatches.length} table rows');
 
+    // Header-based column indices (determined from the <th> header row).
+    int? subjectIdx;
+    int? heldIdx;
+    int? attendIdx;
+    int? percentIdx;
+
     for (final row in rowMatches.toList()) {
       final rowHtml = row.group(1) ?? '';
+
+      // Detect header row: contains at least one <th> element.
+      final isHeaderRow =
+          RegExp(r'<th\b', caseSensitive: false).hasMatch(rowHtml);
+
       final cellMatches = RegExp(
         r'<t[dh][^>]*>(.*?)</t[dh]>',
         caseSensitive: false,
         dotAll: true,
       ).allMatches(rowHtml);
 
-      final rawCells = cellMatches
-          .map((cell) => cell.group(1) ?? '')
-          .where((cell) => cell.trim().isNotEmpty)
-          .toList();
+      // Keep all cells (including empty) to preserve positional indices.
+      final cleanedCells =
+          cellMatches.map((c) => _cleanHtmlText(c.group(1) ?? '')).toList();
 
-      if (rawCells.length < 4) {
+      // --- Header row: determine column indices ---
+      if (isHeaderRow) {
+        for (int i = 0; i < cleanedCells.length; i++) {
+          final lower = cleanedCells[i].toLowerCase().trim();
+          if (lower.contains('subject') ||
+              lower.contains('course') ||
+              lower.contains('paper')) {
+            subjectIdx = i;
+          } else if (lower.contains('held')) {
+            heldIdx = i;
+          } else if (lower.contains('attend') && !lower.contains('attendance')) {
+            attendIdx = i;
+          } else if (lower == '%' || lower.contains('percent')) {
+            percentIdx = i;
+          }
+        }
+        // ignore: avoid_print
+        print(
+          'Header indices: subject=$subjectIdx, held=$heldIdx, '
+          'attend=$attendIdx, percent=$percentIdx',
+        );
         continue;
       }
 
-      final cleanedCells = rawCells
-          .map((cell) => _cleanHtmlText(cell))
-          .where((cell) => cell.isNotEmpty)
-          .toList();
+      // --- Data row: skip rows with fewer than 3 non-empty cells ---
+      if (cleanedCells.where((c) => c.isNotEmpty).length < 3) continue;
 
-      if (cleanedCells.length < 4) {
-        continue;
-      }
-
-      final numericCells = <int>[];
       String? subjectName;
+      int? totalClasses;
+      int? attendedClasses;
+      double? percentage;
 
-      for (int i = 0; i < cleanedCells.length; i++) {
-        final cell = cleanedCells[i];
-        final asInt = int.tryParse(cell);
-        if (asInt != null) {
-          numericCells.add(asInt);
-        } else if (subjectName == null && _looksLikeSubjectCell(cell)) {
-          subjectName = cell;
+      if (subjectIdx != null && heldIdx != null && attendIdx != null) {
+        // Header-based extraction (preferred path).
+        if (subjectIdx < cleanedCells.length) {
+          final s = cleanedCells[subjectIdx].trim();
+          if (s.isNotEmpty) subjectName = s;
+        }
+        if (heldIdx < cleanedCells.length) {
+          totalClasses = int.tryParse(cleanedCells[heldIdx].trim());
+        }
+        if (attendIdx < cleanedCells.length) {
+          attendedClasses = int.tryParse(cleanedCells[attendIdx].trim());
+        }
+        if (percentIdx != null && percentIdx < cleanedCells.length) {
+          final raw = cleanedCells[percentIdx].trim();
+          final normalized = raw.startsWith('.') ? '0$raw' : raw;
+          percentage = double.tryParse(normalized);
+        }
+      } else {
+        // Heuristic fallback: find the subject text cell, then use the
+        // integer cells that follow it (naturally skipping a leading Sl.No).
+        int subjectCellIdx = -1;
+        for (int i = 0; i < cleanedCells.length; i++) {
+          final cell = cleanedCells[i];
+          if (cell.isNotEmpty &&
+              (cell.toLowerCase().trim() == 'total' ||
+                  _looksLikeSubjectCell(cell))) {
+            subjectCellIdx = i;
+            subjectName = cell;
+            break;
+          }
+        }
+        if (subjectCellIdx >= 0) {
+          final intCellsAfterSubject = <int>[];
+          for (int i = subjectCellIdx + 1; i < cleanedCells.length; i++) {
+            final v = int.tryParse(cleanedCells[i].trim());
+            if (v != null) intCellsAfterSubject.add(v);
+          }
+          if (intCellsAfterSubject.length >= 2) {
+            totalClasses = intCellsAfterSubject[0];
+            attendedClasses = intCellsAfterSubject[1];
+          }
         }
       }
+
+      // Attempt to parse percentage as a decimal if not yet resolved.
+      if (percentage == null) {
+        for (final cell in cleanedCells.reversed) {
+          final trimmed = cell.trim();
+          final normalized = trimmed.startsWith('.') ? '0$trimmed' : trimmed;
+          // Only consider values with a decimal point to avoid confusing
+          // Held/Attend integers with percentage.
+          if (normalized.contains('.')) {
+            final parsed = double.tryParse(normalized);
+            if (parsed != null && parsed >= 0.0 && parsed <= 100.0) {
+              percentage = parsed;
+              break;
+            }
+          }
+        }
+      }
+
+      // Compute percentage from held/attend if still unknown.
+      if (percentage == null &&
+          totalClasses != null &&
+          totalClasses > 0 &&
+          attendedClasses != null) {
+        percentage = (attendedClasses / totalClasses) * 100;
+      }
+      percentage ??= 0.0;
 
       if (subjectName == null) {
         // ignore: avoid_print
@@ -479,23 +565,15 @@ class AttendanceService {
         continue;
       }
 
-      if (numericCells.length < 2) {
+      if (totalClasses == null || attendedClasses == null) {
         // ignore: avoid_print
         print('Skipping row (not enough numeric data): $cleanedCells');
         continue;
       }
 
-      int totalClasses = numericCells[0];
-      int attendedClasses = numericCells[1];
-      double percentage = 0.0;
-
-      if (numericCells.length >= 3) {
-        percentage = numericCells[2].toDouble();
-      } else if (totalClasses > 0) {
-        percentage = (attendedClasses / totalClasses) * 100;
-      }
-
       final lowerSubject = subjectName.toLowerCase().trim();
+
+      // Total row detection.
       if (lowerSubject == 'total') {
         hasReport = true;
         totalHeldFromReport = totalClasses;
@@ -508,6 +586,7 @@ class AttendanceService {
         continue;
       }
 
+      // Skip header-like rows that slipped through.
       if (lowerSubject.contains('subject') ||
           lowerSubject.contains('sr') ||
           lowerSubject.contains('sl')) {
