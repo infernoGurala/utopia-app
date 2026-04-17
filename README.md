@@ -9,18 +9,18 @@ UTOPIA is a student productivity app built for **college students**. It replaces
 
 Built by a first-year mechanical engineering student with zero prior coding experience, using Flutter and a fully free infrastructure stack. 
 
-**Website:** [Inferno](https://inferalis.space)
+**Website:** [Inferalis.space](https://inferalis.space)
 
 ---
 
 ## Features
 
 ### 📚 Library — Notes & Files
-- Browse subjects → units → topics in a clean folder structure
-- Markdown notes rendered natively with support for LaTeX math (`flutter_math_fork`), embedded images, and Obsidian-style wikilinks (`![[image]]`)
+- **Community noets** → Allows users to share notes and files with global write access
+- Markdown notes rendered natively with support for LaTeX math (`flutter_math_fork`), embedded images, and etc. md features.
 - File attachments (PDFs, slides) shown as tappable bars at the top of each note — downloaded from Google Drive on first tap, cached forever for offline use
 - Full-text search across all cached markdown content via SQLite
-- Auto-sync with GitHub on app open — silent, no background drain
+- Auto-sync with database on app open — silent, no background drain
 - Note segment sharing — tap any heading, paragraph, or code block to share it directly as a chat message
 - Image pre-fetching — all images referenced in a note are resolved and cached locally for offline access
 - Hidden folders — writers can hide/show folders from the reader view via the developer panel
