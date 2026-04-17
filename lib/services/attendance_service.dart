@@ -69,17 +69,13 @@ class AttendanceService {
         '__VIEWSTATE': tokens['__VIEWSTATE'] ?? '',
         '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
         '__EVENTVALIDATION': tokens['__EVENTVALIDATION'] ?? '',
-        'txtId1': '',
-        'txtPwd1': encryptedPassword,
-        'txtId2': rollNumber.trim(),
-        'txtPwd2': encryptedPassword,
-        'imgBtn2.x': '36',
-        'imgBtn2.y': '4',
-        'txtId3': '',
-        'txtPwd3': '',
-        'hdnpwd1': encryptedPassword,
-        'hdnpwd2': encryptedPassword,
-        'hdnpwd3': '',
+
+        'userType': 'rbtStudent',
+        'txtUserId': rollNumber.trim(),
+        'txtPassword': encryptedPassword,
+        'hdnpwd': encryptedPassword,
+
+        'btnLogin': 'LOGIN',
       };
 
       final response = await _sendRequest(
@@ -135,6 +131,101 @@ class AttendanceService {
     final cookies = <String, String>{};
     try {
       await _login(client, rollNumber, password, cookies);
+
+      final masterResponse = await _sendRequest(
+        client,
+        method: 'GET',
+        path: '/aus/StudentMaster.aspx',
+        cookies: cookies,
+        followRedirects: true,
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: StudentMaster status=${masterResponse.statusCode}, cookieCount=${cookies.length}, bodySnippet=${masterResponse.body.substring(0, masterResponse.body.length.clamp(0, 200))}',
+      );
+
+      final attendancePageResponse = await _sendRequest(
+        client,
+        method: 'GET',
+        path: _attendancePagePath,
+        cookies: cookies,
+        followRedirects: true,
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: AttendancePage status=${attendancePageResponse.statusCode}, cookieCount=${cookies.length}, bodySnippet=${attendancePageResponse.body.substring(0, attendancePageResponse.body.length.clamp(0, 200))}',
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: Full attendance page body length: ${attendancePageResponse.body.length}',
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: Attendance page contains ScriptManager: ${attendancePageResponse.body.contains('ScriptManager')}',
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: Attendance page contains ShowAttendance: ${attendancePageResponse.body.contains('ShowAttendance')}',
+      );
+      // ignore: avoid_print
+      print(
+        'DEBUG: Attendance page contains scrid: ${attendancePageResponse.body.contains('scrid')}',
+      );
+      // ignore: avoid_print
+      print('DEBUG: FULL ATTENDANCE PAGE HTML START');
+      final fullBody = attendancePageResponse.body;
+      for (int i = 0; i < fullBody.length; i += 800) {
+        // ignore: avoid_print
+        print(
+          fullBody.substring(
+            i,
+            i + 800 > fullBody.length ? fullBody.length : i + 800,
+          ),
+        );
+      }
+      // ignore: avoid_print
+      print('DEBUG: FULL ATTENDANCE PAGE HTML END');
+
+      String? requestVerificationToken;
+      try {
+        requestVerificationToken = _extractHiddenInput(
+          attendancePageResponse.body,
+          '__RequestVerificationToken',
+        );
+      } catch (_) {
+        requestVerificationToken = null;
+      }
+      // ignore: avoid_print
+      print('DEBUG: RequestVerificationToken=$requestVerificationToken');
+
+      final hiddenFields = RegExp(
+        r'''<input[^>]+type=["']hidden["'][^>]*name=["']([^"']+)["']''',
+        caseSensitive: false,
+      ).allMatches(attendancePageResponse.body).map((m) => m.group(1)).toList();
+      // ignore: avoid_print
+      print('DEBUG: Hidden fields in attendance page: $hiddenFields');
+
+      final webMethodToken = _extractWebMethodToken(
+        attendancePageResponse.body,
+      );
+      // ignore: avoid_print
+      print('DEBUG: webMethodToken=$webMethodToken');
+
+      final ajaxJs = await _sendRequest(
+        client,
+        method: 'GET',
+        path: '/aus/JSFiles/AjaxMethods.js',
+        cookies: cookies,
+        followRedirects: true,
+      );
+      // ignore: avoid_print
+      print('DEBUG: AjaxMethods.js status=${ajaxJs.statusCode}');
+      final jsContent = ajaxJs.body;
+      for (int i = 0; i < jsContent.length; i += 800) {
+        // ignore: avoid_print
+        print(jsContent.substring(i, (i + 800).clamp(0, jsContent.length)));
+      }
+
       final attendanceBody = jsonEncode({
         'fromDate': fromDate,
         'toDate': toDate,
@@ -144,6 +235,11 @@ class AttendanceService {
       print('Attendance request url: https://$_portalHost$_attendancePath');
       // ignore: avoid_print
       print('Attendance request body: $attendanceBody');
+      // ignore: avoid_print
+      print(
+        'DEBUG: Cookies being sent to attendance POST: ${_cookieHeader(cookies)}',
+      );
+
       final response = await _sendRequest(
         client,
         method: 'POST',
@@ -154,8 +250,14 @@ class AttendanceService {
         body: attendanceBody,
         extraHeaders: {
           'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
+          HttpHeaders.refererHeader:
+              'https://$_portalHost/aus/Academics/studentattendance.aspx?scrid=3&showtype=SA',
           'x-requested-with': 'XMLHttpRequest',
+          HttpHeaders.acceptHeader:
+              'application/json, text/javascript, */*; q=0.01',
+          'cache-control': 'no-cache',
+          'pragma': 'no-cache',
+          if (webMethodToken != null) 'x-auth-token': webMethodToken,
         },
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
@@ -174,7 +276,9 @@ class AttendanceService {
         attendanceHtml = response.body;
       }
       // ignore: avoid_print
-      print('Attendance extracted HTML:\n$attendanceHtml');
+      print('RAW RESPONSE: ${response.body}');
+      // ignore: avoid_print
+      print('EXTRACTED HTML: $attendanceHtml');
 
       final parsed = _parseAttendanceHtml(attendanceHtml);
       final hasReport = parsed['hasReport'] as bool? ?? false;
@@ -306,65 +410,130 @@ class AttendanceService {
     int? totalAttendedFromReport;
     double? totalPercentageFromReport;
     var hasReport = false;
-    final plainText = _cleanHtmlText(html);
+
+    String tableHtml = html;
+    final tblReportMatch = RegExp(
+      r'''<table[^>]*id=["']tblReport["'][^>]*>(.*?)</table>''',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(html);
+    if (tblReportMatch != null) {
+      tableHtml = tblReportMatch.group(1) ?? html;
+      // ignore: avoid_print
+      print('Found #tblReport, using its content for parsing');
+    }
+
+    final plainText = _cleanHtmlText(tableHtml);
     final studentName = _extractLabeledValue(plainText, 'Student Name');
     final rowMatches = RegExp(
       r'<tr[^>]*>(.*?)</tr>',
       caseSensitive: false,
       dotAll: true,
-    ).allMatches(html);
+    ).allMatches(tableHtml);
 
-    for (final row in rowMatches) {
+    // ignore: avoid_print
+    print('Parsing attendance: found ${rowMatches.length} table rows');
+
+    for (final row in rowMatches.toList()) {
       final rowHtml = row.group(1) ?? '';
       final cellMatches = RegExp(
         r'<t[dh][^>]*>(.*?)</t[dh]>',
         caseSensitive: false,
         dotAll: true,
       ).allMatches(rowHtml);
-      if (cellMatches.length < 4) {
+
+      final rawCells = cellMatches
+          .map((cell) => cell.group(1) ?? '')
+          .where((cell) => cell.trim().isNotEmpty)
+          .toList();
+
+      if (rawCells.length < 4) {
         continue;
       }
 
-      final cells = cellMatches
-          .map((cell) => _cleanHtmlText(cell.group(1) ?? ''))
+      final cleanedCells = rawCells
+          .map((cell) => _cleanHtmlText(cell))
           .where((cell) => cell.isNotEmpty)
           .toList();
-      if (cells.length < 4) {
+
+      if (cleanedCells.length < 4) {
         continue;
       }
 
-      final subjectIndex = cells.indexWhere(_looksLikeSubjectCell);
-      if (subjectIndex == -1) {
+      final numericCells = <int>[];
+      String? subjectName;
+
+      for (int i = 0; i < cleanedCells.length; i++) {
+        final cell = cleanedCells[i];
+        final asInt = int.tryParse(cell);
+        if (asInt != null) {
+          numericCells.add(asInt);
+        } else if (subjectName == null && _looksLikeSubjectCell(cell)) {
+          subjectName = cell;
+        }
+      }
+
+      if (subjectName == null) {
+        // ignore: avoid_print
+        print('Skipping row (no subject found): $cleanedCells');
         continue;
       }
 
-      final subject = cells[subjectIndex];
-      final numericTail = cells.sublist(subjectIndex + 1);
-      final totalClasses = _firstInt(numericTail);
-      final attendedClasses = _secondInt(numericTail);
-      final percentage = _extractPercentage(numericTail);
+      if (numericCells.length < 2) {
+        // ignore: avoid_print
+        print('Skipping row (not enough numeric data): $cleanedCells');
+        continue;
+      }
 
-      if (subject.toLowerCase() == 'total') {
+      int totalClasses = numericCells[0];
+      int attendedClasses = numericCells[1];
+      double percentage = 0.0;
+
+      if (numericCells.length >= 3) {
+        percentage = numericCells[2].toDouble();
+      } else if (totalClasses > 0) {
+        percentage = (attendedClasses / totalClasses) * 100;
+      }
+
+      final lowerSubject = subjectName.toLowerCase().trim();
+      if (lowerSubject == 'total') {
         hasReport = true;
         totalHeldFromReport = totalClasses;
         totalAttendedFromReport = attendedClasses;
         totalPercentageFromReport = percentage;
+        // ignore: avoid_print
+        print(
+          'Found total row: held=$totalClasses, attended=$attendedClasses, percentage=$percentage',
+        );
         continue;
       }
 
-      if (subject.toLowerCase().contains('subject') ||
-          totalClasses == null ||
-          attendedClasses == null ||
-          percentage == null) {
+      if (lowerSubject.contains('subject') ||
+          lowerSubject.contains('sr') ||
+          lowerSubject.contains('sl')) {
+        // ignore: avoid_print
+        print('Skipping header row: $subjectName');
         continue;
       }
+
+      // ignore: avoid_print
+      print(
+        'Parsed subject: $subjectName, held=$totalClasses, attended=$attendedClasses, percentage=$percentage',
+      );
 
       subjects.add({
-        'subject': subject,
+        'subject': subjectName,
         'totalClasses': totalClasses,
         'attendedClasses': attendedClasses,
         'percentage': percentage,
       });
+    }
+
+    if (subjects.isEmpty && !hasReport) {
+      // ignore: avoid_print
+      print(
+        'PARSING FAILED - HTML snippet: ${tableHtml.length > 500 ? '${tableHtml.substring(0, 500)}...' : tableHtml}',
+      );
     }
 
     final totalHeld = subjects.fold<int>(
@@ -438,6 +607,14 @@ class AttendanceService {
     }
 
     throw const FormatException('Portal login tokens were not found');
+  }
+
+  static String? _extractWebMethodToken(String html) {
+    final match = RegExp(
+      r"var\s+_tkn\s*=\s*'([^']+)'",
+      caseSensitive: true,
+    ).firstMatch(html);
+    return match?.group(1);
   }
 
   static bool _looksLikeSubjectCell(String value) {
