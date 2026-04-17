@@ -465,15 +465,11 @@ class AttendanceService {
               lower.contains('course') ||
               lower.contains('paper')) {
             subjectIdx = i;
-          } else if (lower == 'held' || lower.contains('held')) {
+          } else if (lower.contains('held')) {
             heldIdx = i;
-          } else if (lower == 'attend' ||
-              lower == 'attended' ||
-              (lower.contains('attend') && !lower.contains('attendance'))) {
+          } else if (lower.contains('attend') && !lower.contains('attendance')) {
             attendIdx = i;
-          } else if (lower == '%' ||
-              lower == 'percentage' ||
-              lower.contains('percent')) {
+          } else if (lower == '%' || lower.contains('percent')) {
             percentIdx = i;
           }
         }
