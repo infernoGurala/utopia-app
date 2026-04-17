@@ -23,16 +23,16 @@ class AcetAttendanceService {
       'Chrome/123.0.0.0 Mobile Safari/537.36';
   static const bool _isReleaseBuild = kReleaseMode;
   static final RegExp _loginUserFieldPattern = RegExp(
-    r'(id|name)\s*=\s*["\'](txtid2|txtuserid)["\']',
+    r'''(id|name)\s*=\s*["'](txtid2|txtuserid)["']''',
   );
   static final RegExp _loginPasswordFieldPattern = RegExp(
-    r'(id|name)\s*=\s*["\'](txtpwd2|txtpassword)["\']',
+    r'''(id|name)\s*=\s*["'](txtpwd2|txtpassword)["']''',
   );
   static final List<RegExp> _webMethodTokenPatterns = [
     RegExp(r"var\s+_tkn\s*=\s*'([^']+)'"),
     RegExp(r'var\s+_tkn\s*=\s*"([^"]+)"'),
-    RegExp(r"['_\"]_tkn['_\"]\s*:\s*'([^']+)'"),
-    RegExp(r'["_\']_tkn["_\']\s*:\s*"([^"]+)"'),
+    RegExp(r"""['"]_tkn['"]\s*:\s*'([^']+)'"""),
+    RegExp(r'''['"]_tkn['"]\s*:\s*"([^"]+)"'''),
   ];
 
   static Future<String> _encryptPassword(String password) async {
