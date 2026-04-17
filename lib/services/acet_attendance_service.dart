@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter/foundation.dart';
@@ -23,6 +24,45 @@ class AcetAttendanceService {
       'AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/123.0.0.0 Mobile Safari/537.36';
   static const bool _isReleaseBuild = kReleaseMode;
+
+  static final RegExp _hiddenInputPattern = RegExp(
+    r'''<input\s+([^>]*?)>''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  static final RegExp _inputNameAttrPattern = RegExp(
+    r'''name\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _inputIdAttrPattern = RegExp(
+    r'''id\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _inputTypeAttrPattern = RegExp(
+    r'''type\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _inputValueAttrPattern = RegExp(
+    r'''value\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _textInputPattern = RegExp(
+    r'''<input\s+[^>]*type\s*=\s*["']text["'][^>]*>''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  static final RegExp _passwordInputPattern = RegExp(
+    r'''<input\s+[^>]*type\s*=\s*["']password["'][^>]*>''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
   static final RegExp _loginUserFieldPattern = RegExp(
     r'''(id|name)\s*=\s*["'](txtid2|txtuserid)["']''',
   );
@@ -36,6 +76,586 @@ class AcetAttendanceService {
     RegExp(r'''['"]_tkn['"]\s*:\s*"([^"]+)"'''),
   ];
 
+  static final List<RegExp> _genericTokenPatterns = [
+    RegExp(r"var\s+token\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+token\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r'var\s+authToken\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+authToken\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+_token\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+_token\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+tkn\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+tkn\s*=\s*'([^']+)'", caseSensitive: false),
+  ];
+
+  static final RegExp _scriptSrcPattern = RegExp(
+    r'''<script[^>]+src\s*=\s*["']([^"']+)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _hiddenInputTokenPattern = RegExp(
+    r'''<input\s+[^>]*type\s*=\s*["']hidden["'][^>]*>''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  static String _generateTraceId() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final random = Random().nextInt(999).toString().padLeft(3, '0');
+    return '${timestamp.substring(timestamp.length - 6)}_$random';
+  }
+
+  static String _scrubSensitive(String body) {
+    var scrubbed = body;
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'__VIEWSTATE[^>]*value="([^"]{0,80})"'),
+      (m) => '__VIEWSTATE value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'__VIEWSTATE[^>]*value="([^"]{80,})"'),
+      (m) => '__VIEWSTATE value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'__EVENTVALIDATION[^>]*value="([^"]{0,80})"'),
+      (m) => '__EVENTVALIDATION value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'__EVENTVALIDATION[^>]*value="([^"]{80,})"'),
+      (m) => '__EVENTVALIDATION value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'__VIEWSTATEGENERATOR[^>]*value="([^"]{0,80})"'),
+      (m) => '__VIEWSTATEGENERATOR value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'value="[^"]{80,}"'),
+      (m) => 'value="<redacted>"',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'ASP\.NET_SessionId=[^;]{1,};'),
+      (m) => 'ASP.NET_SessionId=<redacted>;',
+    );
+    scrubbed = scrubbed.replaceAllMapped(
+      RegExp(r'[A-Za-z0-9+/]{100,}={0,2}'),
+      (m) => '<base64-ish-redacted>',
+    );
+    return scrubbed;
+  }
+
+  static String _truncateLocation(String? location) {
+    if (location == null || location.isEmpty) return '-';
+    if (location.length <= 120) return location;
+    return '${location.substring(0, 117)}...';
+  }
+
+  static Map<String, String> _parseHiddenFormFields(
+    String html,
+    String traceId,
+  ) {
+    final hiddenFields = <String, String>{};
+    final matches = _hiddenInputPattern.allMatches(html);
+
+    for (final match in matches) {
+      final inputTag = match.group(1) ?? '';
+
+      final typeMatch = _inputTypeAttrPattern.firstMatch(inputTag);
+      final type = typeMatch?.group(1)?.toLowerCase() ?? 'text';
+
+      if (type != 'hidden') continue;
+
+      String? name;
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) {
+        name = nameMatch.group(1);
+      }
+
+      String key;
+      if (name != null && name.isNotEmpty) {
+        key = name;
+      } else {
+        final idMatch = _inputIdAttrPattern.firstMatch(inputTag);
+        if (idMatch != null) {
+          key = idMatch.group(1) ?? '';
+        } else {
+          continue;
+        }
+      }
+
+      if (key.isEmpty) continue;
+
+      final valueMatch = _inputValueAttrPattern.firstMatch(inputTag);
+      final value = valueMatch?.group(1) ?? '';
+
+      hiddenFields[key] = value;
+    }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print(
+        '[$traceId][PARSE] hiddenFields: count=${hiddenFields.length} '
+        'keys=[${hiddenFields.keys.join(", ")}]',
+      );
+    }
+
+    return hiddenFields;
+  }
+
+  static _LoginFieldNames _detectLoginFieldNames(String html, String traceId) {
+    String? userFieldName;
+    String? passwordFieldName;
+    String? submitButtonName;
+    String? submitButtonValue;
+    bool hasHdnPwd = false;
+
+    final textInputs = _textInputPattern.allMatches(html).toList();
+    for (final match in textInputs) {
+      final inputTag = match.group(0) ?? '';
+
+      String? name;
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) name = nameMatch.group(1);
+
+      String? id;
+      final idMatch = _inputIdAttrPattern.firstMatch(inputTag);
+      if (idMatch != null) id = idMatch.group(1);
+
+      final fieldName = name ?? id ?? '';
+
+      if (fieldName.isEmpty) continue;
+
+      final lower = fieldName.toLowerCase();
+      if (lower.contains('user') ||
+          lower.contains('id') ||
+          lower.contains('roll') ||
+          lower.contains('login')) {
+        if (userFieldName == null) {
+          userFieldName = fieldName;
+        }
+      }
+    }
+
+    final passwordInputs = _passwordInputPattern.allMatches(html).toList();
+    for (final match in passwordInputs) {
+      final inputTag = match.group(0) ?? '';
+
+      String? name;
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) name = nameMatch.group(1);
+
+      String? id;
+      final idMatch = _inputIdAttrPattern.firstMatch(inputTag);
+      if (idMatch != null) id = idMatch.group(1);
+
+      final fieldName = name ?? id ?? '';
+
+      if (fieldName.isEmpty) continue;
+
+      final lower = fieldName.toLowerCase();
+      if (lower.contains('pwd') ||
+          lower.contains('password') ||
+          lower.contains('pass')) {
+        if (passwordFieldName == null) {
+          passwordFieldName = fieldName;
+        }
+      }
+    }
+
+    final submitPattern = RegExp(
+      r'''<input\s+[^>]*type\s*=\s*["']submit["'][^>]*>''',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    final submitMatches = submitPattern.allMatches(html).toList();
+    for (final match in submitMatches) {
+      final inputTag = match.group(0) ?? '';
+
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) {
+        submitButtonName = nameMatch.group(1);
+      }
+
+      final valueMatch = _inputValueAttrPattern.firstMatch(inputTag);
+      if (valueMatch != null) {
+        submitButtonValue = valueMatch.group(1);
+      }
+
+      break;
+    }
+
+    if (html.contains('hdnpwd') || html.contains('hdnpwd')) {
+      hasHdnPwd = true;
+    }
+
+    final fallbackUserField = userFieldName ?? 'txtId2';
+    final fallbackPasswordField = passwordFieldName ?? 'txtPwd2';
+    final fallbackButtonName = submitButtonName ?? 'btnLogin';
+    final fallbackButtonValue = submitButtonValue ?? 'LOGIN';
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print(
+        '[$traceId][PARSE] detectedFields: '
+        'userField=$userFieldName ($fallbackUserField), '
+        'passwordField=$passwordFieldName ($fallbackPasswordField), '
+        'buttonName=$submitButtonName, '
+        'buttonValue=$submitButtonValue, '
+        'hasHdnPwd=$hasHdnPwd',
+      );
+    }
+
+    return _LoginFieldNames(
+      userFieldName: userFieldName,
+      passwordFieldName: passwordFieldName,
+      submitButtonName: submitButtonName,
+      submitButtonValue: submitButtonValue,
+      hasHdnPwd: hasHdnPwd,
+      fallbackUserField: fallbackUserField,
+      fallbackPasswordField: fallbackPasswordField,
+      fallbackButtonName: fallbackButtonName,
+      fallbackButtonValue: fallbackButtonValue,
+    );
+  }
+
+  static const Set<String> _safeFormKeys = {
+    'userType',
+    'btnLogin',
+    'fromDate',
+    'toDate',
+    'excludeothersubjects',
+  };
+
+  static const Set<String> _redactedFormKeys = {
+    'txtPwd2',
+    'txtPassword',
+    'hdnpwd',
+    '__VIEWSTATE',
+    '__EVENTVALIDATION',
+    '__VIEWSTATEGENERATOR',
+  };
+
+  static void _debugRequest({
+    required String traceId,
+    required String step,
+    required String method,
+    required String url,
+    required String? contentType,
+    required int contentLength,
+    required bool followRedirects,
+    required List<String> cookieKeys,
+    required Map<String, String> requestHeaders,
+    String? body,
+  }) {
+    if (_isReleaseBuild) return;
+
+    final safeHeaders = <String, String>{};
+    for (final entry in requestHeaders.entries) {
+      final keyLower = entry.key.toLowerCase();
+      if (keyLower == 'origin' ||
+          keyLower == 'referer' ||
+          keyLower == 'accept' ||
+          keyLower == 'content-type' ||
+          keyLower == 'x-requested-with' ||
+          keyLower == 'x-auth-token' ||
+          keyLower == 'user-agent' ||
+          keyLower == 'cache-control' ||
+          keyLower == 'pragma') {
+        safeHeaders[entry.key] = entry.value;
+      }
+    }
+
+    String formInfo = '';
+    String redactions = '';
+    if (body != null && body.isNotEmpty) {
+      if (contentType != null &&
+          contentType.contains('application/x-www-form-urlencoded')) {
+        final params = Uri.splitQueryString(body);
+        final allKeys = params.keys.toList();
+        final safeKeys = <String>[];
+        final redactedEntries = <String>[];
+
+        for (final key in allKeys) {
+          if (_safeFormKeys.contains(key)) {
+            safeKeys.add(key);
+          } else if (_redactedFormKeys.contains(key)) {
+            final value = params[key] ?? '';
+            if (key == '__VIEWSTATE' ||
+                key == '__EVENTVALIDATION' ||
+                key == '__VIEWSTATEGENERATOR') {
+              redactedEntries.add('$key=len=${value.length}');
+            } else {
+              redactedEntries.add('$key=<redacted>');
+            }
+          } else {
+            safeKeys.add(key);
+          }
+        }
+
+        formInfo = 'formKeys=[${allKeys.join(', ')}]';
+        if (redactedEntries.isNotEmpty) {
+          redactions = ' redacted={${redactedEntries.join(', ')}}';
+        }
+      } else if (contentType != null &&
+          contentType.contains('application/json')) {
+        try {
+          final json = jsonDecode(body) as Map<String, dynamic>;
+          final keys = json.keys.toList();
+          final safeEntries = <String>[];
+          final redactedEntries = <String>[];
+
+          for (final key in keys) {
+            final value = json[key];
+            if (key == 'fromDate' || key == 'toDate') {
+              safeEntries.add('$key=${value ?? "null"}');
+            } else if (value is String && value.length > 50) {
+              redactedEntries.add('$key=len=${value.length}');
+            } else {
+              safeEntries.add('$key=${value ?? "null"}');
+            }
+          }
+
+          formInfo = 'jsonKeys=[${keys.join(', ')}]';
+          if (safeEntries.isNotEmpty) {
+            formInfo += ' values={${safeEntries.join(', ')}}';
+          }
+          if (redactedEntries.isNotEmpty) {
+            redactions = ' redacted={${redactedEntries.join(', ')}}';
+          }
+        } catch (_) {
+          formInfo = 'bodyLen=${body.length}';
+        }
+      } else {
+        formInfo = 'bodyLen=${body.length}';
+      }
+    }
+
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][REQ] method=$method url=$url '
+      'contentType=${contentType ?? "-"} contentLen=$contentLength '
+      'followRedirects=$followRedirects '
+      'cookies=[${cookieKeys.join(', ')}] '
+      '$formInfo$redactions',
+    );
+    if (safeHeaders.isNotEmpty) {
+      final headerStr = safeHeaders.entries
+          .map((e) => '${e.key}=${e.value}')
+          .join(' ');
+      // ignore: avoid_print
+      print('[$traceId][$step][REQ] headers: $headerStr');
+    }
+  }
+
+  static void _debugResponseHeaders({
+    required String traceId,
+    required String step,
+    required int statusCode,
+    required String? location,
+    required List<String> setCookieNames,
+    required bool hasSessionId,
+    required bool hasFrmAuth,
+    required bool hasViewState,
+    required bool loginPage,
+  }) {
+    if (_isReleaseBuild) return;
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][RES] status=$statusCode '
+      'location=${_truncateLocation(location)} '
+      'setCookies=[${setCookieNames.join(', ')}] '
+      'hasSessionId=$hasSessionId hasFrmAuth=$hasFrmAuth '
+      'hasViewState=$hasViewState loginPage=$loginPage',
+    );
+  }
+
+  static void _debugBrowserParity({
+    required String traceId,
+    required String step,
+    required int? expectedStatus,
+    required String? expectedLocation,
+    required bool? expectedSetsFrmAuth,
+    required int gotStatus,
+    required String? gotLocation,
+    required bool gotSetsFrmAuth,
+    required bool gotLoginPage,
+  }) {
+    if (_isReleaseBuild) return;
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][PARITY] expected={status:$expectedStatus, '
+      'location:$expectedLocation, setsFrmAuth:$expectedSetsFrmAuth}',
+    );
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][PARITY] got={status:$gotStatus, '
+      'location:${_truncateLocation(gotLocation)}, '
+      'setsFrmAuth:$gotSetsFrmAuth, loginPage:$gotLoginPage}',
+    );
+
+    final mismatches = <String>[];
+    if (expectedStatus != null && gotStatus != expectedStatus) {
+      mismatches.add('status:$gotStatus != $expectedStatus');
+    }
+    if (expectedLocation != null &&
+        gotLocation != null &&
+        gotLocation.contains(expectedLocation) == false) {
+      mismatches.add('location mismatch');
+    }
+    if (expectedSetsFrmAuth != null && gotSetsFrmAuth != expectedSetsFrmAuth) {
+      mismatches.add('frmAuth:$gotSetsFrmAuth != $expectedSetsFrmAuth');
+    }
+    if (mismatches.isNotEmpty) {
+      // ignore: avoid_print
+      print('[$traceId][$step][PARITY][MISMATCH] ${mismatches.join(', ')}');
+    }
+  }
+
+  static void _debugPortalHop({
+    required String traceId,
+    required String step,
+    required String method,
+    required String path,
+    required int statusCode,
+    required String? location,
+    required Map<String, String> cookies,
+    required String? contentType,
+    required int elapsedMs,
+    required bool hasSessionId,
+    required bool hasViewState,
+    required bool hasEventValidation,
+    required bool hasLoginPageMarkers,
+    required String? bodyPreview,
+  }) {
+    if (_isReleaseBuild) return;
+    final cookieKeys = cookies.keys.toList();
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][${elapsedMs}ms] '
+      'method=$method path=$path status=$statusCode '
+      'location=${_truncateLocation(location)} '
+      'contentType=${contentType ?? "-"} '
+      'hasSessionId=$hasSessionId '
+      'cookies=[${cookieKeys.join(", ")}] '
+      'hasViewState=$hasViewState '
+      'hasEventValidation=$hasEventValidation '
+      'hasLoginPageMarkers=$hasLoginPageMarkers',
+    );
+    if (bodyPreview != null && bodyPreview.isNotEmpty) {
+      // ignore: avoid_print
+      print(
+        '[$traceId][$step] bodyPreview: ${bodyPreview.substring(0, min(bodyPreview.length, 400))}',
+      );
+    }
+  }
+
+  static void _debugStep({
+    required String traceId,
+    required String step,
+    required int elapsedMs,
+    String? message,
+  }) {
+    if (_isReleaseBuild) return;
+    // ignore: avoid_print
+    print('[$traceId][$step][${elapsedMs}ms] ${message ?? "done"}');
+  }
+
+  static void _debugLoginMarkers({
+    required String traceId,
+    required String step,
+    required String body,
+  }) {
+    if (_isReleaseBuild) return;
+    final lower = body.toLowerCase();
+    final hasUserField = _loginUserFieldPattern.hasMatch(lower);
+    final hasPasswordField = _loginPasswordFieldPattern.hasMatch(lower);
+    final hasLoginButton =
+        lower.contains('btnlogin') || lower.contains('>login<');
+    final hasLoginFormAction =
+        lower.contains('default.aspx') && lower.contains('<form');
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step] loginMarkers: '
+      'hasUserField=$hasUserField '
+      'hasPasswordField=$hasPasswordField '
+      'hasLoginButton=$hasLoginButton '
+      'hasLoginFormAction=$hasLoginFormAction',
+    );
+  }
+
+  static void _debugFail({
+    required String traceId,
+    required String step,
+    required String reason,
+    int? statusCode,
+    bool? hasSessionId,
+    bool? loginPageDetected,
+    bool? hasViewState,
+    bool? hasToken,
+    String? location,
+    List<String>? cookieKeys,
+  }) {
+    if (_isReleaseBuild) return;
+    final parts = <String>['$traceId][$step][FAIL]'];
+    parts.add('reason=$reason');
+    if (statusCode != null) parts.add('status=$statusCode');
+    if (hasSessionId != null) parts.add('session=$hasSessionId');
+    if (loginPageDetected != null) parts.add('loginPage=$loginPageDetected');
+    if (hasViewState != null) parts.add('hasViewState=$hasViewState');
+    if (hasToken != null) parts.add('hasToken=$hasToken');
+    if (location != null) parts.add('location=${_truncateLocation(location)}');
+    if (cookieKeys != null) parts.add('cookies=[${cookieKeys.join(", ")}]');
+    // ignore: avoid_print
+    print('[${parts.join(' ')}');
+  }
+
+  static void _debugCookieChange({
+    required String traceId,
+    required String stepA,
+    required String stepB,
+    required String? sessionIdBefore,
+    required String? sessionIdAfter,
+  }) {
+    if (_isReleaseBuild) return;
+    if (sessionIdBefore != sessionIdAfter) {
+      // ignore: avoid_print
+      print('[$traceId][WARN] sessionId changed between $stepA and $stepB');
+    }
+  }
+
+  static void _debugTokenExtraction({
+    required String traceId,
+    required String step,
+    required bool hasViewState,
+    required bool hasViewStateGenerator,
+    required bool hasEventValidation,
+    required bool allTokensPresent,
+  }) {
+    if (_isReleaseBuild) return;
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step] tokens: '
+      'hasViewState=$hasViewState '
+      'hasViewStateGenerator=$hasViewStateGenerator '
+      'hasEventValidation=$hasEventValidation '
+      'allPresent=$allTokensPresent',
+    );
+  }
+
+  static void _debugAttendanceParsing({
+    required String traceId,
+    required String step,
+    required int subjectCount,
+    required bool hasReport,
+    required bool hasStudentName,
+    required String htmlLength,
+  }) {
+    if (_isReleaseBuild) return;
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step] parsed: '
+      'subjects=$subjectCount hasReport=$hasReport '
+      'hasStudentName=$hasStudentName htmlLen=$htmlLength',
+    );
+  }
+
   static Future<String> _encryptPassword(String password) async {
     final key = encrypt.Key.fromUtf8(_aesSecret);
     final iv = encrypt.IV.fromUtf8(_aesSecret);
@@ -45,104 +665,169 @@ class AcetAttendanceService {
     return aes.encrypt(password, iv: iv).base64;
   }
 
-  /// Fetches the ACET login page HTML, handling the authcheck.aspx auth gate.
-  ///
-  /// The ACET portal sometimes redirects GET /acet/default.aspx to
-  /// /acet/authcheck.aspx before serving the actual login form. This helper:
-  ///   1. GETs default.aspx (following redirects).
-  ///   2. If __VIEWSTATE is absent (auth gate hit), GETs authcheck.aspx to
-  ///      allow the server to set any required cookies/flags, then retries
-  ///      default.aspx.
-  ///   3. Returns the final HTML containing __VIEWSTATE, ready for token
-  ///      extraction.
   static Future<String> _getLoginPageHtmlWithGateHandling(
     HttpClient client,
     Map<String, String> cookies,
+    String traceId,
   ) async {
+    final sw = Stopwatch()..start();
+
     final initial = await _sendRequest(
       client,
       method: 'GET',
       path: _loginPath,
       cookies: cookies,
       followRedirects: true,
+      traceId: traceId,
+      stepName: 'GET default.aspx (initial)',
     );
-    _debugLoginFlow(
-      label: 'GET default.aspx (initial)',
+    sw.stop();
+
+    final hasViewState = initial.body.contains('__VIEWSTATE');
+    _debugPortalHop(
+      traceId: traceId,
+      step: 'GET default.aspx (initial)',
       method: 'GET',
       path: _loginPath,
       statusCode: initial.statusCode,
       location: initial.location,
       cookies: cookies,
+      contentType: null,
+      elapsedMs: sw.elapsedMilliseconds,
+      hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+      hasViewState: hasViewState,
+      hasEventValidation: initial.body.contains('__EVENTVALIDATION'),
+      hasLoginPageMarkers: _looksLikeLoginPage(initial.body),
+      bodyPreview: _scrubSensitive(initial.body),
+    );
+    _debugLoginMarkers(
+      traceId: traceId,
+      step: 'GET default.aspx (initial)',
       body: initial.body,
     );
 
-    if (initial.body.contains('__VIEWSTATE')) {
+    if (hasViewState) {
       return initial.body;
     }
 
-    if (!_isReleaseBuild) {
-      // ignore: avoid_print
-      print(
-        '[ACET] Auth gate detected (__VIEWSTATE absent). '
-        'Fetching authcheck.aspx to pass the gate...',
-      );
-    }
-
+    var swAuthCheck = Stopwatch()..start();
     final authCheck = await _sendRequest(
       client,
       method: 'GET',
       path: _authCheckPath,
       cookies: cookies,
       followRedirects: true,
+      traceId: traceId,
+      stepName: 'GET authcheck.aspx',
     );
-    _debugLoginFlow(
-      label: 'GET authcheck.aspx',
+    swAuthCheck.stop();
+
+    _debugPortalHop(
+      traceId: traceId,
+      step: 'GET authcheck.aspx',
       method: 'GET',
       path: _authCheckPath,
       statusCode: authCheck.statusCode,
       location: authCheck.location,
       cookies: cookies,
-      body: authCheck.body,
+      contentType: null,
+      elapsedMs: swAuthCheck.elapsedMilliseconds,
+      hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+      hasViewState: authCheck.body.contains('__VIEWSTATE'),
+      hasEventValidation: authCheck.body.contains('__EVENTVALIDATION'),
+      hasLoginPageMarkers: _looksLikeLoginPage(authCheck.body),
+      bodyPreview: _scrubSensitive(authCheck.body),
     );
 
+    final previousSessionId = cookies['ASP.NET_SessionId'];
+    var swRetry = Stopwatch()..start();
     final retry = await _sendRequest(
       client,
       method: 'GET',
       path: _loginPath,
       cookies: cookies,
       followRedirects: true,
+      traceId: traceId,
+      stepName: 'GET default.aspx (retry)',
     );
-    _debugLoginFlow(
-      label: 'GET default.aspx (after authcheck)',
+    swRetry.stop();
+
+    _debugCookieChange(
+      traceId: traceId,
+      stepA: 'GET authcheck.aspx',
+      stepB: 'GET default.aspx (retry)',
+      sessionIdBefore: previousSessionId,
+      sessionIdAfter: cookies['ASP.NET_SessionId'],
+    );
+    _debugPortalHop(
+      traceId: traceId,
+      step: 'GET default.aspx (retry)',
       method: 'GET',
       path: _loginPath,
       statusCode: retry.statusCode,
       location: retry.location,
       cookies: cookies,
+      contentType: null,
+      elapsedMs: swRetry.elapsedMilliseconds,
+      hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+      hasViewState: retry.body.contains('__VIEWSTATE'),
+      hasEventValidation: retry.body.contains('__EVENTVALIDATION'),
+      hasLoginPageMarkers: _looksLikeLoginPage(retry.body),
+      bodyPreview: _scrubSensitive(retry.body),
+    );
+    _debugLoginMarkers(
+      traceId: traceId,
+      step: 'GET default.aspx (retry)',
       body: retry.body,
     );
 
     return retry.body;
   }
 
-  static Future<Map<String, String>> _getLoginTokens(
+  static Future<_LoginPageData> _getLoginPageData(
     HttpClient client,
     Map<String, String> cookies,
+    String traceId,
   ) async {
-    final html = await _getLoginPageHtmlWithGateHandling(client, cookies);
-
-    final viewState = _extractHiddenInput(html, '__VIEWSTATE');
-    final viewStateGenerator = _extractHiddenInput(
-      html,
-      '__VIEWSTATEGENERATOR',
+    var sw = Stopwatch()..start();
+    final html = await _getLoginPageHtmlWithGateHandling(
+      client,
+      cookies,
+      traceId,
     );
-    final eventValidation = _extractHiddenInput(html, '__EVENTVALIDATION');
+    sw.stop();
 
-    return {
-      '__VIEWSTATE': viewState,
-      '__VIEWSTATEGENERATOR': viewStateGenerator,
-      '__EVENTVALIDATION': eventValidation,
-    };
+    final hasViewState = html.contains('__VIEWSTATE');
+    final hasViewStateGenerator = html.contains('__VIEWSTATEGENERATOR');
+    final hasEventValidation = html.contains('__EVENTVALIDATION');
+    _debugTokenExtraction(
+      traceId: traceId,
+      step: 'Extract tokens',
+      hasViewState: hasViewState,
+      hasViewStateGenerator: hasViewStateGenerator,
+      hasEventValidation: hasEventValidation,
+      allTokensPresent:
+          hasViewState && hasViewStateGenerator && hasEventValidation,
+    );
+
+    final hiddenFields = _parseHiddenFormFields(html, traceId);
+    final fieldNames = _detectLoginFieldNames(html, traceId);
+
+    _debugStep(
+      traceId: traceId,
+      step: 'Parse login page',
+      elapsedMs: sw.elapsedMilliseconds,
+      message:
+          'hiddenFields=${hiddenFields.length}, '
+          'userField=${fieldNames.fallbackUserField}, '
+          'passwordField=${fieldNames.fallbackPasswordField}',
+    );
+
+    return _LoginPageData(
+      hiddenFields: hiddenFields,
+      fieldNames: fieldNames,
+      html: html,
+    );
   }
 
   static Future<void> _login(
@@ -150,27 +835,92 @@ class AcetAttendanceService {
     String rollNumber,
     String password,
     Map<String, String> cookies,
-  ) async {
+    String traceId, {
+    bool debugNoRedirect = false,
+  }) async {
     try {
-      final tokens = await _getLoginTokens(client, cookies);
-      final encryptedPassword = await _encryptPassword(password);
-      final formBody = <String, String>{
-        '__VIEWSTATE': tokens['__VIEWSTATE'] ?? '',
-        '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
-        '__EVENTVALIDATION': tokens['__EVENTVALIDATION'] ?? '',
-        'userType': 'rbtStudent',
-        'txtId2': rollNumber.trim(),
-        'txtPwd2': encryptedPassword,
-        'hdnpwd': encryptedPassword,
-        'btnLogin': 'LOGIN',
-      };
+      final tokensSw = Stopwatch()..start();
+      final pageData = await _getLoginPageData(client, cookies, traceId);
+      tokensSw.stop();
 
+      _debugStep(
+        traceId: traceId,
+        step: '_getLoginPageData',
+        elapsedMs: tokensSw.elapsedMilliseconds,
+      );
+
+      final encSw = Stopwatch()..start();
+      final encryptedPassword = await _encryptPassword(password);
+      encSw.stop();
+
+      _debugStep(
+        traceId: traceId,
+        step: 'Encrypt password',
+        elapsedMs: encSw.elapsedMilliseconds,
+      );
+
+      final hiddenFields = pageData.hiddenFields;
+
+      final formBody = <String, String>{};
+
+      for (final entry in hiddenFields.entries) {
+        formBody[entry.key] = entry.value;
+      }
+
+      formBody['txtId1'] = rollNumber.trim();
+      formBody['txtId2'] = rollNumber.trim();
+      formBody['txtId3'] = rollNumber.trim();
+
+      formBody['txtPwd1'] = encryptedPassword;
+      formBody['txtPwd2'] = encryptedPassword;
+      formBody['txtPwd3'] = encryptedPassword;
+
+      if (hiddenFields.containsKey('hdnpwd1')) {
+        formBody['hdnpwd1'] = encryptedPassword;
+      }
+      if (hiddenFields.containsKey('hdnpwd2')) {
+        formBody['hdnpwd2'] = encryptedPassword;
+      }
+      if (hiddenFields.containsKey('hdnpwd3')) {
+        formBody['hdnpwd3'] = encryptedPassword;
+      }
+
+      formBody['imgBtn2.x'] = '42';
+      formBody['imgBtn2.y'] = '6';
+
+      final formKeys = formBody.keys.toList();
+      if (!_isReleaseBuild) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][BUILD] formBody: keys=${formKeys.length} '
+          'keys=[${formKeys.join(", ")}]',
+        );
+        // ignore: avoid_print
+        print(
+          '[$traceId][BUILD] Chrome payload: '
+          'txtId1/2/3, txtPwd1/2/3, imgBtn2.x=42, imgBtn2.y=6, '
+          'hdnpwd1/2/3=${hiddenFields.containsKey('hdnpwd1') || hiddenFields.containsKey('hdnpwd2') || hiddenFields.containsKey('hdnpwd3')}, '
+          'hiddenKeys=[${hiddenFields.keys.join(", ")}]',
+        );
+      }
+
+      final followRedirectsLogin = !debugNoRedirect;
+
+      if (debugNoRedirect) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][DEBUG] debugNoRedirect=true: '
+          'POST login will NOT follow redirects (preserving 302)',
+        );
+      }
+
+      final postSw = Stopwatch()..start();
       final response = await _sendRequest(
         client,
         method: 'POST',
         path: _loginPath,
         cookies: cookies,
-        followRedirects: true,
+        followRedirects: followRedirectsLogin,
         contentType: 'application/x-www-form-urlencoded',
         body: Uri(queryParameters: formBody).query,
         extraHeaders: {
@@ -179,22 +929,56 @@ class AcetAttendanceService {
           HttpHeaders.acceptHeader:
               'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
+        traceId: traceId,
+        stepName: 'POST default.aspx (login)',
       );
-      _debugResponse('POST login', response.statusCode, response.body);
+      postSw.stop();
 
       final sessionId = cookies['ASP.NET_SessionId'];
       final bodyLooksLikeLoginPage = _looksLikeLoginPage(response.body);
-      _debugLoginState(
-        stage: 'POST login',
-        statusCode: response.statusCode,
-        sessionId: sessionId,
-        frmAuth: null,
-        loginPageDetected: bodyLooksLikeLoginPage,
-      );
-      if (sessionId == null || sessionId.isEmpty || bodyLooksLikeLoginPage) {
-        throw Exception('Invalid credentials');
-      }
+      final gotFrmAuth = cookies.containsKey('frmAuth');
 
+      _debugBrowserParity(
+        traceId: traceId,
+        step: 'POST default.aspx (login)',
+        expectedStatus: 302,
+        expectedLocation: '/acet/StudentMaster.aspx',
+        expectedSetsFrmAuth: true,
+        gotStatus: response.statusCode,
+        gotLocation: response.location,
+        gotSetsFrmAuth: gotFrmAuth,
+        gotLoginPage: bodyLooksLikeLoginPage,
+      );
+
+      _debugPortalHop(
+        traceId: traceId,
+        step: 'POST default.aspx (login)',
+        method: 'POST',
+        path: _loginPath,
+        statusCode: response.statusCode,
+        location: response.location,
+        cookies: cookies,
+        contentType: 'application/x-www-form-urlencoded',
+        elapsedMs: postSw.elapsedMilliseconds,
+        hasSessionId: sessionId != null && sessionId.isNotEmpty,
+        hasViewState: response.body.contains('__VIEWSTATE'),
+        hasEventValidation: response.body.contains('__EVENTVALIDATION'),
+        hasLoginPageMarkers: bodyLooksLikeLoginPage,
+        bodyPreview: _scrubSensitive(response.body),
+      );
+      _debugLoginMarkers(
+        traceId: traceId,
+        step: 'POST default.aspx (login)',
+        body: response.body,
+      );
+
+      final isRedirect =
+          response.statusCode == 302 ||
+          response.statusCode == 301 ||
+          response.statusCode == 303 ||
+          response.statusCode == 307;
+
+      final smSw = Stopwatch()..start();
       final studentMaster = await _sendRequest(
         client,
         method: 'GET',
@@ -204,17 +988,65 @@ class AcetAttendanceService {
         extraHeaders: {
           HttpHeaders.refererHeader: 'https://$_portalHost$_loginPath',
         },
+        traceId: traceId,
+        stepName: 'GET StudentMaster.aspx',
       );
-      if (_looksLikeLoginPage(studentMaster.body)) {
-        _debugLoginState(
-          stage: 'GET StudentMaster',
-          statusCode: studentMaster.statusCode,
-          sessionId: cookies['ASP.NET_SessionId'],
-          frmAuth: cookies['frmAuth'],
-          loginPageDetected: true,
+      smSw.stop();
+
+      final studentMasterLoginPage = _looksLikeLoginPage(studentMaster.body);
+
+      final loginSuccess = isRedirect || gotFrmAuth || !studentMasterLoginPage;
+
+      if (!_isReleaseBuild) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][LOGIN] successCheck: '
+          'isRedirect=$isRedirect '
+          'gotFrmAuth=$gotFrmAuth '
+          'studentMasterLoginPage=$studentMasterLoginPage '
+          '-> loginSuccess=$loginSuccess',
+        );
+      }
+
+      if (!loginSuccess) {
+        _debugFail(
+          traceId: traceId,
+          step: 'POST default.aspx (login)',
+          reason: 'Invalid credentials',
+          statusCode: response.statusCode,
+          hasSessionId: sessionId != null && sessionId.isNotEmpty,
+          loginPageDetected: bodyLooksLikeLoginPage,
+          hasViewState: response.body.contains('__VIEWSTATE'),
+          location: response.location,
+          cookieKeys: cookies.keys.toList(),
         );
         throw Exception('Invalid credentials');
       }
+
+      final prevSessionId = sessionId;
+      _debugCookieChange(
+        traceId: traceId,
+        stepA: 'POST default.aspx (login)',
+        stepB: 'GET StudentMaster.aspx',
+        sessionIdBefore: prevSessionId,
+        sessionIdAfter: cookies['ASP.NET_SessionId'],
+      );
+      _debugPortalHop(
+        traceId: traceId,
+        step: 'GET StudentMaster.aspx',
+        method: 'GET',
+        path: _studentMasterPath,
+        statusCode: studentMaster.statusCode,
+        location: studentMaster.location,
+        cookies: cookies,
+        contentType: null,
+        elapsedMs: smSw.elapsedMilliseconds,
+        hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+        hasViewState: studentMaster.body.contains('__VIEWSTATE'),
+        hasEventValidation: studentMaster.body.contains('__EVENTVALIDATION'),
+        hasLoginPageMarkers: studentMasterLoginPage,
+        bodyPreview: _scrubSensitive(studentMaster.body),
+      );
     } on FormatException {
       rethrow;
     } catch (e) {
@@ -231,49 +1063,129 @@ class AcetAttendanceService {
     String fromDate = '',
     String toDate = '',
   }) async {
+    final traceId = _generateTraceId();
     final client = HttpClient()..connectionTimeout = _timeout;
     final cookies = <String, String>{};
-    try {
-      await _login(client, rollNumber, password, cookies);
+    final overallSw = Stopwatch()..start();
 
-      await _sendRequest(
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print('[$traceId] fetchAttendance started');
+    }
+
+    try {
+      final loginSw = Stopwatch()..start();
+      await _login(client, rollNumber, password, cookies, traceId);
+      loginSw.stop();
+      _debugStep(
+        traceId: traceId,
+        step: '_login()',
+        elapsedMs: loginSw.elapsedMilliseconds,
+      );
+
+      final sm1Sw = Stopwatch()..start();
+      final sm1 = await _sendRequest(
         client,
         method: 'GET',
         path: _studentMasterPath,
         cookies: cookies,
         followRedirects: true,
+        traceId: traceId,
+        stepName: 'GET StudentMaster.aspx (post-login)',
+      );
+      sm1Sw.stop();
+      _debugPortalHop(
+        traceId: traceId,
+        step: 'GET StudentMaster.aspx (post-login)',
+        method: 'GET',
+        path: _studentMasterPath,
+        statusCode: sm1.statusCode,
+        location: sm1.location,
+        cookies: cookies,
+        contentType: null,
+        elapsedMs: sm1Sw.elapsedMilliseconds,
+        hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+        hasViewState: sm1.body.contains('__VIEWSTATE'),
+        hasEventValidation: sm1.body.contains('__EVENTVALIDATION'),
+        hasLoginPageMarkers: _looksLikeLoginPage(sm1.body),
+        bodyPreview: _scrubSensitive(sm1.body),
       );
 
+      final attPageSw = Stopwatch()..start();
       final attendancePageResponse = await _sendRequest(
         client,
         method: 'GET',
         path: _attendancePagePath,
         cookies: cookies,
         followRedirects: true,
+        traceId: traceId,
+        stepName: 'GET StudentAttendance.aspx',
+      );
+      attPageSw.stop();
+
+      _debugPortalHop(
+        traceId: traceId,
+        step: 'GET StudentAttendance.aspx',
+        method: 'GET',
+        path: _attendancePagePath,
+        statusCode: attendancePageResponse.statusCode,
+        location: attendancePageResponse.location,
+        cookies: cookies,
+        contentType: null,
+        elapsedMs: attPageSw.elapsedMilliseconds,
+        hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+        hasViewState: attendancePageResponse.body.contains('__VIEWSTATE'),
+        hasEventValidation: attendancePageResponse.body.contains(
+          '__EVENTVALIDATION',
+        ),
+        hasLoginPageMarkers: _looksLikeLoginPage(attendancePageResponse.body),
+        bodyPreview: null,
       );
 
-      final webMethodToken = _extractWebMethodToken(
-        attendancePageResponse.body,
+      _debugTokenExtractionHints(
+        traceId: traceId,
+        step: 'Extract web method token',
+        html: attendancePageResponse.body,
       );
-      _debugAttendanceState(
-        stage: 'GET attendance page',
-        statusCode: attendancePageResponse.statusCode,
-        hasToken: webMethodToken != null && webMethodToken.trim().isNotEmpty,
-        sessionId: cookies['ASP.NET_SessionId'],
-        frmAuth: cookies['frmAuth'],
+
+      final tokenSw = Stopwatch()..start();
+      final webMethodToken = await _extractTokenMultiStrategy(
+        traceId: traceId,
+        client: client,
+        cookies: cookies,
+        attendancePageHtml: attendancePageResponse.body,
       );
-      if (webMethodToken == null || webMethodToken.trim().isEmpty) {
-        throw Exception(
-          'Failed to retrieve attendance auth token from portal response',
-        );
+      tokenSw.stop();
+
+      _debugStep(
+        traceId: traceId,
+        step: 'Extract token (multi-strategy)',
+        elapsedMs: tokenSw.elapsedMilliseconds,
+        message: 'found=${webMethodToken != null && webMethodToken.isNotEmpty}',
+      );
+
+      final hasToken =
+          webMethodToken != null && webMethodToken.trim().isNotEmpty;
+      if (!hasToken) {
+        // ignore: avoid_print
+        print('[$traceId][TOKEN] not found; proceeding without x-auth-token');
       }
 
+      final ajaxSw = Stopwatch()..start();
       await _sendRequest(
         client,
         method: 'GET',
         path: _ajaxJsPath,
         cookies: cookies,
         followRedirects: true,
+        traceId: traceId,
+        stepName: 'GET AjaxMethods.js',
+      );
+      ajaxSw.stop();
+      _debugStep(
+        traceId: traceId,
+        step: 'GET AjaxMethods.js',
+        elapsedMs: ajaxSw.elapsedMilliseconds,
       );
 
       final attendanceBody = jsonEncode({
@@ -282,6 +1194,33 @@ class AcetAttendanceService {
         'excludeothersubjects': false,
       });
 
+      final extraHeaders = <String, String>{
+        'origin': 'https://$_portalHost',
+        HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
+        'x-requested-with': 'XMLHttpRequest',
+        HttpHeaders.acceptHeader: 'application/json, text/javascript, */*',
+        'cache-control': 'no-cache',
+        'pragma': 'no-cache',
+      };
+      if (hasToken) {
+        extraHeaders['x-auth-token'] = webMethodToken;
+      }
+
+      if (!_isReleaseBuild) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][BUILD] ShowAttendance headers: '
+          'origin=https://$_portalHost, '
+          'referer=https://$_portalHost$_attendancePagePath, '
+          'x-requested-with=XMLHttpRequest, '
+          'accept=application/json..., '
+          'cache-control=no-cache, pragma=no-cache, '
+          'x-auth-token=${hasToken ? 'sent' : 'not sent'}',
+        );
+      }
+
+      final prevSessionId = cookies['ASP.NET_SessionId'];
+      final showAttSw = Stopwatch()..start();
       final response = await _sendRequest(
         client,
         method: 'POST',
@@ -290,26 +1229,61 @@ class AcetAttendanceService {
         followRedirects: false,
         contentType: 'application/json; charset=UTF-8',
         body: attendanceBody,
-        extraHeaders: {
-          'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
-          'x-requested-with': 'XMLHttpRequest',
-          HttpHeaders.acceptHeader: 'application/json, text/javascript, */*',
-          'cache-control': 'no-cache',
-          'pragma': 'no-cache',
-          'x-auth-token': webMethodToken,
-        },
+        extraHeaders: extraHeaders,
+        traceId: traceId,
+        stepName: 'POST ShowAttendance',
       );
-      _debugResponse('POST attendance', response.statusCode, response.body);
-      _debugAttendanceState(
-        stage: 'POST ShowAttendance',
-        statusCode: response.statusCode,
-        hasToken: true,
-        sessionId: cookies['ASP.NET_SessionId'],
-        frmAuth: cookies['frmAuth'],
+      showAttSw.stop();
+
+      _debugCookieChange(
+        traceId: traceId,
+        stepA: 'GET StudentAttendance.aspx',
+        stepB: 'POST ShowAttendance',
+        sessionIdBefore: prevSessionId,
+        sessionIdAfter: cookies['ASP.NET_SessionId'],
       );
 
+      bool isJson = false;
+      bool hasKeyD = false;
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        isJson = true;
+        hasKeyD = decoded.containsKey('d');
+      } catch (_) {
+        isJson = false;
+      }
+
+      final responseContentType = response.headers['content-type'];
+
+      if (!_isReleaseBuild) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][POST ShowAttendance][RES] '
+          'status=${response.statusCode} '
+          'contentType=${responseContentType ?? '-'} '
+          'bodyLen=${response.body.length} '
+          'isJson=$isJson hasKeyD=$hasKeyD',
+        );
+        if (response.statusCode != 200) {
+          // ignore: avoid_print
+          print(
+            '[$traceId][POST ShowAttendance][RES] '
+            'error preview: ${_scrubSensitive(response.body).substring(0, min(_scrubSensitive(response.body).length, 300))}',
+          );
+        }
+      }
+
       if (response.statusCode != HttpStatus.ok) {
+        _debugFail(
+          traceId: traceId,
+          step: 'POST ShowAttendance',
+          reason: 'Could not fetch attendance',
+          statusCode: response.statusCode,
+          hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+          hasToken: true,
+          location: null,
+          cookieKeys: cookies.keys.toList(),
+        );
         throw Exception('Could not fetch attendance right now');
       }
 
@@ -321,13 +1295,64 @@ class AcetAttendanceService {
         attendanceHtml = response.body;
       }
 
+      final prevSessionId2 = cookies['ASP.NET_SessionId'];
+      final parseSw = Stopwatch()..start();
       final parsed = _parseAttendanceHtml(attendanceHtml);
+      parseSw.stop();
+
+      _debugCookieChange(
+        traceId: traceId,
+        stepA: 'POST ShowAttendance',
+        stepB: 'Parse attendance HTML',
+        sessionIdBefore: prevSessionId2,
+        sessionIdAfter: cookies['ASP.NET_SessionId'],
+      );
+
+      final subjectCount = (parsed['subjects'] as List).length;
       final hasReport = parsed['hasReport'] as bool? ?? false;
+      final hasStudentName = parsed['studentName'] != null;
+      _debugAttendanceParsing(
+        traceId: traceId,
+        step: 'Parse attendance HTML',
+        subjectCount: subjectCount,
+        hasReport: hasReport,
+        hasStudentName: hasStudentName,
+        htmlLength: attendanceHtml.length.toString(),
+      );
+
       if ((parsed['subjects'] as List).isEmpty && !hasReport) {
+        _debugFail(
+          traceId: traceId,
+          step: 'Parse attendance HTML',
+          reason: 'Attendance data was not found',
+          statusCode: response.statusCode,
+          hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+          hasToken: true,
+          cookieKeys: cookies.keys.toList(),
+        );
         throw Exception('Attendance data was not found in the portal response');
       }
+
+      overallSw.stop();
+      _debugStep(
+        traceId: traceId,
+        step: 'fetchAttendance()',
+        elapsedMs: overallSw.elapsedMilliseconds,
+        message: 'success',
+      );
+
       return parsed;
-    } on FormatException {
+    } on FormatException catch (e) {
+      final msg = e.toString();
+      if (msg.contains('tokens')) {
+        _debugFail(
+          traceId: traceId,
+          step: 'Extract tokens',
+          reason: 'Portal login tokens were not found',
+          hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+          cookieKeys: cookies.keys.toList(),
+        );
+      }
       rethrow;
     } catch (e) {
       if (e is Exception &&
@@ -336,9 +1361,17 @@ class AcetAttendanceService {
               e.toString().contains('Could not fetch attendance') ||
               e.toString().contains(
                 'Failed to retrieve attendance auth token',
-              ))) {
+              ) ||
+              e.toString().contains('tokens were not found'))) {
         rethrow;
       }
+      _debugFail(
+        traceId: traceId,
+        step: 'fetchAttendance()',
+        reason: 'Unable to load attendance: ${e.toString()}',
+        hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+        cookieKeys: cookies.keys.toList(),
+      );
       throw Exception('Unable to load attendance right now');
     } finally {
       client.close(force: true);
@@ -354,6 +1387,8 @@ class AcetAttendanceService {
     String? body,
     String? contentType,
     Map<String, String>? extraHeaders,
+    String? traceId,
+    String? stepName,
   }) async {
     var currentUri = Uri.parse('https://$_portalHost$path');
     var currentMethod = method;
@@ -362,34 +1397,101 @@ class AcetAttendanceService {
     while (true) {
       final request = await _openRequest(client, currentMethod, currentUri);
       request.followRedirects = false;
+
+      final requestHeaders = <String, String>{
+        'User-Agent': _userAgent,
+        'Accept-Language': 'en-IN,en;q=0.9',
+      };
+      if (cookies.isNotEmpty) {
+        request.headers.set(HttpHeaders.cookieHeader, _cookieHeader(cookies));
+      }
+      if (contentType != null) {
+        request.headers.set(HttpHeaders.contentTypeHeader, contentType);
+        requestHeaders['Content-Type'] = contentType;
+      }
+      if (extraHeaders != null) {
+        for (final entry in extraHeaders.entries) {
+          request.headers.set(entry.key, entry.value);
+          requestHeaders[entry.key] = entry.value;
+        }
+      }
       request.headers.set(HttpHeaders.userAgentHeader, _userAgent);
       request.headers.set(
         HttpHeaders.acceptHeader,
         'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       );
       request.headers.set(HttpHeaders.acceptLanguageHeader, 'en-IN,en;q=0.9');
-      if (cookies.isNotEmpty) {
-        request.headers.set(HttpHeaders.cookieHeader, _cookieHeader(cookies));
-      }
-      if (contentType != null) {
-        request.headers.set(HttpHeaders.contentTypeHeader, contentType);
-      }
-      extraHeaders?.forEach(request.headers.set);
+
       if (body != null) {
         final bytes = utf8.encode(body);
         request.contentLength = bytes.length;
         request.add(bytes);
       }
 
+      if (traceId != null && stepName != null) {
+        _debugRequest(
+          traceId: traceId,
+          step: stepName,
+          method: currentMethod,
+          url: currentUri.toString(),
+          contentType: contentType,
+          contentLength: body?.length ?? 0,
+          followRedirects: followRedirects,
+          cookieKeys: cookies.keys.toList(),
+          requestHeaders: requestHeaders,
+          body: body,
+        );
+      }
+
       final response = await request.close().timeout(_timeout);
       final responseBody = await _readResponseBody(response);
+
+      final responseHeaders = <String, String>{};
+      response.headers.forEach((name, values) {
+        if (values.isNotEmpty) {
+          responseHeaders[name] = values.first;
+        }
+      });
+
+      final previousCookies = Map<String, String>.from(cookies);
       _captureCookies(response.cookies, cookies);
+
+      final setCookieNames = response.cookies.map((c) => c.name).toList();
+      final hasNewSessionId =
+          !previousCookies.containsKey('ASP.NET_SessionId') &&
+          cookies.containsKey('ASP.NET_SessionId');
+      final hasNewFrmAuth =
+          !previousCookies.containsKey('frmAuth') &&
+          cookies.containsKey('frmAuth');
+
+      if (traceId != null && stepName != null) {
+        _debugResponseHeaders(
+          traceId: traceId,
+          step: stepName,
+          statusCode: response.statusCode,
+          location: response.headers.value(HttpHeaders.locationHeader),
+          setCookieNames: setCookieNames,
+          hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+          hasFrmAuth: cookies.containsKey('frmAuth'),
+          hasViewState: responseBody.contains('__VIEWSTATE'),
+          loginPage: _looksLikeLoginPage(responseBody),
+        );
+        if (hasNewSessionId) {
+          // ignore: avoid_print
+          print('[$traceId][$stepName][NEW] ASP.NET_SessionId was set');
+        }
+        if (hasNewFrmAuth) {
+          // ignore: avoid_print
+          print('[$traceId][$stepName][NEW] frmAuth was set');
+        }
+      }
 
       if (!followRedirects || !_isRedirect(response.statusCode)) {
         return _PortalResponse(
           statusCode: response.statusCode,
           body: responseBody,
           location: response.headers.value(HttpHeaders.locationHeader),
+          headers: responseHeaders,
         );
       }
 
@@ -398,10 +1500,30 @@ class AcetAttendanceService {
         return _PortalResponse(
           statusCode: response.statusCode,
           body: responseBody,
+          headers: responseHeaders,
         );
       }
       if (redirectCount >= 8) {
+        if (traceId != null) {
+          _debugFail(
+            traceId: traceId,
+            step: stepName ?? 'HTTP redirect',
+            reason: 'Portal redirected too many times',
+            statusCode: response.statusCode,
+            hasSessionId: cookies.containsKey('ASP.NET_SessionId'),
+            location: location,
+            cookieKeys: cookies.keys.toList(),
+          );
+        }
         throw Exception('Portal redirected too many times');
+      }
+
+      if (traceId != null && stepName != null) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][$stepName][REDIRECT] '
+          'count=$redirectCount -> ${_truncateLocation(location)}',
+        );
       }
 
       currentUri = currentUri.resolve(location);
@@ -419,6 +1541,7 @@ class AcetAttendanceService {
       case 'POST':
         return client.postUrl(uri);
       case 'GET':
+        return client.getUrl(uri);
       default:
         return client.getUrl(uri);
     }
@@ -650,50 +1773,201 @@ class AcetAttendanceService {
     return value;
   }
 
-  static String _extractHiddenInput(String html, String fieldName) {
-    final patterns = [
-      RegExp(
-        'id="$fieldName"[^>]*value="([^"]*)"',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        'name="$fieldName"[^>]*value="([^"]*)"',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        "id='$fieldName'[^>]*value='([^']*)'",
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        "name='$fieldName'[^>]*value='([^']*)'",
-        caseSensitive: false,
-        dotAll: true,
-      ),
-    ];
+  static Future<String?> _extractTokenMultiStrategy({
+    required String traceId,
+    required HttpClient client,
+    required Map<String, String> cookies,
+    required String attendancePageHtml,
+  }) async {
+    String? token;
 
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(html);
-      final value = match?.group(1);
-      if (value != null) {
-        return value;
-      }
+    if (_isReleaseBuild == false) {
+      // ignore: avoid_print
+      print(
+        '[$traceId][TOKEN] Starting multi-strategy token extraction. '
+        'htmlLen=${attendancePageHtml.length}',
+      );
     }
 
-    throw const FormatException('Portal login tokens were not found');
-  }
-
-  static String? _extractWebMethodToken(String html) {
     for (final pattern in _webMethodTokenPatterns) {
-      final match = pattern.firstMatch(html);
-      final token = match?.group(1)?.trim();
-      if (token != null && token.isNotEmpty) {
+      final match = pattern.firstMatch(attendancePageHtml);
+      final tkn = match?.group(1)?.trim();
+      if (tkn != null && tkn.isNotEmpty) {
+        token = tkn;
+        if (!_isReleaseBuild) {
+          // ignore: avoid_print
+          print('[$traceId][TOKEN] Strategy A (_tkn patterns): found');
+        }
         return token;
       }
     }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print('[$traceId][TOKEN] Strategy A (_tkn patterns): not found');
+    }
+
+    final hiddenMatches = _hiddenInputTokenPattern.allMatches(
+      attendancePageHtml,
+    );
+    for (final hiddenMatch in hiddenMatches) {
+      final inputTag = hiddenMatch.group(0) ?? '';
+
+      String? name;
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) name = nameMatch.group(1);
+
+      String? id;
+      final idMatch = _inputIdAttrPattern.firstMatch(inputTag);
+      if (idMatch != null) id = idMatch.group(1);
+
+      final fieldKey = (name ?? id ?? '').toLowerCase();
+      if (fieldKey.contains('tkn') || fieldKey.contains('token')) {
+        final valueMatch = _inputValueAttrPattern.firstMatch(inputTag);
+        final value = valueMatch?.group(1)?.trim();
+        if (value != null && value.isNotEmpty) {
+          token = value;
+          if (!_isReleaseBuild) {
+            // ignore: avoid_print
+            print(
+              '[$traceId][TOKEN] Strategy B (hidden input): '
+              'found field=$fieldKey',
+            );
+          }
+          return token;
+        }
+      }
+    }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print('[$traceId][TOKEN] Strategy B (hidden input): not found');
+    }
+
+    for (final pattern in _genericTokenPatterns) {
+      final match = pattern.firstMatch(attendancePageHtml);
+      final tkn = match?.group(1)?.trim();
+      if (tkn != null && tkn.isNotEmpty) {
+        token = tkn;
+        if (!_isReleaseBuild) {
+          // ignore: avoid_print
+          print('[$traceId][TOKEN] Strategy C (generic patterns): found');
+        }
+        return token;
+      }
+    }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print('[$traceId][TOKEN] Strategy C (generic patterns): not found');
+    }
+
+    final scriptMatches = _scriptSrcPattern.allMatches(attendancePageHtml);
+    final jsPaths = <String>[];
+    for (final match in scriptMatches) {
+      final src = match.group(1) ?? '';
+      if (src.contains('JSFiles') || src.contains('.js')) {
+        jsPaths.add(src.split('?').first);
+      }
+    }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print(
+        '[$traceId][TOKEN] Strategy D (fetch JS): checking ${jsPaths.length} JS files',
+      );
+    }
+
+    for (final jsPath in jsPaths) {
+      if (!jsPath.contains(_portalHost)) continue;
+
+      try {
+        final jsPathOnly = jsPath.split('?').first;
+        final jsResponse = await _sendRequest(
+          client,
+          method: 'GET',
+          path: jsPathOnly,
+          cookies: cookies,
+          followRedirects: true,
+          traceId: traceId,
+          stepName: 'GET JS for token ($jsPathOnly)',
+        );
+
+        final jsBody = jsResponse.body;
+
+        for (final pattern in _webMethodTokenPatterns) {
+          final match = pattern.firstMatch(jsBody);
+          final tkn = match?.group(1)?.trim();
+          if (tkn != null && tkn.isNotEmpty) {
+            token = tkn;
+            if (!_isReleaseBuild) {
+              // ignore: avoid_print
+              print('[$traceId][TOKEN] Strategy D: found in $jsPathOnly');
+            }
+            return token;
+          }
+        }
+
+        for (final pattern in _genericTokenPatterns) {
+          final match = pattern.firstMatch(jsBody);
+          final tkn = match?.group(1)?.trim();
+          if (tkn != null && tkn.isNotEmpty) {
+            token = tkn;
+            if (!_isReleaseBuild) {
+              // ignore: avoid_print
+              print('[$traceId][TOKEN] Strategy D: found in $jsPathOnly');
+            }
+            return token;
+          }
+        }
+      } catch (_) {
+        if (!_isReleaseBuild) {
+          // ignore: avoid_print
+          print('[$traceId][TOKEN] Strategy D: failed to fetch $jsPath');
+        }
+      }
+    }
+
+    if (!_isReleaseBuild) {
+      final hasTkn = attendancePageHtml.contains('_tkn');
+      final hasToken = attendancePageHtml.toLowerCase().contains('token');
+      // ignore: avoid_print
+      print(
+        '[$traceId][TOKEN] All strategies failed. '
+        'htmlLen=${attendancePageHtml.length}, '
+        'has_tkn=$hasTkn, has_token=$hasToken, '
+        'scriptSrcs=$jsPaths',
+      );
+    }
+
     return null;
+  }
+
+  static void _debugTokenExtractionHints({
+    required String traceId,
+    required String step,
+    required String html,
+  }) {
+    if (_isReleaseBuild) return;
+
+    final scriptSrcs = <String>[];
+    final srcMatches = _scriptSrcPattern.allMatches(html);
+    for (final match in srcMatches) {
+      final src = match.group(1) ?? '';
+      if (src.isNotEmpty) {
+        scriptSrcs.add(src.split('?').first);
+      }
+    }
+
+    // ignore: avoid_print
+    print(
+      '[$traceId][$step][TOKEN_DEBUG] '
+      'htmlLen=${html.length} '
+      'has_tkn=${html.contains('_tkn')} '
+      'has_token=${html.toLowerCase().contains('token')} '
+      'has_hiddenTkn=${html.toLowerCase().contains('hidden') && html.toLowerCase().contains('tkn')} '
+      'scriptSrcs=[${scriptSrcs.join(', ')}]',
+    );
   }
 
   static bool _looksLikeLoginPage(String body) {
@@ -708,71 +1982,6 @@ class AcetAttendanceService {
     return hasUserField &&
         hasPasswordField &&
         (hasLoginButton || hasLoginFormAction);
-  }
-
-  static void _debugLoginState({
-    required String stage,
-    required int statusCode,
-    required String? sessionId,
-    String? frmAuth,
-    required bool loginPageDetected,
-  }) {
-    if (_isReleaseBuild) {
-      return;
-    }
-    // ignore: avoid_print
-    print(
-      '[ACET][$stage] status=$statusCode '
-      'session=${sessionId != null && sessionId.isNotEmpty} '
-      'loginPage=$loginPageDetected',
-    );
-  }
-
-  /// Logs one hop in the ACET login flow. Prints method, path, status, the
-  /// Location header (if any), the names (never values) of all cookies held,
-  /// and whether the body contains key markers. Suppressed in release builds.
-  static void _debugLoginFlow({
-    required String label,
-    required String method,
-    required String path,
-    required int statusCode,
-    String? location,
-    required Map<String, String> cookies,
-    required String body,
-  }) {
-    if (_isReleaseBuild) return;
-    final cookieKeys = cookies.keys.toList();
-    final hasViewState = body.contains('__VIEWSTATE');
-    final bodyLower = body.toLowerCase();
-    final hasAuthcheck =
-        bodyLower.contains('authcheck.aspx') ||
-        bodyLower.contains('object moved');
-    // ignore: avoid_print
-    print(
-      '[ACET][$label] campus=ACET method=$method path=$path '
-      'status=$statusCode location=${location ?? "-"} '
-      'cookies(${cookieKeys.length})=[${cookieKeys.join(", ")}] '
-      'hasViewState=$hasViewState hasAuthcheckRedirect=$hasAuthcheck',
-    );
-  }
-
-  static void _debugAttendanceState({
-    required String stage,
-    required int statusCode,
-    required bool hasToken,
-    required String? sessionId,
-    required String? frmAuth,
-  }) {
-    if (_isReleaseBuild) {
-      return;
-    }
-    // ignore: avoid_print
-    print(
-      '[ACET][$stage] status=$statusCode '
-      'token=$hasToken '
-      'session=${sessionId != null && sessionId.isNotEmpty} '
-      'frmAuth=${frmAuth != null && frmAuth.isNotEmpty}',
-    );
   }
 
   static bool _looksLikeSubjectCell(String value) {
@@ -805,14 +2014,6 @@ class AcetAttendanceService {
     );
     return utf8.decode(bytes, allowMalformed: true);
   }
-
-  static void _debugResponse(String label, int statusCode, String body) {
-    final preview = body.length <= 500 ? body : body.substring(0, 500);
-    // ignore: avoid_print
-    print('$label response code: $statusCode');
-    // ignore: avoid_print
-    print('$label response body preview: $preview');
-  }
 }
 
 class _PortalResponse {
@@ -820,9 +2021,47 @@ class _PortalResponse {
     required this.statusCode,
     required this.body,
     this.location,
-  });
+    Map<String, String>? headers,
+  }) : headers = headers ?? const {};
 
   final int statusCode;
   final String body;
   final String? location;
+  final Map<String, String> headers;
+}
+
+class _LoginFieldNames {
+  const _LoginFieldNames({
+    this.userFieldName,
+    this.passwordFieldName,
+    this.submitButtonName,
+    this.submitButtonValue,
+    required this.hasHdnPwd,
+    required this.fallbackUserField,
+    required this.fallbackPasswordField,
+    required this.fallbackButtonName,
+    required this.fallbackButtonValue,
+  });
+
+  final String? userFieldName;
+  final String? passwordFieldName;
+  final String? submitButtonName;
+  final String? submitButtonValue;
+  final bool hasHdnPwd;
+  final String fallbackUserField;
+  final String fallbackPasswordField;
+  final String fallbackButtonName;
+  final String fallbackButtonValue;
+}
+
+class _LoginPageData {
+  const _LoginPageData({
+    required this.hiddenFields,
+    required this.fieldNames,
+    required this.html,
+  });
+
+  final Map<String, String> hiddenFields;
+  final _LoginFieldNames fieldNames;
+  final String html;
 }
