@@ -15,6 +15,7 @@ class AcetAttendanceService {
   static const String _attendancePath =
       '$_prefix/Academics/studentattendance.aspx/ShowAttendance';
   static const String _ajaxJsPath = '$_prefix/JSFiles/AjaxMethods.js';
+  static const String _authCheckPath = '$_prefix/authcheck.aspx';
 
   static const Duration _timeout = Duration(seconds: 20);
   static const String _userAgent =
@@ -44,28 +45,96 @@ class AcetAttendanceService {
     return aes.encrypt(password, iv: iv).base64;
   }
 
-  static Future<Map<String, String>> _getLoginTokens(
+  /// Fetches the ACET login page HTML, handling the authcheck.aspx auth gate.
+  ///
+  /// The ACET portal sometimes redirects GET /acet/default.aspx to
+  /// /acet/authcheck.aspx before serving the actual login form. This helper:
+  ///   1. GETs default.aspx (following redirects).
+  ///   2. If __VIEWSTATE is absent (auth gate hit), GETs authcheck.aspx to
+  ///      allow the server to set any required cookies/flags, then retries
+  ///      default.aspx.
+  ///   3. Returns the final HTML containing __VIEWSTATE, ready for token
+  ///      extraction.
+  static Future<String> _getLoginPageHtmlWithGateHandling(
     HttpClient client,
     Map<String, String> cookies,
   ) async {
-    final response = await _sendRequest(
+    final initial = await _sendRequest(
       client,
       method: 'GET',
       path: _loginPath,
       cookies: cookies,
-      followRedirects: false,
+      followRedirects: true,
     );
-    _debugResponse('GET login page', response.statusCode, response.body);
+    _debugLoginFlow(
+      label: 'GET default.aspx (initial)',
+      method: 'GET',
+      path: _loginPath,
+      statusCode: initial.statusCode,
+      location: initial.location,
+      cookies: cookies,
+      body: initial.body,
+    );
 
-    final viewState = _extractHiddenInput(response.body, '__VIEWSTATE');
+    if (initial.body.contains('__VIEWSTATE')) {
+      return initial.body;
+    }
+
+    if (!_isReleaseBuild) {
+      // ignore: avoid_print
+      print('[ACET] Auth gate detected (__VIEWSTATE absent). '
+          'Fetching authcheck.aspx to pass the gate...');
+    }
+
+    final authCheck = await _sendRequest(
+      client,
+      method: 'GET',
+      path: _authCheckPath,
+      cookies: cookies,
+      followRedirects: true,
+    );
+    _debugLoginFlow(
+      label: 'GET authcheck.aspx',
+      method: 'GET',
+      path: _authCheckPath,
+      statusCode: authCheck.statusCode,
+      location: authCheck.location,
+      cookies: cookies,
+      body: authCheck.body,
+    );
+
+    final retry = await _sendRequest(
+      client,
+      method: 'GET',
+      path: _loginPath,
+      cookies: cookies,
+      followRedirects: true,
+    );
+    _debugLoginFlow(
+      label: 'GET default.aspx (after authcheck)',
+      method: 'GET',
+      path: _loginPath,
+      statusCode: retry.statusCode,
+      location: retry.location,
+      cookies: cookies,
+      body: retry.body,
+    );
+
+    return retry.body;
+  }
+
+  static Future<Map<String, String>> _getLoginTokens(
+    HttpClient client,
+    Map<String, String> cookies,
+  ) async {
+    final html = await _getLoginPageHtmlWithGateHandling(client, cookies);
+
+    final viewState = _extractHiddenInput(html, '__VIEWSTATE');
     final viewStateGenerator = _extractHiddenInput(
-      response.body,
+      html,
       '__VIEWSTATEGENERATOR',
     );
-    final eventValidation = _extractHiddenInput(
-      response.body,
-      '__EVENTVALIDATION',
-    );
+    final eventValidation = _extractHiddenInput(html, '__EVENTVALIDATION');
 
     return {
       '__VIEWSTATE': viewState,
@@ -657,6 +726,33 @@ class AcetAttendanceService {
       'session=${sessionId != null && sessionId.isNotEmpty} '
       'frmAuth=${frmAuth != null && frmAuth.isNotEmpty} '
       'loginPage=$loginPageDetected',
+    );
+  }
+
+  /// Logs one hop in the ACET login flow. Prints method, path, status, the
+  /// Location header (if any), the names (never values) of all cookies held,
+  /// and whether the body contains key markers. Suppressed in release builds.
+  static void _debugLoginFlow({
+    required String label,
+    required String method,
+    required String path,
+    required int statusCode,
+    String? location,
+    required Map<String, String> cookies,
+    required String body,
+  }) {
+    if (_isReleaseBuild) return;
+    final cookieKeys = cookies.keys.toList();
+    final hasViewState = body.contains('__VIEWSTATE');
+    final bodyLower = body.toLowerCase();
+    final hasAuthcheck = bodyLower.contains('authcheck.aspx') ||
+        bodyLower.contains('object moved');
+    // ignore: avoid_print
+    print(
+      '[ACET][$label] campus=ACET method=$method path=$path '
+      'status=$statusCode location=${location ?? "-"} '
+      'cookies(${cookieKeys.length})=[${cookieKeys.join(", ")}] '
+      'hasViewState=$hasViewState hasAuthcheckRedirect=$hasAuthcheck',
     );
   }
 
