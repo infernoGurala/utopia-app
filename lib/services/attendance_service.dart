@@ -126,7 +126,7 @@ class AttendanceService {
           lowerBody.contains('txtid2') ||
           loginFormActionPattern.hasMatch(lowerBody);
 
-      final isAcetCollege = normalizedCollege == Campus.acet.name;
+      final isAcetCollege = campus == Campus.acet;
       final isAcetLoginValid =
           hasSession &&
           (response.statusCode == HttpStatus.ok || hasRedirectStatusCode) &&
