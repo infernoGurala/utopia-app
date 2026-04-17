@@ -267,6 +267,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   static const double _attendanceTarget = 0.75;
+  static const Duration _toggleAnimDuration = Duration(milliseconds: 180);
 
   int _missableClasses(int attended, int held) {
     if (held <= 0 || attended <= 0) {
@@ -545,7 +546,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             onTap: () =>
                                 setState(() => _selectedCampus = Campus.aus),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
+                              duration: _toggleAnimDuration,
                               decoration: BoxDecoration(
                                 color: _selectedCampus == Campus.aus
                                     ? U.primary
@@ -565,13 +566,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             ),
                           ),
                         ),
-                        Container(width: 1, color: U.border),
+                        VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color: U.border,
+                        ),
                         Expanded(
                           child: GestureDetector(
                             onTap: () =>
                                 setState(() => _selectedCampus = Campus.acet),
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
+                              duration: _toggleAnimDuration,
                               decoration: BoxDecoration(
                                 color: _selectedCampus == Campus.acet
                                     ? U.primary
