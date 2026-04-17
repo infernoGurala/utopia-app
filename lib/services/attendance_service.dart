@@ -109,10 +109,14 @@ class AttendanceService {
       final frmAuth = cookies['frmAuth'];
       final hasRedirectStatusCode =
           response.statusCode >= 300 && response.statusCode < 400;
+      final isAusRedirectStatus =
+          response.statusCode == HttpStatus.movedTemporarily ||
+          response.statusCode == HttpStatus.found ||
+          response.statusCode == HttpStatus.movedPermanently;
       final hasSession = sessionId != null && sessionId.isNotEmpty;
       final hasFrmAuth = frmAuth != null && frmAuth.isNotEmpty;
       final redirectedToStudentMaster =
-          response.statusCode == HttpStatus.found &&
+          isAusRedirectStatus &&
           location.toLowerCase().contains('studentmaster.aspx');
       final lowerBody = response.body.toLowerCase();
       final loginFormAction = RegExp(
@@ -135,7 +139,14 @@ class AttendanceService {
         throw Exception('Invalid credentials');
       }
 
-      return Map<String, String>.from(cookies);
+      final loginCookies = <String, String>{};
+      if (hasSession) {
+        loginCookies['sessionId'] = sessionId!;
+      }
+      if (hasFrmAuth) {
+        loginCookies['frmAuth'] = frmAuth!;
+      }
+      return loginCookies;
     } on FormatException {
       rethrow;
     } catch (e) {
