@@ -20,6 +20,12 @@ class AcetAttendanceService {
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/123.0.0.0 Mobile Safari/537.36';
+  static final RegExp _loginUserFieldPattern = RegExp(
+    r'(id|name)\s*=\s*["\'](txtid2|txtuserid)["\']',
+  );
+  static final RegExp _loginPasswordFieldPattern = RegExp(
+    r'(id|name)\s*=\s*["\'](txtpwd2|txtpassword)["\']',
+  );
 
   static Future<String> _encryptPassword(String password) async {
     final key = encrypt.Key.fromUtf8(_aesSecret);
@@ -623,12 +629,8 @@ class AcetAttendanceService {
 
   static bool _looksLikeLoginPage(String body) {
     final lower = body.toLowerCase();
-    final hasUserField =
-        RegExp(r'(id|name)\s*=\s*["' "'" r'](txtid2|txtuserid)["' "'" r']')
-            .hasMatch(lower);
-    final hasPasswordField =
-        RegExp(r'(id|name)\s*=\s*["' "'" r'](txtpwd2|txtpassword)["' "'" r']')
-            .hasMatch(lower);
+    final hasUserField = _loginUserFieldPattern.hasMatch(lower);
+    final hasPasswordField = _loginPasswordFieldPattern.hasMatch(lower);
     final hasLoginButton = lower.contains('btnlogin') || lower.contains('>login<');
     final hasLoginFormAction = lower.contains('default.aspx') && lower.contains('<form');
 
