@@ -69,17 +69,13 @@ class AttendanceService {
         '__VIEWSTATE': tokens['__VIEWSTATE'] ?? '',
         '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
         '__EVENTVALIDATION': tokens['__EVENTVALIDATION'] ?? '',
-        'txtId1': '',
-        'txtPwd1': encryptedPassword,
-        'txtId2': rollNumber.trim(),
-        'txtPwd2': encryptedPassword,
-        'imgBtn2.x': '36',
-        'imgBtn2.y': '4',
-        'txtId3': '',
-        'txtPwd3': '',
-        'hdnpwd1': encryptedPassword,
-        'hdnpwd2': encryptedPassword,
-        'hdnpwd3': '',
+
+        'userType': 'rbtStudent',
+        'txtUserId': rollNumber.trim(),
+        'txtPassword': encryptedPassword,
+        'hdnpwd': encryptedPassword,
+
+        'btnLogin': 'LOGIN',
       };
 
       final response = await _sendRequest(
@@ -135,15 +131,41 @@ class AttendanceService {
     final cookies = <String, String>{};
     try {
       await _login(client, rollNumber, password, cookies);
+
+      await _sendRequest(
+        client,
+        method: 'GET',
+        path: '/aus/StudentMaster.aspx',
+        cookies: cookies,
+        followRedirects: true,
+      );
+
+      final attendancePageResponse = await _sendRequest(
+        client,
+        method: 'GET',
+        path: _attendancePagePath,
+        cookies: cookies,
+        followRedirects: true,
+      );
+
+      final webMethodToken = _extractWebMethodToken(
+        attendancePageResponse.body,
+      );
+
+      await _sendRequest(
+        client,
+        method: 'GET',
+        path: '/aus/JSFiles/AjaxMethods.js',
+        cookies: cookies,
+        followRedirects: true,
+      );
+
       final attendanceBody = jsonEncode({
         'fromDate': fromDate,
         'toDate': toDate,
         'excludeothersubjects': false,
       });
-      // ignore: avoid_print
-      print('Attendance request url: https://$_portalHost$_attendancePath');
-      // ignore: avoid_print
-      print('Attendance request body: $attendanceBody');
+
       final response = await _sendRequest(
         client,
         method: 'POST',
@@ -154,8 +176,14 @@ class AttendanceService {
         body: attendanceBody,
         extraHeaders: {
           'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
+          HttpHeaders.refererHeader:
+              'https://$_portalHost/aus/Academics/studentattendance.aspx?scrid=3&showtype=SA',
           'x-requested-with': 'XMLHttpRequest',
+          HttpHeaders.acceptHeader:
+              'application/json, text/javascript, */*; q=0.01',
+          'cache-control': 'no-cache',
+          'pragma': 'no-cache',
+          if (webMethodToken != null) 'x-auth-token': webMethodToken,
         },
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
@@ -174,7 +202,9 @@ class AttendanceService {
         attendanceHtml = response.body;
       }
       // ignore: avoid_print
-      print('Attendance extracted HTML:\n$attendanceHtml');
+      print('RAW RESPONSE: ${response.body}');
+      // ignore: avoid_print
+      print('EXTRACTED HTML: $attendanceHtml');
 
       final parsed = _parseAttendanceHtml(attendanceHtml);
       final hasReport = parsed['hasReport'] as bool? ?? false;
@@ -306,45 +336,163 @@ class AttendanceService {
     int? totalAttendedFromReport;
     double? totalPercentageFromReport;
     var hasReport = false;
-    final plainText = _cleanHtmlText(html);
+
+    String tableHtml = html;
+    final tblReportMatch = RegExp(
+      r'''<table[^>]*id=["']tblReport["'][^>]*>(.*?)</table>''',
+      caseSensitive: false,
+      dotAll: true,
+    ).firstMatch(html);
+    if (tblReportMatch != null) {
+      tableHtml = tblReportMatch.group(1) ?? html;
+      // ignore: avoid_print
+      print('Found #tblReport, using its content for parsing');
+    }
+
+    final plainText = _cleanHtmlText(tableHtml);
     final studentName = _extractLabeledValue(plainText, 'Student Name');
     final rowMatches = RegExp(
       r'<tr[^>]*>(.*?)</tr>',
       caseSensitive: false,
       dotAll: true,
-    ).allMatches(html);
+    ).allMatches(tableHtml);
 
-    for (final row in rowMatches) {
+    // Header-based column indices (determined from the <th> header row).
+    int? subjectIdx;
+    int? heldIdx;
+    int? attendIdx;
+    int? percentIdx;
+
+    for (final row in rowMatches.toList()) {
       final rowHtml = row.group(1) ?? '';
+
+      // Detect header row: contains at least one <th> element.
+      final isHeaderRow = RegExp(
+        r'<th\b',
+        caseSensitive: false,
+      ).hasMatch(rowHtml);
+
       final cellMatches = RegExp(
         r'<t[dh][^>]*>(.*?)</t[dh]>',
         caseSensitive: false,
         dotAll: true,
       ).allMatches(rowHtml);
-      if (cellMatches.length < 4) {
-        continue;
-      }
 
-      final cells = cellMatches
-          .map((cell) => _cleanHtmlText(cell.group(1) ?? ''))
-          .where((cell) => cell.isNotEmpty)
+      // Keep all cells (including empty) to preserve positional indices.
+      final cleanedCells = cellMatches
+          .map((c) => _cleanHtmlText(c.group(1) ?? ''))
           .toList();
-      if (cells.length < 4) {
+
+      // --- Header row: determine column indices ---
+      if (isHeaderRow) {
+        for (int i = 0; i < cleanedCells.length; i++) {
+          final lower = cleanedCells[i].toLowerCase().trim();
+          if (lower.contains('subject') ||
+              lower.contains('course') ||
+              lower.contains('paper')) {
+            subjectIdx = i;
+          } else if (lower.contains('held')) {
+            heldIdx = i;
+          } else if (lower.contains('attend') &&
+              !lower.contains('attendance')) {
+            attendIdx = i;
+          } else if (lower == '%' || lower.contains('percent')) {
+            percentIdx = i;
+          }
+        }
         continue;
       }
 
-      final subjectIndex = cells.indexWhere(_looksLikeSubjectCell);
-      if (subjectIndex == -1) {
+      // --- Data row: skip rows with fewer than 3 non-empty cells ---
+      if (cleanedCells.where((c) => c.isNotEmpty).length < 3) continue;
+
+      String? subjectName;
+      int? totalClasses;
+      int? attendedClasses;
+      double? percentage;
+
+      if (subjectIdx != null && heldIdx != null && attendIdx != null) {
+        // Header-based extraction (preferred path).
+        if (subjectIdx < cleanedCells.length) {
+          final s = cleanedCells[subjectIdx].trim();
+          if (s.isNotEmpty) subjectName = s;
+        }
+        if (heldIdx < cleanedCells.length) {
+          totalClasses = int.tryParse(cleanedCells[heldIdx].trim());
+        }
+        if (attendIdx < cleanedCells.length) {
+          attendedClasses = int.tryParse(cleanedCells[attendIdx].trim());
+        }
+        if (percentIdx != null && percentIdx < cleanedCells.length) {
+          final raw = cleanedCells[percentIdx].trim();
+          final normalized = raw.startsWith('.') ? '0$raw' : raw;
+          percentage = double.tryParse(normalized);
+        }
+      } else {
+        // Heuristic fallback: find the subject text cell, then use the
+        // integer cells that follow it (naturally skipping a leading Sl.No).
+        int subjectCellIdx = -1;
+        for (int i = 0; i < cleanedCells.length; i++) {
+          final cell = cleanedCells[i];
+          if (cell.isNotEmpty &&
+              (cell.toLowerCase().trim() == 'total' ||
+                  _looksLikeSubjectCell(cell))) {
+            subjectCellIdx = i;
+            subjectName = cell;
+            break;
+          }
+        }
+        if (subjectCellIdx >= 0) {
+          final intCellsAfterSubject = <int>[];
+          for (int i = subjectCellIdx + 1; i < cleanedCells.length; i++) {
+            final v = int.tryParse(cleanedCells[i].trim());
+            if (v != null) intCellsAfterSubject.add(v);
+          }
+          if (intCellsAfterSubject.length >= 2) {
+            totalClasses = intCellsAfterSubject[0];
+            attendedClasses = intCellsAfterSubject[1];
+          }
+        }
+      }
+
+      // Attempt to parse percentage as a decimal if not yet resolved.
+      if (percentage == null) {
+        for (final cell in cleanedCells.reversed) {
+          final trimmed = cell.trim();
+          final normalized = trimmed.startsWith('.') ? '0$trimmed' : trimmed;
+          // Only consider values with a decimal point to avoid confusing
+          // Held/Attend integers with percentage.
+          if (normalized.contains('.')) {
+            final parsed = double.tryParse(normalized);
+            if (parsed != null && parsed >= 0.0 && parsed <= 100.0) {
+              percentage = parsed;
+              break;
+            }
+          }
+        }
+      }
+
+      // Compute percentage from held/attend if still unknown.
+      if (percentage == null &&
+          totalClasses != null &&
+          totalClasses > 0 &&
+          attendedClasses != null) {
+        percentage = (attendedClasses / totalClasses) * 100;
+      }
+      percentage ??= 0.0;
+
+      if (subjectName == null) {
         continue;
       }
 
-      final subject = cells[subjectIndex];
-      final numericTail = cells.sublist(subjectIndex + 1);
-      final totalClasses = _firstInt(numericTail);
-      final attendedClasses = _secondInt(numericTail);
-      final percentage = _extractPercentage(numericTail);
+      if (totalClasses == null || attendedClasses == null) {
+        continue;
+      }
 
-      if (subject.toLowerCase() == 'total') {
+      final lowerSubject = subjectName.toLowerCase().trim();
+
+      // Total row detection.
+      if (lowerSubject == 'total') {
         hasReport = true;
         totalHeldFromReport = totalClasses;
         totalAttendedFromReport = attendedClasses;
@@ -352,20 +500,22 @@ class AttendanceService {
         continue;
       }
 
-      if (subject.toLowerCase().contains('subject') ||
-          totalClasses == null ||
-          attendedClasses == null ||
-          percentage == null) {
+      // Skip header-like rows that slipped through.
+      if (lowerSubject.contains('subject') ||
+          lowerSubject.contains('sr') ||
+          lowerSubject.contains('sl')) {
         continue;
       }
 
       subjects.add({
-        'subject': subject,
+        'subject': subjectName,
         'totalClasses': totalClasses,
         'attendedClasses': attendedClasses,
         'percentage': percentage,
       });
     }
+
+    if (subjects.isEmpty && !hasReport) {}
 
     final totalHeld = subjects.fold<int>(
       0,
@@ -438,6 +588,14 @@ class AttendanceService {
     }
 
     throw const FormatException('Portal login tokens were not found');
+  }
+
+  static String? _extractWebMethodToken(String html) {
+    final match = RegExp(
+      r"var\s+_tkn\s*=\s*'([^']+)'",
+      caseSensitive: true,
+    ).firstMatch(html);
+    return match?.group(1);
   }
 
   static bool _looksLikeSubjectCell(String value) {
