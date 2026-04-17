@@ -189,7 +189,9 @@ class AcetAttendanceService {
         frmAuth: cookies['frmAuth'],
       );
       if (webMethodToken == null || webMethodToken.trim().isEmpty) {
-        throw Exception('Missing authentication token for attendance request');
+        throw Exception(
+          'Failed to retrieve attendance auth token (session may have expired)',
+        );
       }
 
       await _sendRequest(
@@ -259,7 +261,7 @@ class AcetAttendanceService {
           (e.toString().contains('Invalid credentials') ||
               e.toString().contains('Attendance data was not found') ||
               e.toString().contains('Could not fetch attendance') ||
-              e.toString().contains('Missing authentication token'))) {
+              e.toString().contains('Failed to retrieve attendance auth token'))) {
         rethrow;
       }
       throw Exception('Unable to load attendance right now');
