@@ -13,8 +13,7 @@ class AttendanceService {
   // Campus-specific path helpers
   // ---------------------------------------------------------------------------
 
-  static String _loginPath(Campus campus) =>
-      '${campus.basePath}/default.aspx';
+  static String _loginPath(Campus campus) => '${campus.basePath}/default.aspx';
 
   static const Duration _timeout = Duration(seconds: 20);
   static const String _userAgent =
@@ -120,7 +119,7 @@ class AttendanceService {
           location.toLowerCase().contains('studentmaster.aspx');
       final lowerBody = response.body.toLowerCase();
       final loginFormActionPattern = RegExp(
-        r"action\s*=\s*['\"]default\.aspx['\"]",
+        r"action\s*=\s*['\x22]default\.aspx['\x22]",
       );
       final returnedLoginForm =
           lowerBody.contains('txtid2') ||
@@ -131,7 +130,8 @@ class AttendanceService {
           hasSession &&
           (response.statusCode == HttpStatus.ok || hasRedirectStatusCode) &&
           !returnedLoginForm;
-      final isAusLoginValid = redirectedToStudentMaster && hasFrmAuth && hasSession;
+      final isAusLoginValid =
+          redirectedToStudentMaster && hasFrmAuth && hasSession;
       final loginSucceeded = isAcetCollege ? isAcetLoginValid : isAusLoginValid;
 
       if (!loginSucceeded) {
@@ -218,8 +218,7 @@ class AttendanceService {
         body: attendanceBody,
         extraHeaders: {
           'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader:
-              'https://$_portalHost$attendancePagePath',
+          HttpHeaders.refererHeader: 'https://$_portalHost$attendancePagePath',
           'x-requested-with': 'XMLHttpRequest',
           HttpHeaders.acceptHeader:
               'application/json, text/javascript, */*; q=0.01',

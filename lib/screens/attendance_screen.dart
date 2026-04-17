@@ -113,11 +113,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         campus: campus,
       );
       if (saveCredentials) {
-        await SecureStorageService.saveCredentials(
-          trimmedRoll,
-          password,
-          campus,
-        );
+        await SecureStorageService.saveCredentials(trimmedRoll, password);
       }
       _savedCredentials = {
         'rollNumber': trimmedRoll,
@@ -547,10 +543,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   // Campus selector
                   Text(
                     'Campus',
-                    style: GoogleFonts.outfit(
-                      color: U.sub,
-                      fontSize: 13,
-                    ),
+                    style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   SegmentedButton<Campus>(
