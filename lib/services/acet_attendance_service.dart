@@ -25,6 +25,33 @@ class AcetAttendanceService {
       'Chrome/123.0.0.0 Mobile Safari/537.36';
   static const bool _isReleaseBuild = kReleaseMode;
 
+  static String formatPortalDate(DateTime dt) {
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    final year = dt.year.toString();
+    return '$day-$month-$year';
+  }
+
+  static DateTime todayLocal() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  static DateTime yesterdayLocal() {
+    return todayLocal().subtract(const Duration(days: 1));
+  }
+
+  static DateTime parsePortalDate(String dateStr) {
+    final parts = dateStr.split('-');
+    if (parts.length == 3) {
+      final day = int.tryParse(parts[0]) ?? 1;
+      final month = int.tryParse(parts[1]) ?? 1;
+      final year = int.tryParse(parts[2]) ?? DateTime.now().year;
+      return DateTime(year, month, day);
+    }
+    return todayLocal();
+  }
+
   static final RegExp _hiddenInputPattern = RegExp(
     r'''<input\s+([^>]*?)>''',
     caseSensitive: false,
@@ -1188,9 +1215,45 @@ class AcetAttendanceService {
         elapsedMs: ajaxSw.elapsedMilliseconds,
       );
 
+      DateTime fromDt;
+      DateTime toDt;
+
+      if (fromDate.isEmpty || toDate.isEmpty) {
+        fromDt = todayLocal();
+        toDt = todayLocal();
+      } else {
+        fromDt = parsePortalDate(fromDate);
+        toDt = parsePortalDate(toDate);
+      }
+
+      if (fromDt.isAfter(toDt)) {
+        final temp = fromDt;
+        fromDt = toDt;
+        toDt = temp;
+      }
+
+      final today = todayLocal();
+      if (toDt.isAfter(today)) {
+        toDt = today;
+      }
+
+      final formattedFromDate = formatPortalDate(fromDt);
+      final formattedToDate = formatPortalDate(toDt);
+
+      if (!_isReleaseBuild) {
+        // ignore: avoid_print
+        print(
+          '[$traceId][DATES] '
+          'from=$formattedFromDate '
+          'to=$formattedToDate '
+          'fromInput=$fromDate '
+          'toInput=$toDate',
+        );
+      }
+
       final attendanceBody = jsonEncode({
-        'fromDate': fromDate,
-        'toDate': toDate,
+        'fromDate': formattedFromDate,
+        'toDate': formattedToDate,
         'excludeothersubjects': false,
       });
 
@@ -1319,6 +1382,31 @@ class AcetAttendanceService {
         hasStudentName: hasStudentName,
         htmlLength: attendanceHtml.length.toString(),
       );
+
+      final totalAttended = parsed['totalAttended'] as int? ?? 0;
+      final totalHeld = parsed['totalClasses'] as int? ?? 0;
+
+      if (response.statusCode == 200) {
+        if ((parsed['subjects'] as List).isEmpty && !hasReport) {
+          if (!_isReleaseBuild) {
+            // ignore: avoid_print
+            print(
+              '[$traceId][WARN] empty report for range '
+              '$formattedFromDate to $formattedToDate: '
+              'subjects=$subjectCount hasReport=$hasReport',
+            );
+          }
+        } else if (totalAttended == 0 && totalHeld == 0 && subjectCount > 0) {
+          if (!_isReleaseBuild) {
+            // ignore: avoid_print
+            print(
+              '[$traceId][WARN] all zeros for range '
+              '$formattedFromDate to $formattedToDate: '
+              'attended=$totalAttended held=$totalHeld',
+            );
+          }
+        }
+      }
 
       if ((parsed['subjects'] as List).isEmpty && !hasReport) {
         _debugFail(

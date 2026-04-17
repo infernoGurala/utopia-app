@@ -314,6 +314,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: now,
         credentials: credentials,
         onRefresh: _refresh,
+        portalDateLabel: _formatPortalDateForPortal(now),
       ),
     );
   }
@@ -337,6 +338,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: yesterday,
         credentials: credentials,
         onRefresh: _refresh,
+        portalDateLabel: _formatPortalDateForPortal(yesterday),
       ),
     );
   }
@@ -382,8 +384,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         date: selectedDate,
         credentials: credentials,
         onRefresh: _refresh,
+        portalDateLabel: _formatPortalDateForPortal(selectedDate),
       ),
     );
+  }
+
+  String _formatPortalDateForPortal(DateTime dt) {
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    return '$day-$month-${dt.year}';
   }
 
   String _formatDisplayDate(DateTime date) {
@@ -1381,6 +1390,7 @@ class _AttendanceDateSheet extends StatefulWidget {
     required this.date,
     required this.credentials,
     required this.onRefresh,
+    this.portalDateLabel,
   });
 
   final String title;
@@ -1388,6 +1398,7 @@ class _AttendanceDateSheet extends StatefulWidget {
   final DateTime date;
   final Map<String, String> credentials;
   final VoidCallback onRefresh;
+  final String? portalDateLabel;
 
   @override
   State<_AttendanceDateSheet> createState() => _AttendanceDateSheetState();
@@ -1396,6 +1407,12 @@ class _AttendanceDateSheet extends StatefulWidget {
 class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
   late Future<Map<String, dynamic>> _future;
 
+  String _formatPortalDate(DateTime dt) {
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = dt.month.toString().padLeft(2, '0');
+    return '$day-$month-${dt.year}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1403,12 +1420,13 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
   }
 
   void _loadData() {
+    final portalDate = widget.portalDateLabel ?? _formatPortalDate(widget.date);
     _future = AttendanceService.fetchAttendance(
       widget.credentials['rollNumber'] ?? '',
       widget.credentials['password'] ?? '',
       college: widget.credentials['college'] ?? 'aus',
-      fromDate: widget.dateLabel,
-      toDate: widget.dateLabel,
+      fromDate: portalDate,
+      toDate: portalDate,
     );
   }
 
