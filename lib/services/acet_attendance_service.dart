@@ -102,6 +102,13 @@ class AcetAttendanceService {
       final sessionId = cookies['ASP.NET_SessionId'];
       final frmAuth = cookies['frmAuth'];
       final bodyLooksLikeLoginPage = _looksLikeLoginPage(response.body);
+      _debugLoginState(
+        stage: 'POST login',
+        statusCode: response.statusCode,
+        sessionId: sessionId,
+        frmAuth: frmAuth,
+        loginPageDetected: bodyLooksLikeLoginPage,
+      );
       if (sessionId == null ||
           sessionId.isEmpty ||
           frmAuth == null ||
@@ -121,6 +128,13 @@ class AcetAttendanceService {
         },
       );
       if (_looksLikeLoginPage(studentMaster.body)) {
+        _debugLoginState(
+          stage: 'GET StudentMaster',
+          statusCode: studentMaster.statusCode,
+          sessionId: cookies['ASP.NET_SessionId'],
+          frmAuth: cookies['frmAuth'],
+          loginPageDetected: true,
+        );
         throw Exception('Invalid credentials');
       }
     } on FormatException {
@@ -163,6 +177,13 @@ class AcetAttendanceService {
       final webMethodToken = _extractWebMethodToken(
         attendancePageResponse.body,
       );
+      _debugAttendanceState(
+        stage: 'GET attendance page',
+        statusCode: attendancePageResponse.statusCode,
+        hasToken: webMethodToken != null && webMethodToken.trim().isNotEmpty,
+        sessionId: cookies['ASP.NET_SessionId'],
+        frmAuth: cookies['frmAuth'],
+      );
       if (webMethodToken == null || webMethodToken.trim().isEmpty) {
         throw Exception('Could not fetch attendance right now');
       }
@@ -201,6 +222,13 @@ class AcetAttendanceService {
         },
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
+      _debugAttendanceState(
+        stage: 'POST ShowAttendance',
+        statusCode: response.statusCode,
+        hasToken: true,
+        sessionId: cookies['ASP.NET_SessionId'],
+        frmAuth: cookies['frmAuth'],
+      );
 
       if (response.statusCode != HttpStatus.ok) {
         throw Exception('Could not fetch attendance right now');
@@ -600,6 +628,38 @@ class AcetAttendanceService {
         lower.contains('txtuserid') ||
         lower.contains('txtpassword') ||
         lower.contains('__eventvalidation');
+  }
+
+  static void _debugLoginState({
+    required String stage,
+    required int statusCode,
+    required String? sessionId,
+    required String? frmAuth,
+    required bool loginPageDetected,
+  }) {
+    // ignore: avoid_print
+    print(
+      '[ACET][$stage] status=$statusCode '
+      'session=${sessionId != null && sessionId.isNotEmpty} '
+      'frmAuth=${frmAuth != null && frmAuth.isNotEmpty} '
+      'loginPage=$loginPageDetected',
+    );
+  }
+
+  static void _debugAttendanceState({
+    required String stage,
+    required int statusCode,
+    required bool hasToken,
+    required String? sessionId,
+    required String? frmAuth,
+  }) {
+    // ignore: avoid_print
+    print(
+      '[ACET][$stage] status=$statusCode '
+      'token=$hasToken '
+      'session=${sessionId != null && sessionId.isNotEmpty} '
+      'frmAuth=${frmAuth != null && frmAuth.isNotEmpty}',
+    );
   }
 
   static bool _looksLikeSubjectCell(String value) {
