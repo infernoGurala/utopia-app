@@ -120,7 +120,7 @@ class AttendanceService {
           location.toLowerCase().contains('studentmaster.aspx');
       final lowerBody = response.body.toLowerCase();
       final loginFormActionPattern = RegExp(
-        r"action\s*=\s*['\"]default\.aspx",
+        r"action\s*=\s*['\"]default\.aspx['\"]",
       );
       final returnedLoginForm =
           lowerBody.contains('txtid2') ||
