@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import '../models/campus.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
@@ -19,9 +20,9 @@ class AttendanceScreen extends StatefulWidget {
 
 class _AttendanceScreenState extends State<AttendanceScreen>
     with SingleTickerProviderStateMixin {
-  static const String _defaultRollPrefix = '25B11ME';
   final TextEditingController _rollController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  Campus _selectedCampus = Campus.aus;
 
   late final AnimationController _glowController;
   _AttendanceViewState _state = _AttendanceViewState.loading;
@@ -55,10 +56,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         return;
       }
       if (credentials == null) {
-        _rollController.text = _defaultRollPrefix;
-        _rollController.selection = TextSelection.collapsed(
-          offset: _rollController.text.length,
-        );
         setState(() => _state = _AttendanceViewState.initial);
         return;
       }
@@ -66,9 +63,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _savedCredentials = credentials;
       _rollController.text = credentials['rollNumber'] ?? '';
       _passwordController.text = credentials['password'] ?? '';
+      setState(() {
+        _selectedCampus = Campus.fromName(credentials['campus']);
+      });
       await _fetchAttendance(
         rollNumber: _rollController.text,
         password: _passwordController.text,
+        campus: _selectedCampus,
         saveCredentials: false,
         keepFormOnFailure: false,
       );
@@ -86,6 +87,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Future<void> _fetchAttendance({
     required String rollNumber,
     required String password,
+    required Campus campus,
     required bool saveCredentials,
     required bool keepFormOnFailure,
   }) async {
@@ -108,11 +110,20 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       final result = await AttendanceService.fetchAttendance(
         trimmedRoll,
         password,
+        campus: campus,
       );
       if (saveCredentials) {
-        await SecureStorageService.saveCredentials(trimmedRoll, password);
+        await SecureStorageService.saveCredentials(
+          trimmedRoll,
+          password,
+          campus,
+        );
       }
-      _savedCredentials = {'rollNumber': trimmedRoll, 'password': password};
+      _savedCredentials = {
+        'rollNumber': trimmedRoll,
+        'password': password,
+        'campus': campus.name,
+      };
       if (!mounted) {
         return;
       }
@@ -151,6 +162,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     await _fetchAttendance(
       rollNumber: credentials['rollNumber'] ?? '',
       password: credentials['password'] ?? '',
+      campus: Campus.fromName(credentials['campus']),
       saveCredentials: false,
       keepFormOnFailure: false,
     );
@@ -203,10 +215,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _errorMessage = null;
       _rollController.clear();
       _passwordController.clear();
-      _rollController.text = _defaultRollPrefix;
-      _rollController.selection = TextSelection.collapsed(
-        offset: _rollController.text.length,
-      );
+      _selectedCampus = Campus.aus;
       _state = _AttendanceViewState.initial;
     });
   }
@@ -523,7 +532,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               ),
                             ),
                             Text(
-                              'Minimal setup, live report, secure local storage.',
+                              'Enter your university portal credentials.',
                               style: GoogleFonts.outfit(
                                 color: U.sub,
                                 fontSize: 13,
@@ -535,9 +544,40 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ],
                   ),
                   const SizedBox(height: 20),
+                  // Campus selector
+                  Text(
+                    'Campus',
+                    style: GoogleFonts.outfit(
+                      color: U.sub,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<Campus>(
+                    segments: Campus.values
+                        .map(
+                          (c) => ButtonSegment<Campus>(
+                            value: c,
+                            label: Text(c.label),
+                          ),
+                        )
+                        .toList(),
+                    selected: {_selectedCampus},
+                    onSelectionChanged: (Set<Campus> selection) {
+                      setState(() => _selectedCampus = selection.first);
+                    },
+                    style: SegmentedButton.styleFrom(
+                      backgroundColor: U.surface,
+                      foregroundColor: U.sub,
+                      selectedForegroundColor: U.bg,
+                      selectedBackgroundColor: U.primary,
+                      side: BorderSide(color: U.border),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   _buildField(
                     controller: _rollController,
-                    hintText: 'Enter remaining digits',
+                    hintText: 'e.g. 25B11ME001',
                     labelText: 'Roll Number',
                     textInputAction: TextInputAction.next,
                   ),
@@ -561,6 +601,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     onSubmitted: (_) => _fetchAttendance(
                       rollNumber: _rollController.text,
                       password: _passwordController.text,
+                      campus: _selectedCampus,
                       saveCredentials: true,
                       keepFormOnFailure: true,
                     ),
@@ -572,6 +613,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       onPressed: () => _fetchAttendance(
                         rollNumber: _rollController.text,
                         password: _passwordController.text,
+                        campus: _selectedCampus,
                         saveCredentials: true,
                         keepFormOnFailure: true,
                       ),
@@ -591,6 +633,37 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           fontSize: 15,
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Privacy disclaimer
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: U.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: U.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: U.sub,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'These credentials are used only to sign in to your university portal. They are stored locally on this device and never sent to any third-party server. You can clear them at any time.',
+                            style: GoogleFonts.outfit(
+                              color: U.sub,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1361,6 +1434,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
     _future = AttendanceService.fetchAttendance(
       widget.credentials['rollNumber'] ?? '',
       widget.credentials['password'] ?? '',
+      campus: Campus.fromName(widget.credentials['campus']),
       fromDate: widget.dateLabel,
       toDate: widget.dateLabel,
     );
