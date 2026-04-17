@@ -1,0 +1,378 @@
+UTOPIA
+======
+
+UTOPIA is a student productivity app built for college students. It consolidates
+multiple academic tools — notes, attendance tracking, AI assistance, real-time
+chat, campus mapping, and gamification — into a single offline-first mobile app.
+
+Website: https://inferalis.space
+
+Quick Start
+-----------
+
+* Report a bug: Open an issue on GitHub
+* Get the latest version: https://github.com/infernoGurala/utopia-app/releases
+* Build the app: See Getting Started section below
+* Join the community: https://inferalis.space
+
+Essential Documentation
+-----------------------
+
+All users should be familiar with:
+
+* Features: See Features section below
+* Architecture: See Architecture section below
+* Design System: See Design System section below
+* Tech Stack: See Tech Stack section below
+
+Documentation can be found in the README or viewed online at:
+https://inferalis.space
+
+
+Who Are You?
+============
+
+Find your role below:
+
+* Student - Using UTOPIA for academics and campus life
+* Class Rep / Writer - Managing content and communicating with students
+* Developer - Contributing to the UTOPIA codebase
+* Academic Researcher - Studying app architecture and design
+
+
+For Specific Users
+==================
+
+Student
+-------
+
+Welcome! UTOPIA has everything you need for college:
+
+* Library: Browse community notes and files with full offline access
+* Luna: Get AI-powered academic help, attendance-aware responses
+* Attendance: Track your college portal attendance securely
+* Chat: Message friends with custom emojis
+* SciWordle: Daily science word game with streaks and leaderboards
+* Campus Map: Find friends on campus (8AM-10PM IST)
+* Notifications: Receive morning schedule updates and broadcasts
+* Search: Find any note content instantly
+
+Class Rep / Writer
+------------------
+
+Manage content and communicate with students:
+
+* Developer Panel: Access writer tools from Profile > Developer Mode
+* Timetable Editor: Update weekly class schedule from the app
+* Notes Management: Edit notes in the utopia-content repository
+* Quotes Editor: Manage the morning quote pool
+* Broadcast: Send urgent messages to all students instantly
+* Folder Visibility: Hide/show library folders from readers
+* Manual Notifications: Trigger morning notifications manually
+
+Developer
+---------
+
+Contribute to the UTOPIA codebase:
+
+* Getting Started: See Getting Started section below
+* Architecture: lib/services/ contains all business logic
+* Firebase Setup: Configure Auth, Firestore, and Cloud Messaging
+* GitHub Actions: Morning notifications and broadcasts automation
+* Content Storage: Separate utopia-content repo for notes and files
+* Build Commands: flutter build apk --release for Android
+* Code Style: Follow Flutter/Dart conventions
+
+Academic Researcher
+-------------------
+
+Explore UTOPIA's architecture and design:
+
+* Architecture: Service layer pattern with screens never touching Firebase
+* Offline-First: SQLite caching with auto-sync on app open
+* Multi-Provider AI: Configurable failover across Groq, Gemini, OpenAI
+* Real-Time Systems: Firestore for chat, Realtime DB for location
+* Free Infrastructure: Entire stack runs on free tiers (Firebase, GitHub Actions)
+* Security: AES-128-CBC encryption for credentials, flutter_secure_storage
+* Design System: Material 3 with Catppuccin colour palette
+
+
+Features
+========
+
+Library — Notes & Files
+-----------------------
+
+* Community notes with Markdown rendering and LaTeX math support
+* File attachments (PDFs, slides) from Google Drive, cached for offline
+* Full-text search across all cached content via SQLite
+* Note segment sharing — tap any heading or paragraph to share it
+* Hidden folders support for writers
+
+Luna — Intelligent Academic Assistant
+------------------------------------
+
+* Multi-provider AI with automatic failover (Groq, Gemini, OpenAI-compatible)
+* Context-aware responses using timetable, attendance, and available notes
+* Attendance-aware answers to "can I skip class?"
+* Conversation history with last 20 messages
+* Clean markdown responses with structured formatting
+
+Attendance
+---------
+
+* Direct scraping from info.aec.edu.in college portal
+* AES-128-CBC encrypted credential storage
+* Subject-wise breakdown with progress bars
+* 75% threshold tracking per subject
+
+Chat & Friends
+-------------
+
+* Real-time 1-on-1 messaging via Firestore
+* 120+ custom kawaii emoji system across 7 categories
+* Typing indicators and online/offline presence
+* Message actions — reply, edit, unsend
+* Note sharing directly into conversations
+
+Campus Map
+----------
+
+* Google Maps locked to Aditya University campus
+* Real-time friend location sharing (8AM-10PM IST only)
+* Catppuccin-themed dark map style
+* Per-user location sharing toggle
+
+SciWordle — Daily Science Word Game
+-----------------------------------
+
+* Daily science-themed Wordle with variable word length
+* Scoring system with streak bonuses
+* Anti-cheat — results locked after playing
+* Leaderboard ranked by total score
+* Champion badges for top players (Legend, GOAT)
+
+Morning Notifications
+---------------------
+
+* Daily schedule at 5:00 AM IST
+* Luna-style format: Morning/Afternoon schedule, Must Carry, Quote
+* Fully automated via GitHub Actions
+* Holiday detection with custom messages
+
+Timetable
+---------
+
+* Weekly class schedule with day tabs
+* Writers can edit via visual UI in-app
+* Data stored as JSON in content repository
+
+In-App Updates
+--------------
+
+* Version checking via Firestore
+* Optional and forced update support
+* Direct APK download with progress indicator
+* Native Android package installer
+
+
+Architecture
+============
+
+Service Layer
+------------
+
+All business logic lives in lib/services/ — screens never touch Firebase
+or HTTP directly.
+
+* AIService — Multi-provider AI chat with failover and history
+* AttendanceService — Portal scraping, AES encryption, HTML parsing
+* GitHubService — Content sync, folder/file listing, note caching
+* WriterGitHubService — Write-back to GitHub (timetable, quotes, folders)
+* CacheService — SQLite database for folders, files, notes, settings
+* FileCacheService — Binary file downloads and local caching
+* ChatService — Real-time messaging, typing state, unread counts
+* ChatEmojiCatalog — 120+ custom emoji definitions with inline rendering
+* NotificationService — FCM, local notifications, background handling
+* BroadcastService — Writer broadcast via GitHub Actions
+* SciwordleService — Daily game state, scoring, streaks, leaderboard
+* GameChampionService — Real-time top-3 rankings
+* RoleService — Writer role checking with caching
+* LocationService — GPS for campus map
+* AppUpdateService — Version checking, APK download, install
+* SecureStorageService — Encrypted credential storage
+* SearchService — Full-text search across cached notes
+
+Screen Layer
+-----------
+
+* HomeScreen — Library browser with folders, files, sync
+* NoteViewerScreen — Markdown rendering with segment sharing
+* AttendanceScreen — Login, subject breakdown, progress bars
+* UniversityScreen — Friends, Community, Events, Everyone tabs
+* FriendsScreen — User list with presence and champion badges
+* ChatScreen — 1-on-1 messaging with emoji picker
+* IaaScreen — Luna AI assistant chat interface
+* MapScreen — Campus map with live location sharing
+* SciwordleScreen — Daily word game UI
+* SciwordleLeaderboard — Score rankings with champions
+* SciwordleStatsScreen — Personal game statistics
+* ProfileScreen — Settings, theme, developer mode access
+* DeveloperPanelScreen — Writer tools hub
+* TimetableScreen — Weekly schedule viewer
+* TimetableEditorScreen — Visual editor for writers
+* BroadcastScreen — Urgent message sender
+
+Navigation
+----------
+
+AppShell (BottomNavigationBar)
+├── Library (HomeScreen)
+├── Attendance (AttendanceScreen)
+├── University (UniversityScreen → FriendsScreen, etc.)
+└── Profile (ProfileScreen)
+
+Secondary screens pushed via Navigator.push: Note Viewer, IAA, Chat,
+Map, SciWordle, Developer Panel, Search, etc.
+
+
+Design System
+=============
+
+UTOPIA uses Catppuccin Mocha colour palette with Material 3 components
+and Outfit as the primary typeface.
+
+* Background: #1E1E2E (Base)
+* Surface: #313244 (Surface0)
+* Primary: #CBA6F7 (Mauve)
+* Text: #CDD6F4 (Text)
+* Subtext: #A6ADC8 (Subtext0)
+* Accent: #94E2D5 (Teal)
+* Green: #A6E3A1
+* Yellow: #F9E2AF
+* Error: #F38BA8 (Red)
+* Border: #45475A (Surface1)
+
+Theme system supports multiple named palettes with flexible tokens.
+
+
+Tech Stack
+==========
+
+* App framework: Flutter 3.41.5 (Dart 3.11.3)
+* Auth: Firebase Auth (Google Sign-In)
+* Database: Cloud Firestore + Firebase Realtime Database
+* Local cache: SQLite (sqflite) + path_provider
+* Push notifications: Firebase Cloud Messaging + flutter_local_notifications
+* Content storage: GitHub (utopia-content repo)
+* File storage: Google Drive (shared folder)
+* Automation: GitHub Actions (notifications, broadcasts)
+* AI providers: Groq, Gemini, OpenAI-compatible
+* Maps: Google Maps SDK
+* Attendance: Direct scraping with AES-128-CBC encryption
+* Markdown: flutter_markdown + flutter_math_fork (LaTeX)
+* Security: flutter_secure_storage, encrypt package
+* Design: Material 3 + Catppuccin Mocha
+* Typography: Google Fonts (Outfit)
+
+Monthly cost: 0 — entire stack runs on free tiers.
+
+
+Platform Support
+================
+
+| Feature            | Android | Windows |
+|--------------------|---------|---------|
+| Library / Notes    | Yes     | Yes     |
+| Attendance         | Yes     | Yes     |
+| Luna (IAA)         | Yes     | Yes     |
+| SciWordle          | Yes     | Yes     |
+| Chat               | Yes     | Limited |
+| Campus Map         | Yes     | No      |
+| Push Notifications | Yes     | No      |
+| Google Sign-In     | Yes     | No      |
+| In-App Updates     | Yes     | No      |
+
+
+Getting Started
+===============
+
+Prerequisites
+-------------
+
+* Flutter SDK ^3.11.3
+* Android SDK (for Android builds)
+* Firebase project with Auth, Firestore, Realtime Database, Cloud Messaging
+* Google Maps API key (for campus map)
+
+Setup
+-----
+
+```bash
+git clone https://github.com/infernoGurala/utopia-app.git
+cd utopia-app
+flutter pub get
+flutter run
+```
+
+Firebase Configuration
+----------------------
+
+Place google-services.json (Android) and firebase_options.dart in appropriate
+locations. The app expects these Firestore collections:
+
+* config/github — GitHub PAT and workflow settings
+* config/iaa — AI provider configuration
+* config/app_update — Update version info and APK URL
+* users — User profiles and presence
+* chats — Chat rooms and messages
+* notifications — Push notification history
+* sciwordle_daily — Daily game questions
+* sciwordle_scores — Player scores and streaks
+* sciwordle_progress — In-progress game state
+
+
+Key Decisions
+=============
+
+* No background sync — app syncs only when opened. Battery saver.
+* No Play Store — APK distributed via GitHub Releases + in-app updates.
+* No backend — GitHub Actions replaces a server for all automation.
+* Offline first — all content cached in SQLite. Notes, folders, and images
+  survive airplane mode.
+* Multi-provider AI — IAA cascades through providers, keys, and models with
+  automatic failover.
+* Custom emoji — 120+ kawaii-style illustrated emojis as bundled assets.
+* Single codebase — Android and Windows share identical Flutter code.
+* Free only — every integration uses a free tier.
+
+
+Target Users
+============
+
+* ~60 students — readers (browse notes, get notifications, check attendance,
+  chat, play SciWordle)
+* 2-5 class reps — writers (edit notes, manage timetable, send broadcasts)
+* Campus: Aditya University, Visakhapatnam (Mechanical Engineering)
+
+
+Communication and Support
+=========================
+
+* GitHub Issues: https://github.com/infernoGurala/utopia-app/issues
+* Website: https://inferalis.space
+* Email: johnmosesg160@gmail.com
+* GitHub: https://github.com/infernoGurala
+
+
+Author
+======
+
+John Moses Gurala
+First-year Mechanical Engineering, Aditya University
+Email: johnmosesg160@gmail.com
+GitHub: https://github.com/infernoGurala
+
+---
+
+UTOPIA v2.2.4 — inferalis.space — Built with Flutter — April 2026

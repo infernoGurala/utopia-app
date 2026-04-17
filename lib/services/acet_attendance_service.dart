@@ -82,8 +82,10 @@ class AcetAttendanceService {
 
     if (!_isReleaseBuild) {
       // ignore: avoid_print
-      print('[ACET] Auth gate detected (__VIEWSTATE absent). '
-          'Fetching authcheck.aspx to pass the gate...');
+      print(
+        '[ACET] Auth gate detected (__VIEWSTATE absent). '
+        'Fetching authcheck.aspx to pass the gate...',
+      );
     }
 
     final authCheck = await _sendRequest(
@@ -181,20 +183,15 @@ class AcetAttendanceService {
       _debugResponse('POST login', response.statusCode, response.body);
 
       final sessionId = cookies['ASP.NET_SessionId'];
-      final frmAuth = cookies['frmAuth'];
       final bodyLooksLikeLoginPage = _looksLikeLoginPage(response.body);
       _debugLoginState(
         stage: 'POST login',
         statusCode: response.statusCode,
         sessionId: sessionId,
-        frmAuth: frmAuth,
+        frmAuth: null,
         loginPageDetected: bodyLooksLikeLoginPage,
       );
-      if (sessionId == null ||
-          sessionId.isEmpty ||
-          frmAuth == null ||
-          frmAuth.isEmpty ||
-          bodyLooksLikeLoginPage) {
+      if (sessionId == null || sessionId.isEmpty || bodyLooksLikeLoginPage) {
         throw Exception('Invalid credentials');
       }
 
@@ -297,8 +294,7 @@ class AcetAttendanceService {
           'origin': 'https://$_portalHost',
           HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
           'x-requested-with': 'XMLHttpRequest',
-          HttpHeaders.acceptHeader:
-              'application/json, text/javascript, */*',
+          HttpHeaders.acceptHeader: 'application/json, text/javascript, */*',
           'cache-control': 'no-cache',
           'pragma': 'no-cache',
           'x-auth-token': webMethodToken,
@@ -338,7 +334,9 @@ class AcetAttendanceService {
           (e.toString().contains('Invalid credentials') ||
               e.toString().contains('Attendance data was not found') ||
               e.toString().contains('Could not fetch attendance') ||
-              e.toString().contains('Failed to retrieve attendance auth token'))) {
+              e.toString().contains(
+                'Failed to retrieve attendance auth token',
+              ))) {
         rethrow;
       }
       throw Exception('Unable to load attendance right now');
@@ -702,8 +700,10 @@ class AcetAttendanceService {
     final lower = body.toLowerCase();
     final hasUserField = _loginUserFieldPattern.hasMatch(lower);
     final hasPasswordField = _loginPasswordFieldPattern.hasMatch(lower);
-    final hasLoginButton = lower.contains('btnlogin') || lower.contains('>login<');
-    final hasLoginFormAction = lower.contains('default.aspx') && lower.contains('<form');
+    final hasLoginButton =
+        lower.contains('btnlogin') || lower.contains('>login<');
+    final hasLoginFormAction =
+        lower.contains('default.aspx') && lower.contains('<form');
 
     return hasUserField &&
         hasPasswordField &&
@@ -714,7 +714,7 @@ class AcetAttendanceService {
     required String stage,
     required int statusCode,
     required String? sessionId,
-    required String? frmAuth,
+    String? frmAuth,
     required bool loginPageDetected,
   }) {
     if (_isReleaseBuild) {
@@ -724,7 +724,6 @@ class AcetAttendanceService {
     print(
       '[ACET][$stage] status=$statusCode '
       'session=${sessionId != null && sessionId.isNotEmpty} '
-      'frmAuth=${frmAuth != null && frmAuth.isNotEmpty} '
       'loginPage=$loginPageDetected',
     );
   }
@@ -745,7 +744,8 @@ class AcetAttendanceService {
     final cookieKeys = cookies.keys.toList();
     final hasViewState = body.contains('__VIEWSTATE');
     final bodyLower = body.toLowerCase();
-    final hasAuthcheck = bodyLower.contains('authcheck.aspx') ||
+    final hasAuthcheck =
+        bodyLower.contains('authcheck.aspx') ||
         bodyLower.contains('object moved');
     // ignore: avoid_print
     print(
