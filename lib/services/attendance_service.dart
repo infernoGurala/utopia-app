@@ -3,14 +3,31 @@ import 'dart:io';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
 
+import '../models/campus.dart';
+
 class AttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
-  static const String _loginPath = '/aus/default.aspx';
-  static const String _attendancePath =
-      '/aus/Academics/studentattendance.aspx/ShowAttendance';
-  static const String _attendancePagePath =
-      '/aus/Academics/studentattendance.aspx?scrid=3&showtype=SA';
   static const String _aesSecret = '8701661282118308';
+
+  // ---------------------------------------------------------------------------
+  // Campus-specific path helpers
+  // ---------------------------------------------------------------------------
+
+  static String _loginPath(Campus campus) =>
+      '${campus.basePath}/default.aspx';
+
+  static String _studentMasterPath(Campus campus) =>
+      '${campus.basePath}/StudentMaster.aspx';
+
+  static String _attendancePath(Campus campus) =>
+      '${campus.basePath}/Academics/studentattendance.aspx/ShowAttendance';
+
+  static String _attendancePagePath(Campus campus) =>
+      '${campus.basePath}/Academics/studentattendance.aspx?scrid=3&showtype=SA';
+
+  static String _ajaxMethodsPath(Campus campus) =>
+      '${campus.basePath}/JSFiles/AjaxMethods.js';
+
   static const Duration _timeout = Duration(seconds: 20);
   static const String _userAgent =
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
@@ -29,11 +46,12 @@ class AttendanceService {
   static Future<Map<String, String>> _getLoginTokens(
     HttpClient client,
     Map<String, String> cookies,
+    Campus campus,
   ) async {
     final response = await _sendRequest(
       client,
       method: 'GET',
-      path: _loginPath,
+      path: _loginPath(campus),
       cookies: cookies,
       followRedirects: true,
     );
@@ -61,10 +79,12 @@ class AttendanceService {
     String rollNumber,
     String password,
     Map<String, String> cookies,
+    Campus campus,
   ) async {
     try {
-      final tokens = await _getLoginTokens(client, cookies);
+      final tokens = await _getLoginTokens(client, cookies, campus);
       final encryptedPassword = await _encryptPassword(password);
+      final loginPath = _loginPath(campus);
       final formBody = <String, String>{
         '__VIEWSTATE': tokens['__VIEWSTATE'] ?? '',
         '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
@@ -81,14 +101,14 @@ class AttendanceService {
       final response = await _sendRequest(
         client,
         method: 'POST',
-        path: _loginPath,
+        path: loginPath,
         cookies: cookies,
         followRedirects: false,
         contentType: 'application/x-www-form-urlencoded',
         body: Uri(queryParameters: formBody).query,
         extraHeaders: {
           'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_loginPath',
+          HttpHeaders.refererHeader: 'https://$_portalHost$loginPath',
         },
       );
       _debugResponse('POST login', response.statusCode, response.body);
@@ -124,26 +144,28 @@ class AttendanceService {
   static Future<Map<String, dynamic>> fetchAttendance(
     String rollNumber,
     String password, {
+    Campus campus = Campus.aus,
     String fromDate = '',
     String toDate = '',
   }) async {
     final client = HttpClient()..connectionTimeout = _timeout;
     final cookies = <String, String>{};
     try {
-      await _login(client, rollNumber, password, cookies);
+      await _login(client, rollNumber, password, cookies, campus);
 
       await _sendRequest(
         client,
         method: 'GET',
-        path: '/aus/StudentMaster.aspx',
+        path: _studentMasterPath(campus),
         cookies: cookies,
         followRedirects: true,
       );
 
+      final attendancePagePath = _attendancePagePath(campus);
       final attendancePageResponse = await _sendRequest(
         client,
         method: 'GET',
-        path: _attendancePagePath,
+        path: attendancePagePath,
         cookies: cookies,
         followRedirects: true,
       );
@@ -155,7 +177,7 @@ class AttendanceService {
       await _sendRequest(
         client,
         method: 'GET',
-        path: '/aus/JSFiles/AjaxMethods.js',
+        path: _ajaxMethodsPath(campus),
         cookies: cookies,
         followRedirects: true,
       );
@@ -169,7 +191,7 @@ class AttendanceService {
       final response = await _sendRequest(
         client,
         method: 'POST',
-        path: _attendancePath,
+        path: _attendancePath(campus),
         cookies: cookies,
         followRedirects: false,
         contentType: 'application/json; charset=UTF-8',
@@ -177,7 +199,7 @@ class AttendanceService {
         extraHeaders: {
           'origin': 'https://$_portalHost',
           HttpHeaders.refererHeader:
-              'https://$_portalHost/aus/Academics/studentattendance.aspx?scrid=3&showtype=SA',
+              'https://$_portalHost$attendancePagePath',
           'x-requested-with': 'XMLHttpRequest',
           HttpHeaders.acceptHeader:
               'application/json, text/javascript, */*; q=0.01',
