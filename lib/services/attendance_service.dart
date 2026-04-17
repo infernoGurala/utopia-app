@@ -132,16 +132,12 @@ class AttendanceService {
     try {
       await _login(client, rollNumber, password, cookies);
 
-      final masterResponse = await _sendRequest(
+      await _sendRequest(
         client,
         method: 'GET',
         path: '/aus/StudentMaster.aspx',
         cookies: cookies,
         followRedirects: true,
-      );
-      // ignore: avoid_print
-      print(
-        'DEBUG: StudentMaster status=${masterResponse.statusCode}, cookieCount=${cookies.length}, bodySnippet=${masterResponse.body.substring(0, masterResponse.body.length.clamp(0, 200))}',
       );
 
       final attendancePageResponse = await _sendRequest(
@@ -151,94 +147,24 @@ class AttendanceService {
         cookies: cookies,
         followRedirects: true,
       );
-      // ignore: avoid_print
-      print(
-        'DEBUG: AttendancePage status=${attendancePageResponse.statusCode}, cookieCount=${cookies.length}, bodySnippet=${attendancePageResponse.body.substring(0, attendancePageResponse.body.length.clamp(0, 200))}',
-      );
-      // ignore: avoid_print
-      print(
-        'DEBUG: Full attendance page body length: ${attendancePageResponse.body.length}',
-      );
-      // ignore: avoid_print
-      print(
-        'DEBUG: Attendance page contains ScriptManager: ${attendancePageResponse.body.contains('ScriptManager')}',
-      );
-      // ignore: avoid_print
-      print(
-        'DEBUG: Attendance page contains ShowAttendance: ${attendancePageResponse.body.contains('ShowAttendance')}',
-      );
-      // ignore: avoid_print
-      print(
-        'DEBUG: Attendance page contains scrid: ${attendancePageResponse.body.contains('scrid')}',
-      );
-      // ignore: avoid_print
-      print('DEBUG: FULL ATTENDANCE PAGE HTML START');
-      final fullBody = attendancePageResponse.body;
-      for (int i = 0; i < fullBody.length; i += 800) {
-        // ignore: avoid_print
-        print(
-          fullBody.substring(
-            i,
-            i + 800 > fullBody.length ? fullBody.length : i + 800,
-          ),
-        );
-      }
-      // ignore: avoid_print
-      print('DEBUG: FULL ATTENDANCE PAGE HTML END');
-
-      String? requestVerificationToken;
-      try {
-        requestVerificationToken = _extractHiddenInput(
-          attendancePageResponse.body,
-          '__RequestVerificationToken',
-        );
-      } catch (_) {
-        requestVerificationToken = null;
-      }
-      // ignore: avoid_print
-      print('DEBUG: RequestVerificationToken=$requestVerificationToken');
-
-      final hiddenFields = RegExp(
-        r'''<input[^>]+type=["']hidden["'][^>]*name=["']([^"']+)["']''',
-        caseSensitive: false,
-      ).allMatches(attendancePageResponse.body).map((m) => m.group(1)).toList();
-      // ignore: avoid_print
-      print('DEBUG: Hidden fields in attendance page: $hiddenFields');
 
       final webMethodToken = _extractWebMethodToken(
         attendancePageResponse.body,
       );
-      // ignore: avoid_print
-      print('DEBUG: webMethodToken=$webMethodToken');
 
-      final ajaxJs = await _sendRequest(
+      await _sendRequest(
         client,
         method: 'GET',
         path: '/aus/JSFiles/AjaxMethods.js',
         cookies: cookies,
         followRedirects: true,
       );
-      // ignore: avoid_print
-      print('DEBUG: AjaxMethods.js status=${ajaxJs.statusCode}');
-      final jsContent = ajaxJs.body;
-      for (int i = 0; i < jsContent.length; i += 800) {
-        // ignore: avoid_print
-        print(jsContent.substring(i, (i + 800).clamp(0, jsContent.length)));
-      }
 
       final attendanceBody = jsonEncode({
         'fromDate': fromDate,
         'toDate': toDate,
         'excludeothersubjects': false,
       });
-      // ignore: avoid_print
-      print('Attendance request url: https://$_portalHost$_attendancePath');
-      // ignore: avoid_print
-      print('Attendance request body: $attendanceBody');
-      // ignore: avoid_print
-      print(
-        'DEBUG: Cookies being sent to attendance POST: ${_cookieHeader(cookies)}',
-      );
 
       final response = await _sendRequest(
         client,
@@ -431,9 +357,6 @@ class AttendanceService {
       dotAll: true,
     ).allMatches(tableHtml);
 
-    // ignore: avoid_print
-    print('Parsing attendance: found ${rowMatches.length} table rows');
-
     // Header-based column indices (determined from the <th> header row).
     int? subjectIdx;
     int? heldIdx;
@@ -444,8 +367,10 @@ class AttendanceService {
       final rowHtml = row.group(1) ?? '';
 
       // Detect header row: contains at least one <th> element.
-      final isHeaderRow =
-          RegExp(r'<th\b', caseSensitive: false).hasMatch(rowHtml);
+      final isHeaderRow = RegExp(
+        r'<th\b',
+        caseSensitive: false,
+      ).hasMatch(rowHtml);
 
       final cellMatches = RegExp(
         r'<t[dh][^>]*>(.*?)</t[dh]>',
@@ -454,8 +379,9 @@ class AttendanceService {
       ).allMatches(rowHtml);
 
       // Keep all cells (including empty) to preserve positional indices.
-      final cleanedCells =
-          cellMatches.map((c) => _cleanHtmlText(c.group(1) ?? '')).toList();
+      final cleanedCells = cellMatches
+          .map((c) => _cleanHtmlText(c.group(1) ?? ''))
+          .toList();
 
       // --- Header row: determine column indices ---
       if (isHeaderRow) {
@@ -467,17 +393,13 @@ class AttendanceService {
             subjectIdx = i;
           } else if (lower.contains('held')) {
             heldIdx = i;
-          } else if (lower.contains('attend') && !lower.contains('attendance')) {
+          } else if (lower.contains('attend') &&
+              !lower.contains('attendance')) {
             attendIdx = i;
           } else if (lower == '%' || lower.contains('percent')) {
             percentIdx = i;
           }
         }
-        // ignore: avoid_print
-        print(
-          'Header indices: subject=$subjectIdx, held=$heldIdx, '
-          'attend=$attendIdx, percent=$percentIdx',
-        );
         continue;
       }
 
@@ -560,14 +482,10 @@ class AttendanceService {
       percentage ??= 0.0;
 
       if (subjectName == null) {
-        // ignore: avoid_print
-        print('Skipping row (no subject found): $cleanedCells');
         continue;
       }
 
       if (totalClasses == null || attendedClasses == null) {
-        // ignore: avoid_print
-        print('Skipping row (not enough numeric data): $cleanedCells');
         continue;
       }
 
@@ -579,10 +497,6 @@ class AttendanceService {
         totalHeldFromReport = totalClasses;
         totalAttendedFromReport = attendedClasses;
         totalPercentageFromReport = percentage;
-        // ignore: avoid_print
-        print(
-          'Found total row: held=$totalClasses, attended=$attendedClasses, percentage=$percentage',
-        );
         continue;
       }
 
@@ -590,15 +504,8 @@ class AttendanceService {
       if (lowerSubject.contains('subject') ||
           lowerSubject.contains('sr') ||
           lowerSubject.contains('sl')) {
-        // ignore: avoid_print
-        print('Skipping header row: $subjectName');
         continue;
       }
-
-      // ignore: avoid_print
-      print(
-        'Parsed subject: $subjectName, held=$totalClasses, attended=$attendedClasses, percentage=$percentage',
-      );
 
       subjects.add({
         'subject': subjectName,
@@ -608,12 +515,7 @@ class AttendanceService {
       });
     }
 
-    if (subjects.isEmpty && !hasReport) {
-      // ignore: avoid_print
-      print(
-        'PARSING FAILED - HTML snippet: ${tableHtml.length > 500 ? '${tableHtml.substring(0, 500)}...' : tableHtml}',
-      );
-    }
+    if (subjects.isEmpty && !hasReport) {}
 
     final totalHeld = subjects.fold<int>(
       0,
