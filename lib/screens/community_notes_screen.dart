@@ -8,7 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'note_viewer_screen.dart';
 
 /// Number of approvals required before a community deletion is executed.
-const int kDeletionApprovalsRequired = 3;
+/// Set to 2 for now (requester counts as the first approval automatically).
+const int kDeletionApprovalsRequired = 2;
 
 class CommunityNotesScreen extends StatefulWidget {
   final String universityFolderName;
@@ -104,7 +105,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (aIsFolder && !bIsFolder) return -1;
       if (!aIsFolder && bIsFolder) return 1;
 
-      return (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? '');
+      return (a['name'] as String? ?? '').toLowerCase().compareTo(
+            (b['name'] as String? ?? '').toLowerCase(),
+          );
     });
   }
 
@@ -531,7 +534,22 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           ],
         ),
         body: _loading
-            ? Center(child: CircularProgressIndicator(color: U.primary))
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: U.primary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Please wait while loading the list.',
+                      style: GoogleFonts.outfit(
+                        color: U.sub,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              )
             : _items.isEmpty
             ? Center(
                 child: Column(
@@ -576,9 +594,54 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         itemBuilder: (context, index) {
                           final item = _items[index];
                           final name = item['name'] as String;
+                          final path = item['path'] as String;
+
+                          final deletionDoc = _pendingDeletions
+                              .where(
+                                (d) =>
+                                    (d.data()
+                                            as Map<String, dynamic>)['path'] ==
+                                    path,
+                              )
+                              .firstOrNull;
+                          final isPendingDeletion = deletionDoc != null;
+                          final approvals = isPendingDeletion
+                              ? List<String>.from(
+                                  deletionDoc!['approvals'] ?? [],
+                                )
+                              : <String>[];
+                          final user = FirebaseAuth.instance.currentUser;
+                          final hasApproved =
+                              user != null && approvals.contains(user.uid);
+                          final isRequester =
+                              isPendingDeletion &&
+                              user != null &&
+                              (deletionDoc!.data()
+                                      as Map<String, dynamic>)['requesterUid'] ==
+                                  user.uid;
+                          final effectiveStatus = isPendingDeletion
+                              ? _effectiveStatus(deletionDoc!)
+                              : 'none';
+                          final isExecuting = effectiveStatus == 'executing';
+
                           return _buildProgramCard(
                             title: name,
                             onTap: () => _navigateToFolder(name),
+                            isPendingDeletion: isPendingDeletion,
+                            approvalCount: approvals.length,
+                            isExecuting: isExecuting,
+                            isEditMode: _isEditMode,
+                            onEditTap:
+                                (!isPendingDeletion && _isEditMode)
+                                    ? () => _showRootFolderEditOptions(item)
+                                    : null,
+                            onLongPress: isPendingDeletion
+                                ? () => _showRootFolderPendingOptions(
+                                      deletionDoc!,
+                                      hasApproved,
+                                      isRequester,
+                                    )
+                                : null,
                           );
                         },
                       )
@@ -616,12 +679,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           final isExecuting = effectiveStatus == 'executing';
                           final isFailed = effectiveStatus == 'failed';
 
-                          String pendingSubtitle() {
-                            if (isExecuting) return 'Deletion in progress...';
-                            if (isFailed) return 'Deletion failed — tap for details';
-                            return 'Pending Deletion (${approvals.length}/$kDeletionApprovalsRequired approvals)';
-                          }
-
                           return ListTile(
                             leading: Icon(
                               isFolder
@@ -637,22 +694,17 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                 color: isPendingDeletion ? U.sub : U.text,
                               ),
                             ),
-                            subtitle:
-                                !isFolder &&
-                                    item['size'] != null &&
-                                    !name.toLowerCase().endsWith('.md')
-                                ? Text(
-                                    isPendingDeletion
-                                        ? pendingSubtitle()
-                                        : _formatFileSize(item['size'] as int),
-                                    style: GoogleFonts.outfit(
-                                      color: U.sub,
-                                      fontSize: 12,
-                                    ),
+                            subtitle: isPendingDeletion
+                                ? _buildDeletionProgressWidget(
+                                    approvals.length,
+                                    isExecuting,
+                                    isFailed,
                                   )
-                                : (isPendingDeletion
+                                : (!isFolder &&
+                                          item['size'] != null &&
+                                          !name.toLowerCase().endsWith('.md')
                                       ? Text(
-                                          pendingSubtitle(),
+                                          _formatFileSize(item['size'] as int),
                                           style: GoogleFonts.outfit(
                                             color: U.sub,
                                             fontSize: 12,
@@ -684,23 +736,26 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                   _showFailedInfo(deletionDoc!);
                                   return;
                                 }
+                                // Allow navigating into pending folders
+                                if (isFolder) {
+                                  _navigateToFolder(name);
+                                  return;
+                                }
                                 // Allow read-only viewing of pending files
-                                if (!isFolder) {
-                                  final downloadUrl =
-                                      item['download_url'] as String?;
-                                  if (downloadUrl != null &&
-                                      downloadUrl.isNotEmpty) {
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => NoteViewerScreen(
-                                          title: name.replaceAll('.md', ''),
-                                          filePath: path,
-                                          isEditable: false,
-                                        ),
+                                final downloadUrl =
+                                    item['download_url'] as String?;
+                                if (downloadUrl != null &&
+                                    downloadUrl.isNotEmpty) {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => NoteViewerScreen(
+                                        title: name.replaceAll('.md', ''),
+                                        filePath: path,
+                                        isEditable: false,
                                       ),
-                                    );
-                                  }
+                                    ),
+                                  );
                                 }
                                 return;
                               }
@@ -754,7 +809,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         'name': name,
         'type': type,
         'requesterUid': user.uid,
-        'approvals': <String>[],
+        'approvals': <String>[user.uid], // requester automatically counts as first approval
         'isDeleted': false,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
@@ -765,7 +820,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Deletion requested. Needs $kDeletionApprovalsRequired approvals.'),
+            content: Text(
+              'Deletion requested (1/$kDeletionApprovalsRequired approvals).',
+            ),
             backgroundColor: U.primary,
           ),
         );
@@ -1038,6 +1095,111 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     );
   }
 
+  /// Root-folder edit options: only delete (request) is offered at program level.
+  void _showRootFolderEditOptions(Map<String, dynamic> item) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: U.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: Icon(Icons.delete_outline, color: U.red),
+            title: Text(
+              'Request Deletion',
+              style: GoogleFonts.outfit(color: U.red),
+            ),
+            onTap: () {
+              Navigator.pop(ctx);
+              _requestDeletion(item);
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  /// Options shown when long-pressing a pending-deletion program card in the root grid.
+  void _showRootFolderPendingOptions(
+    QueryDocumentSnapshot deletionDoc,
+    bool hasApproved,
+    bool isRequester,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: U.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (!hasApproved)
+            ListTile(
+              leading: Icon(Icons.check_circle_outline, color: U.red),
+              title: Text(
+                'Approve Deletion',
+                style: GoogleFonts.outfit(color: U.red),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _approveDeletion(deletionDoc);
+              },
+            ),
+          if (hasApproved)
+            ListTile(
+              leading: Icon(Icons.undo_rounded, color: U.sub),
+              title: Text(
+                'Undo Approval',
+                style: GoogleFonts.outfit(color: U.text),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _undoApproval(deletionDoc);
+              },
+            ),
+          if (isRequester)
+            ListTile(
+              leading: Icon(Icons.cancel_outlined, color: U.red),
+              title: Text(
+                'Cancel Request',
+                style: GoogleFonts.outfit(color: U.red),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _cancelDeletion(deletionDoc);
+              },
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
   /// Returns the effective deletion status for a doc.
   /// Handles legacy docs that lack the [status] field by falling back to [isDeleted].
   String _effectiveStatus(QueryDocumentSnapshot doc) {
@@ -1237,6 +1399,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   Widget _buildProgramCard({
     required String title,
     required VoidCallback onTap,
+    bool isPendingDeletion = false,
+    int approvalCount = 0,
+    bool isExecuting = false,
+    bool isEditMode = false,
+    VoidCallback? onEditTap,
+    VoidCallback? onLongPress,
   }) {
     // Curated color pairs for vibrant gradients
     final colorPairs = [
@@ -1255,24 +1423,31 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     final pairIndex = title.hashCode.abs() % colorPairs.length;
     final pair = colorPairs[pairIndex];
 
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: isPendingDeletion
+          ? const [Color(0xFF4B4B4B), Color(0xFF3A3A3A)]
+          : [pair[0], pair[1]],
+    );
+
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(28),
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [pair[0], pair[1]],
-          ),
+          gradient: gradient,
           borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: pair[0].withValues(alpha: 0.25),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: isPendingDeletion
+              ? []
+              : [
+                  BoxShadow(
+                    color: pair[0].withValues(alpha: 0.25),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -1336,10 +1511,120 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   ],
                 ),
               ),
+              // Edit icon overlay when in edit mode (non-pending only)
+              if (isEditMode && !isPendingDeletion && onEditTap != null)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: onEditTap,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.edit_outlined,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              // Pending deletion: progress bar at bottom
+              if (isPendingDeletion && !isExecuting)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          '$approvalCount/$kDeletionApprovalsRequired approvals',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontSize: 11,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      LinearProgressIndicator(
+                        value: kDeletionApprovalsRequired > 0
+                            ? approvalCount / kDeletionApprovalsRequired
+                            : 0.0,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.grey,
+                        ),
+                        minHeight: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              if (isPendingDeletion && isExecuting)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                    minHeight: 4,
+                  ),
+                ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// Builds a subtitle widget showing deletion progress with a grey progress bar.
+  Widget _buildDeletionProgressWidget(
+    int approvalCount,
+    bool isExecuting,
+    bool isFailed,
+  ) {
+    if (isExecuting) {
+      return Text(
+        'Deletion in progress...',
+        style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+      );
+    }
+    if (isFailed) {
+      return Text(
+        'Deletion failed — tap for details',
+        style: GoogleFonts.outfit(color: U.red, fontSize: 12),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Pending Deletion ($approvalCount/$kDeletionApprovalsRequired approvals)',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: kDeletionApprovalsRequired > 0
+              ? approvalCount / kDeletionApprovalsRequired
+              : 0.0,
+          backgroundColor: U.border,
+          valueColor: const AlwaysStoppedAnimation<Color>(Colors.grey),
+          minHeight: 3,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ],
     );
   }
 

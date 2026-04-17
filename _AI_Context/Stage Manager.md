@@ -35,22 +35,23 @@
 - [x] donot show the file size for markdown
 - [x] change the university community notes of just the programs which is university notes->folders displayed to be in a similar way of the boxes in library by more cooler and easy to find the program, at most there will be 15 program folders here.
 - [x] the edit mode tooggle should work for all cases, currently iy works for folders, but if i went inside a file even without edit mode turned on, it just gives me free write access, it must be changed.
-- [x] Delete option: 3 approvals required (`kDeletionApprovalsRequired = 3`). Delete-requested file appears at top, greyed out. People can still view the file (read-only). Progress shown (n/3). Undo approval and cancel request supported. Concurrency-safe via Firestore transaction lock (status: pending→executing→executed/failed/cancelled).
+- [x] Delete option: 2 approvals required (`kDeletionApprovalsRequired = 2`, configurable). Requester auto-counts as first approval. Delete-requested file/folder appears at top, greyed out. Pending folders can still be navigated; pending files viewable read-only. Progress shown (n/2) with grey LinearProgressIndicator. Undo approval and cancel request supported. Concurrency-safe via Firestore transaction lock (status: pending→executing→executed/failed/cancelled).
 - [x] as already mentioned, the changes must be displaed instantly in the app, there should be no loading screen shown when modifiying the files/folders. all the loading should be background work not foreground.
-- [ ] sort folders--> alphabetical order.
+- [x] sort folders--> alphabetical order.
 - [x] when the user changes his university the app must restart and his library must change accordingly, now, only the university notes are working per university. classes joined/created must also change according to the university.
-- [ ] add a loading name in university loading, as please wait while loading the list.
-- [ ] university root folder inside option the remove the view programm text that is showing up on the folder..
+- [x] add a loading name in university loading, as please wait while loading the list.
+- [x] university root folder inside option the remove the view programm text that is showing up on the folder..
 - [x] Remove the name "View Program" inside the University Notes folder view, and rename the "university notes" to "community notes".
-- [ ] Add a delete option in university root folder also. CURRENTLY NOT ADDED, BECAUSE THIS SCREEN USES DIFFERNT UI THAN REST. ADD SUITABLE WAY TO DELETE THE WORKFLOW. AND THIS DELETION CONSISTS ALSO 23 APPROVALS.
+- [x] Add a delete option in university root folder also. Edit icon shown on each program card in edit mode; long-press on pending card shows approve/undo/cancel. Same 2-approval workflow applies.
 - [ ] edit mode, the add new files/folder icon appears inside the community notes. which it should not appear.
-- [ ] auto add one approval, for the file/folder deletion on the account of the user who first deleted the item.
+- [x] auto add one approval, for the file/folder deletion on the account of the user who first deleted the item.
 - [ ] when the file is in active state of deletion give two options, approval/unapprove by icons coloured red and green. 
-- [ ] in active delete mode, in case of folder in active deletion pending mode. it is not opening. the folder should be opened.
+- [x] in active delete mode, in case of folder in active deletion pending mode. it is not opening. the folder should be opened.
 - [ ] KEYBOARD TEXT EDITOR IS BROKEN FROM THE INITIAL V1.0 THE "|" IN THE TYPING IS NOT WOKRING, INSTEAD OF SLIDING THROUGH LETTERS IT SELECTS THE TEXTS. BUG FIX NEEDED.
 - [ ] ADD A CLEAR PATH ON TOP OF THE SCREEN TO INDICATE WHERE THE USER IS. AND THE PATHS MUST BE CLICKABLE AND CLEAR AND NOT VERY DISTRACTING. -- ADD FOR UNIVERSITY FOLDER AFTER MAIN ROOT FOLDER ONLY. LEAVE THE MAIN, ADD FOR REMAINIG. UNIVERSITY(MAIN)(LEAVE)-->CSE(LEAVE)-->SEM-1,SEM2,SEM3(ADD FROM HERE). THIS WILL BE THE FOLDER STRUCTURE ADD THIS WAY.
-- [ ] ADD ALPHABETICAL SORTING IN ROOT UNIVERISTY FOLDER ALSO. AND ENSURE IT IS SAME EVERYWHERE.
-- [ ] “University Notes” is renamed to “Community Notes”201
+- [x] ADD ALPHABETICAL SORTING IN ROOT UNIVERISTY FOLDER ALSO. AND ENSURE IT IS SAME EVERYWHERE.
+- [x] “University Notes” is renamed to “Community Notes”
+- [ ] 
 ---
 
 ## Next Up
