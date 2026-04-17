@@ -27,6 +27,12 @@ class AcetAttendanceService {
   static final RegExp _loginPasswordFieldPattern = RegExp(
     r'(id|name)\s*=\s*["\'](txtpwd2|txtpassword)["\']',
   );
+  static final List<RegExp> _webMethodTokenPatterns = [
+    RegExp(r"var\s+_tkn\s*=\s*'([^']+)'"),
+    RegExp(r'var\s+_tkn\s*=\s*"([^"]+)"'),
+    RegExp(r"['_\"]_tkn['_\"]\s*:\s*'([^']+)'"),
+    RegExp(r'["_\']_tkn["_\']\s*:\s*"([^"]+)"'),
+  ];
 
   static Future<String> _encryptPassword(String password) async {
     final key = encrypt.Key.fromUtf8(_aesSecret);
@@ -191,7 +197,7 @@ class AcetAttendanceService {
       );
       if (webMethodToken == null || webMethodToken.trim().isEmpty) {
         throw Exception(
-          'Failed to retrieve attendance auth token (session may have expired)',
+          'Failed to retrieve attendance auth token from portal response',
         );
       }
 
@@ -612,14 +618,7 @@ class AcetAttendanceService {
   }
 
   static String? _extractWebMethodToken(String html) {
-    final patterns = [
-      RegExp(r"var\s+_tkn\s*=\s*'([^']+)'"),
-      RegExp(r'var\s+_tkn\s*=\s*"([^"]+)"'),
-      RegExp(r"['_\"]_tkn['_\"]\s*:\s*'([^']+)'"),
-      RegExp(r'["_\']_tkn["_\']\s*:\s*"([^"]+)"'),
-    ];
-
-    for (final pattern in patterns) {
+    for (final pattern in _webMethodTokenPatterns) {
       final match = pattern.firstMatch(html);
       final token = match?.group(1)?.trim();
       if (token != null && token.isNotEmpty) {
