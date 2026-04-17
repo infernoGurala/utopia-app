@@ -1,23 +1,15 @@
-# UTOPIA — The Student Productivity Platform
+## UTOPIA — Student Productivity & life Simplified
 
 > **One app. Every academic need. Works offline.**
 
-![Flutter](https://img.shields.io/badge/Flutter-3.41.5-02569B?style=flat-square&logo=flutter)
-![Dart](https://img.shields.io/badge/Dart-3.11.3-0175C2?style=flat-square&logo=dart)
-![Firebase](https://img.shields.io/badge/Firebase-Enabled-FFCA28?style=flat-square&logo=firebase)
-![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Windows-brightgreen?style=flat-square)
-![Version](https://img.shields.io/badge/Version-2.2.4-blue?style=flat-square)
-![License](https://img.shields.io/badge/License-Private-red?style=flat-square)
+What is UTOPIA?
+===============
 
----
+UTOPIA is a student productivity app built for **college students**. It replaces every scattered academic tool — college portals, attendance trackers, note-sharing groups, class schedules, community help — with a single offline-first app that just works.
 
-## What is UTOPIA?
+Built by a first-year mechanical engineering student with zero prior coding experience, using Flutter and a fully free infrastructure stack. 
 
-UTOPIA is a cross-platform student productivity app built for **college students**. It replaces every scattered academic tool — college portals, attendance trackers, note-sharing groups, class schedules — with a single offline-first app that just works.
-
-Built by a first-year mechanical engineering student with zero prior coding experience, using Flutter and a fully free infrastructure stack.
-
-**Website:** [utopia.inferalis.space](https://utopia.inferalis.space)
+**Website:** [Inferno](https://inferalis.space)
 
 ---
 
