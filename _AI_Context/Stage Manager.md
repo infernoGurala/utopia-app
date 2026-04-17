@@ -43,7 +43,7 @@
 - [x] university root folder inside option the remove the view programm text that is showing up on the folder..
 - [x] Remove the name "View Program" inside the University Notes folder view, and rename the "university notes" to "community notes".
 - [x] Add a delete option in university root folder also. Edit icon shown on each program card in edit mode; long-press on pending card shows approve/undo/cancel. Same 2-approval workflow applies.
-- [ ] edit mode, the add new files/folder icon appears inside the community notes. which it should not appear.
+- [ ] the plus icon, beside the edit mode, which is add new files/folders in the current directory is a mismatch, the feature is only to be visible when the edit mode is turned on. 
 - [x] auto add one approval, for the file/folder deletion on the account of the user who first deleted the item.
 - [ ] when the file is in active state of deletion give two options, approval/unapprove by icons coloured red and green. 
 - [x] in active delete mode, in case of folder in active deletion pending mode. it is not opening. the folder should be opened.
@@ -51,9 +51,25 @@
 - [ ] ADD A CLEAR PATH ON TOP OF THE SCREEN TO INDICATE WHERE THE USER IS. AND THE PATHS MUST BE CLICKABLE AND CLEAR AND NOT VERY DISTRACTING. -- ADD FOR UNIVERSITY FOLDER AFTER MAIN ROOT FOLDER ONLY. LEAVE THE MAIN, ADD FOR REMAINIG. UNIVERSITY(MAIN)(LEAVE)-->CSE(LEAVE)-->SEM-1,SEM2,SEM3(ADD FROM HERE). THIS WILL BE THE FOLDER STRUCTURE ADD THIS WAY.
 - [x] ADD ALPHABETICAL SORTING IN ROOT UNIVERISTY FOLDER ALSO. AND ENSURE IT IS SAME EVERYWHERE.
 - [x] “University Notes” is renamed to “Community Notes”
-- [ ] not just turn the icon grey, but make the folder in university root folder show as pending deletion.
+- [ ] not just turn the icon grey, but make the folder in university root folder show as pending deletion with approve and unapprove icons.
 - [ ] add a option to make the folder which are in delete mode to bring them alive again. opposite votes will bring the files to normal zone.
-- [ ] 
+- [ ] LONG PRESS ON NOTES, TO get option to the class in library(HOME). Two options, one is Pin the class, other is exit the class. If the user owns the class then he doesn't have the exit class, instead he will have properties option to go to class properties.
+- [ ] Add a owner name under the class, and University name under the community notes. In a light weight text and contrast color. 
+- [ ] Complexity reduction, in profile screen, make a settings screen,not just section, all the settings must open in a new clean screen.
+	- what to include in settings?
+			1. Theme
+			2. IAA assistant toogle 
+			3. signout
+ - [ ] Add a detailed overview of the feature inside each future.
+ - [ ] Add a rollout in about UTOPIA section in profile. Add admin screen info.
+ - [ ] Increase the Emoji size, make it better. Make UI Better. And ease. 
+ - [ ] v3.0 Classes and Friends.
+ - [ ] Make Map feature obvious. Make it a Bar and icon and make it obvious.
+ - [ ] Make the name, IAA full form in it's section.
+ - [ ] Time table connection 
+ - [ ] Everyone section.
+ - [ ] Theme preview, improve the theme selection. 
+ - [ ] Last change date in uni folder
 ---
 
 ## Next Up
