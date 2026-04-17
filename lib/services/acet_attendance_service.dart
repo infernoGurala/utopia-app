@@ -20,6 +20,7 @@ class AcetAttendanceService {
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/123.0.0.0 Mobile Safari/537.36';
+  static const bool _isReleaseBuild = bool.fromEnvironment('dart.vm.product');
   static final RegExp _loginUserFieldPattern = RegExp(
     r'(id|name)\s*=\s*["\'](txtid2|txtuserid)["\']',
   );
@@ -647,6 +648,9 @@ class AcetAttendanceService {
     required String? frmAuth,
     required bool loginPageDetected,
   }) {
+    if (_isReleaseBuild) {
+      return;
+    }
     // ignore: avoid_print
     print(
       '[ACET][$stage] status=$statusCode '
@@ -663,6 +667,9 @@ class AcetAttendanceService {
     required String? sessionId,
     required String? frmAuth,
   }) {
+    if (_isReleaseBuild) {
+      return;
+    }
     // ignore: avoid_print
     print(
       '[ACET][$stage] status=$statusCode '
