@@ -267,7 +267,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   static const double _attendanceTarget = 0.75;
-  static const Duration _toggleAnimDuration = Duration(milliseconds: 180);
 
   int _missableClasses(int attended, int held) {
     if (held <= 0 || attended <= 0) {
@@ -479,127 +478,103 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       key: const ValueKey('attendance_initial'),
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
-          Center(
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: U.primary,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.fact_check_rounded,
-                color: U.bg,
-                size: 36,
-              ),
+          _GradientHero(
+            icon: Icons.fact_check_rounded,
+            eyebrow: 'Semester sync',
+            title: 'Bring attendance into your daily flow',
+            subtitle:
+                'Connect once and keep your attendance report inside Utopia.',
+            trailing: _InfoPill(
+              icon: Icons.shield_rounded,
+              label: 'On-device only',
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Connect Attendance',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              color: U.text,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Connect once and track your attendance inside Utopia.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              color: U.sub,
-              fontSize: 13,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           Card(
             color: U.card,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(28),
               side: BorderSide(color: U.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Custom campus segmented toggle
-                  Container(
-                    height: 46,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: U.border),
-                      color: U.surface,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedCampus = Campus.aus),
-                            child: AnimatedContainer(
-                              duration: _toggleAnimDuration,
-                              decoration: BoxDecoration(
-                                color: _selectedCampus == Campus.aus
-                                    ? U.primary
-                                    : Colors.transparent,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                Campus.aus.label,
-                                style: GoogleFonts.outfit(
-                                  color: _selectedCampus == Campus.aus
-                                      ? U.bg
-                                      : U.sub,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: U.primary.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          Icons.lock_person_rounded,
+                          color: U.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Connect your college account',
+                              style: GoogleFonts.outfit(
+                                color: U.text,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ),
-                        ),
-                        VerticalDivider(
-                          width: 1,
-                          thickness: 1,
-                          color: U.border,
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _selectedCampus = Campus.acet),
-                            child: AnimatedContainer(
-                              duration: _toggleAnimDuration,
-                              decoration: BoxDecoration(
-                                color: _selectedCampus == Campus.acet
-                                    ? U.primary
-                                    : Colors.transparent,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                Campus.acet.label,
-                                style: GoogleFonts.outfit(
-                                  color: _selectedCampus == Campus.acet
-                                      ? U.bg
-                                      : U.sub,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
+                            Text(
+                              'Enter your university portal credentials.',
+                              style: GoogleFonts.outfit(
+                                color: U.sub,
+                                fontSize: 13,
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Campus selector
+                  Text(
+                    'Campus',
+                    style: GoogleFonts.outfit(
+                      color: U.sub,
+                      fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  SegmentedButton<Campus>(
+                    segments: Campus.values
+                        .map(
+                          (c) => ButtonSegment<Campus>(
+                            value: c,
+                            label: Text(c.label),
+                          ),
+                        )
+                        .toList(),
+                    selected: {_selectedCampus},
+                    onSelectionChanged: (Set<Campus> selection) {
+                      setState(() => _selectedCampus = selection.first);
+                    },
+                    style: SegmentedButton.styleFrom(
+                      backgroundColor: U.surface,
+                      foregroundColor: U.sub,
+                      selectedForegroundColor: U.bg,
+                      selectedBackgroundColor: U.primary,
+                      side: BorderSide(color: U.border),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   _buildField(
                     controller: _rollController,
                     hintText: 'e.g. 25B11ME001',
@@ -634,7 +609,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton(
+                    child: FilledButton.icon(
                       onPressed: () => _fetchAttendance(
                         rollNumber: _rollController.text,
                         password: _passwordController.text,
@@ -650,13 +625,45 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           borderRadius: BorderRadius.circular(18),
                         ),
                       ),
-                      child: Text(
-                        'Connect',
+                      icon: const Icon(Icons.sync_lock_rounded),
+                      label: Text(
+                        'Connect attendance',
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w700,
                           fontSize: 15,
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Privacy disclaimer
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: U.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: U.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: U.sub,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'These credentials are used only to sign in to your university portal. They are stored locally on this device and never sent to any third-party server. You can clear them at any time.',
+                            style: GoogleFonts.outfit(
+                              color: U.sub,
+                              fontSize: 12,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -713,6 +720,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final studentName = (data['studentName'] as String? ?? '').trim();
     final overall = (data['overallPercentage'] as num?)?.toDouble() ?? 0;
     final overallColor = _percentageColor(overall);
+    final belowTarget = subjects.where((subject) {
+      final percentage = (subject['percentage'] as num?)?.toDouble() ?? 0;
+      return percentage < 75;
+    }).length;
 
     return Stack(
       children: [
@@ -730,75 +741,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Summary header
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      margin: const EdgeInsets.only(
-                                        right: 10,
-                                        top: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: overallColor,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${overall.toStringAsFixed(1)}%',
-                                      style: GoogleFonts.outfit(
-                                        color: U.text,
-                                        fontSize: 44,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (studentName.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    studentName,
-                                    style: GoogleFonts.outfit(
-                                      color: U.sub,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: U.surface,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: U.border),
-                            ),
-                            child: Text(
-                              Campus.fromName(
-                                _savedCredentials?['campus'],
-                              ).label,
-                              style: GoogleFonts.outfit(
-                                color: U.sub,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
+                      _GradientHero(
+                        icon: Icons.timeline_rounded,
+                        eyebrow: _headlineFor(overall),
+                        title: '${overall.toStringAsFixed(1)}%',
+                        subtitle: _heroStatusText(belowTarget),
+                        detail: studentName.isEmpty ? null : studentName,
+                        trailing: _InfoPill(
+                          icon: Icons.cloud_done_rounded,
+                          label: 'Till now',
+                        ),
+                        accent: overallColor,
+                        subtitleColor: belowTarget > 0 ? U.red : null,
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -909,6 +863,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final attendedClasses = (subject['attendedClasses'] as num?)?.toInt() ?? 0;
     final percentage = (subject['percentage'] as num?)?.toDouble() ?? 0;
     final color = _percentageColor(percentage);
+    final classesNeeded = _classesNeededToRecover(
+      attendedClasses,
+      totalClasses,
+    );
+    final missableClasses = _missableClasses(attendedClasses, totalClasses);
+    final bufferLine = percentage >= 75
+        ? missableClasses == 0
+              ? 'At the 75% line'
+              : 'Can miss $missableClasses more class${missableClasses == 1 ? '' : 'es'}'
+        : classesNeeded == 0
+        ? 'Needs attention'
+        : 'Attend $classesNeeded more class${classesNeeded == 1 ? '' : 'es'} to reach 75%';
 
     return Card(
       margin: EdgeInsets.zero,
@@ -977,7 +943,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     : (percentage / 100).clamp(0.0, 1.0),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+            Text(
+              bufferLine,
+              style: GoogleFonts.outfit(
+                color: percentage >= 75 ? U.sub : color,
+                fontSize: 12,
+                fontWeight: percentage >= 75
+                    ? FontWeight.w500
+                    : FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
