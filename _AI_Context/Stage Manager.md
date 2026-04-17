@@ -51,6 +51,8 @@
 - [ ] ADD A CLEAR PATH ON TOP OF THE SCREEN TO INDICATE WHERE THE USER IS. AND THE PATHS MUST BE CLICKABLE AND CLEAR AND NOT VERY DISTRACTING. -- ADD FOR UNIVERSITY FOLDER AFTER MAIN ROOT FOLDER ONLY. LEAVE THE MAIN, ADD FOR REMAINIG. UNIVERSITY(MAIN)(LEAVE)-->CSE(LEAVE)-->SEM-1,SEM2,SEM3(ADD FROM HERE). THIS WILL BE THE FOLDER STRUCTURE ADD THIS WAY.
 - [x] ADD ALPHABETICAL SORTING IN ROOT UNIVERISTY FOLDER ALSO. AND ENSURE IT IS SAME EVERYWHERE.
 - [x] “University Notes” is renamed to “Community Notes”
+- [ ] not just turn the icon grey, but make the folder in university root folder show as pending deletion.
+- [ ] add a option to make the folder which are in delete mode to bring them alive again. opposite votes will bring the files to normal zone.
 - [ ] 
 ---
 
