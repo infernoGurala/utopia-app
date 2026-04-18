@@ -5,11 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
 import '../services/class_service.dart';
 import '../services/github_global_service.dart';
 import 'class_detail_screen.dart';
+import 'class_settings_screen.dart';
 import 'community_notes_screen.dart';
 import 'sciwordle_screen.dart';
 
@@ -43,11 +45,40 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   bool _isLoading = true;
   bool _isSyncing = false;
   bool _isLoadingActive = false;
+  final Map<String, String> _ownerNames = {};
+  Set<String> _pinnedClassIds = {};
 
   @override
   void initState() {
     super.initState();
+    _loadPinnedClasses();
     _loadData();
+  }
+
+  // ── Pinned classes persistence ──
+  Future<void> _loadPinnedClasses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pinned = prefs.getStringList('pinned_class_ids');
+    if (pinned != null && mounted) {
+      setState(() => _pinnedClassIds = pinned.toSet());
+    }
+  }
+
+  Future<void> _savePinnedClasses() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('pinned_class_ids', _pinnedClassIds.toList());
+  }
+
+  void _togglePin(String classId) {
+    setState(() {
+      if (_pinnedClassIds.contains(classId)) {
+        _pinnedClassIds.remove(classId);
+      } else {
+        _pinnedClassIds.add(classId);
+      }
+    });
+    _savePinnedClasses();
+    HapticFeedback.lightImpact();
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
@@ -83,7 +114,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           if (cachedUniId != null) {
             _universityId = cachedUniId;
             final cachedClasses =
-                await _classService.getClassesForUser(user.uid, fromCache: true);
+                await _classService.getClassesForUser(user.uid, universityId: _universityId, fromCache: true);
             if (mounted && cachedClasses.isNotEmpty) {
               setState(() {
                 _classes = cachedClasses;
@@ -107,9 +138,10 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       if (uniId != null) {
         _universityId = uniId;
         unawaited(_githubGlobalService.ensureUniversityFolderExists(uniId));
+        unawaited(_preloadCommunityIcons());
       }
 
-      final classes = await _classService.getClassesForUser(user.uid);
+      final classes = await _classService.getClassesForUser(user.uid, universityId: _universityId);
 
       if (mounted) {
         setState(() {
@@ -118,6 +150,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           _isSyncing = false;
         });
       }
+
+      // Fetch owner display names for all classes
+      _fetchOwnerNames(classes);
     } catch (_) {
       if (mounted) {
         setState(() {
@@ -127,6 +162,39 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       }
     } finally {
       _isLoadingActive = false;
+    }
+  }
+
+  /// Preload community icons seamlessly to local memory so CommunityNotesScreen has zero pop-in.
+  Future<void> _preloadCommunityIcons() async {
+    if (_universityId.isEmpty) return;
+    final path = '$_universityId/Community/.icons.json';
+    try {
+      final content = await _githubGlobalService.getFileContentRaw(path);
+      if (content.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cache_$path', content);
+      }
+    } catch (_) {}
+  }
+
+  /// Fetch display names for class owners and cache them.
+  Future<void> _fetchOwnerNames(List<ClassModel> classes) async {
+    final uidsToFetch = <String>{};
+    for (final c in classes) {
+      if (c.creatorUid.isNotEmpty && !_ownerNames.containsKey(c.creatorUid)) {
+        uidsToFetch.add(c.creatorUid);
+      }
+    }
+    if (uidsToFetch.isEmpty) return;
+    for (final uid in uidsToFetch) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+        final name = doc.data()?['displayName'] as String? ?? '';
+        if (mounted && name.isNotEmpty) {
+          setState(() => _ownerNames[uid] = name);
+        }
+      } catch (_) {}
     }
   }
 
@@ -222,8 +290,18 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                           // ── SciWordle (Design I) ──
                           _buildSciWordleTile(context),
 
-                          // ── User classes ──
-                          ..._classes.map(
+                          // ── User classes (pinned first) ──
+                          ...(() {
+                            final sorted = List<ClassModel>.from(_classes);
+                            sorted.sort((a, b) {
+                              final aPinned = _pinnedClassIds.contains(a.classId);
+                              final bPinned = _pinnedClassIds.contains(b.classId);
+                              if (aPinned && !bPinned) return -1;
+                              if (!aPinned && bPinned) return 1;
+                              return 0;
+                            });
+                            return sorted;
+                          })().map(
                             (c) => _buildClassTile(context, c),
                           ),
 
@@ -419,6 +497,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   // ──────────────────────────────────────────────────────────────────
   Widget _buildClassTile(BuildContext context, ClassModel c) {
     final accent = U.peach;
+    final isPinned = _pinnedClassIds.contains(c.classId);
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -431,12 +510,18 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           ),
         );
       },
+      onLongPress: () => _showClassLongPressMenu(c),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           color: U.surface,
-          border: Border.all(color: U.border.withValues(alpha: 0.45), width: 1),
+          border: Border.all(
+            color: isPinned
+                ? U.primary.withValues(alpha: 0.35)
+                : U.border.withValues(alpha: 0.45),
+            width: isPinned ? 1.2 : 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.18),
@@ -449,26 +534,294 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           borderRadius: BorderRadius.circular(17),
           child: CustomPaint(
             painter: _CornerBracketPainter(accent.withValues(alpha: 0.4)),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.menu_book_rounded, color: accent, size: 30),
+                      const SizedBox(height: 12),
+                      Text(
+                        c.name.toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          color: U.text, fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.8,
+                        ),
+                      ),
+                      if (_ownerNames[c.creatorUid] != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          _ownerNames[c.creatorUid]!,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // Pin indicator
+                if (isPinned)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Icon(
+                      Icons.push_pin_rounded,
+                      size: 14,
+                      color: U.primary.withValues(alpha: 0.55),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Long press context menu for class cards
+  // ──────────────────────────────────────────────────────────────────
+  void _showClassLongPressMenu(ClassModel c) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final isOwner = c.creatorUid == user.uid;
+    final isPinned = _pinnedClassIds.contains(c.classId);
+
+    HapticFeedback.mediumImpact();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: U.border.withValues(alpha: 0.5), width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Header ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+              child: Row(
                 children: [
-                  Icon(Icons.menu_book_rounded, color: accent, size: 30),
-                  const SizedBox(height: 12),
-                  Text(
-                    c.name.toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(
-                      color: U.text, fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.8,
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: U.peach.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.menu_book_rounded, color: U.peach, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.name,
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          isOwner ? 'Owner' : 'Member',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ),
+            Divider(color: U.border.withValues(alpha: 0.5), height: 1),
+            // ── Pin / Unpin ──
+            _buildMenuOption(
+              icon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+              label: isPinned ? 'Unpin Class' : 'Pin Class',
+              subtitle: isPinned ? 'Remove from top of list' : 'Keep at top of class list',
+              color: U.primary,
+              onTap: () {
+                Navigator.pop(ctx);
+                _togglePin(c.classId);
+              },
+            ),
+            // ── Properties (owner only) ──
+            if (isOwner)
+              _buildMenuOption(
+                icon: Icons.settings_outlined,
+                label: 'Properties',
+                subtitle: 'Manage writers, share code, delete',
+                color: U.sub,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ClassSettingsScreen(classModel: c),
+                    ),
+                  );
+                },
+              ),
+            // ── Exit class (non-owner only) ──
+            if (!isOwner)
+              _buildMenuOption(
+                icon: Icons.exit_to_app_rounded,
+                label: 'Exit Class',
+                subtitle: 'Leave this class permanently',
+                color: U.red,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmExitClass(c);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMenuOption({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.outfit(
+                      color: color == U.red ? U.red : U.text,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.outfit(
+                      color: U.dim,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: U.dim, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmExitClass(ClassModel c) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.exit_to_app_rounded, color: U.red, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              'Exit Class',
+              style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to leave "${c.name}"?\n\nYou will need the class code to rejoin.',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) return;
+                await _classService.leaveClass(c.classId, user.uid);
+                // Remove from local pinned list if pinned
+                _pinnedClassIds.remove(c.classId);
+                _savePinnedClasses();
+                // Refresh class list
+                await _loadData(forceRefresh: true);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Left "${c.name}" successfully.'),
+                      backgroundColor: U.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to leave class: $e'),
+                      backgroundColor: U.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: U.red,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Exit', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
@@ -594,7 +947,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                                 } catch (_) {}
 
                                 final classes = await _classService
-                                    .getClassesForUser(user.uid);
+                                    .getClassesForUser(user.uid, universityId: _universityId);
                                 if (mounted && mounted) {
                                   setState(() => _classes = classes);
                                   if (Navigator.canPop(bottomSheetContext)) {
@@ -724,7 +1077,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                                   user.uid,
                                 );
                                 final classes = await _classService
-                                    .getClassesForUser(user.uid);
+                                    .getClassesForUser(user.uid, universityId: _universityId);
                                 if (mounted) {
                                   setState(() => _classes = classes);
                                   ScaffoldMessenger.of(context).showSnackBar(

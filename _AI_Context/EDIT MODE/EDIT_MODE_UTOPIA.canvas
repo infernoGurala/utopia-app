@@ -1,0 +1,13 @@
+{
+	"nodes":[
+		{"id":"cbc594e2c1201cd2","type":"text","text":"[[EDIT FILE icon]]","x":-38,"y":40,"width":250,"height":60},
+		{"id":"b87bfda764782570","type":"text","text":"[[editmode screen opens]]","x":380,"y":40,"width":250,"height":60},
+		{"id":"f996d49720ca4704","type":"text","text":"[[choose type of input]]","x":795,"y":39,"width":250,"height":60},
+		{"id":"346e416a991c4b8d","x":1231,"y":37,"width":250,"height":60,"type":"text","text":"[[Save the file]]"}
+	],
+	"edges":[
+		{"id":"8f96f11d49cf7e9d","fromNode":"cbc594e2c1201cd2","fromSide":"right","toNode":"b87bfda764782570","toSide":"left"},
+		{"id":"16d081227e16ec64","fromNode":"b87bfda764782570","fromSide":"right","toNode":"f996d49720ca4704","toSide":"left"},
+		{"id":"8950d4ef8e37663e","fromNode":"f996d49720ca4704","fromSide":"right","toNode":"346e416a991c4b8d","toSide":"left"}
+	]
+}

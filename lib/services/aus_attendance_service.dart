@@ -186,6 +186,14 @@ class AusAttendanceService {
       );
       _debugResponse('POST attendance', response.statusCode, response.body);
 
+      if (response.statusCode == HttpStatus.unauthorized) {
+        // 401 after a successful login means the attendance module itself
+        // is down server-side (portal is broken, not wrong credentials).
+        throw Exception(
+          'The portal attendance server is temporarily unavailable. '
+          'Please try again later.',
+        );
+      }
       if (response.statusCode != HttpStatus.ok) {
         throw Exception('Could not fetch attendance right now');
       }
@@ -210,7 +218,8 @@ class AusAttendanceService {
       if (e is Exception &&
           (e.toString().contains('Invalid credentials') ||
               e.toString().contains('Attendance data was not found') ||
-              e.toString().contains('Could not fetch attendance'))) {
+              e.toString().contains('Could not fetch attendance') ||
+              e.toString().contains('temporarily unavailable'))) {
         rethrow;
       }
       throw Exception('Unable to load attendance right now');

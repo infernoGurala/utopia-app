@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import '../services/attendance_cache_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
@@ -31,6 +32,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   String? _errorMessage;
   Map<String, dynamic>? _attendanceData;
   Map<String, String>? _savedCredentials;
+  bool _isFromCache = false;
+  String? _cacheAgeLabel;
 
   @override
   void initState() {
@@ -138,6 +141,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       }
       setState(() {
         _attendanceData = result;
+        _isFromCache = result['fromCache'] as bool? ?? false;
+        _cacheAgeLabel = result['cacheAgeLabel'] as String?;
         _state = _AttendanceViewState.loaded;
       });
     } catch (e) {
@@ -174,7 +179,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       college: credentials['college'] ?? 'aus',
       saveCredentials: false,
       keepFormOnFailure: false,
-      mode: _AttendanceRangeMode.period,
+      mode: _AttendanceRangeMode.tillNow, // full semester, same as initial load
     );
   }
 
@@ -216,6 +221,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     await SecureStorageService.clearCredentials();
+    final roll = _savedCredentials?['rollNumber'] ?? '';
+    if (roll.isNotEmpty) {
+      unawaited(AttendanceCacheService.clear(roll));
+    }
     if (!mounted) {
       return;
     }
@@ -223,6 +232,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _savedCredentials = null;
       _attendanceData = null;
       _errorMessage = null;
+      _isFromCache = false;
+      _cacheAgeLabel = null;
       _rollController.clear();
       _passwordController.clear();
       _selectedCollege = 'aus';
@@ -764,6 +775,44 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             key: const ValueKey('attendance_loaded'),
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              if (_isFromCache)
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9E2AF).withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFFF9E2AF).withValues(alpha: 0.30),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          color: Color(0xFFF9E2AF),
+                          size: 15,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Portal unreachable — showing cached data'
+                            '${_cacheAgeLabel != null ? ' from $_cacheAgeLabel' : ''}. Pull to retry.',
+                            style: GoogleFonts.outfit(
+                              color: const Color(0xFFF9E2AF),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -771,6 +820,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _GradientHero(
+
                         icon: Icons.timeline_rounded,
                         eyebrow: _headlineFor(overall),
                         title: '${overall.toStringAsFixed(1)}%',

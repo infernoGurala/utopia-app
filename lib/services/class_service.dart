@@ -270,6 +270,37 @@ class ClassService {
     await batch.commit();
   }
 
+  /// Leave a class — removes membership, writer role, and decrements member count.
+  /// Throws if the user is the class creator (owners cannot leave their own class).
+  Future<void> leaveClass(String classId, String uid) async {
+    final classRef = _firestore.collection('classes').doc(classId);
+    final classDoc = await classRef.get();
+    if (!classDoc.exists) throw Exception('Class not found');
+
+    if (classDoc.data()?['creatorUid'] == uid) {
+      throw Exception('The class owner cannot leave. Delete the class instead.');
+    }
+
+    final batch = _firestore.batch();
+
+    // Remove membership sub-document
+    batch.delete(
+      _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('memberships')
+          .doc(classId),
+    );
+
+    // Remove from writerUids (no-op if not a writer)
+    batch.update(classRef, {
+      'writerUids': FieldValue.arrayRemove([uid]),
+      'memberCount': FieldValue.increment(-1),
+    });
+
+    await batch.commit();
+  }
+
   Future<void> deleteClass(String classId) async {
     // Note: This only deletes the Firestore record.
     // GitHub folders are preserved for safety and can be manually cleared if needed.

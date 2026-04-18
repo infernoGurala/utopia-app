@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main.dart';
 import '../models/class_model.dart';
 import '../services/github_global_service.dart';
@@ -39,6 +40,18 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     super.initState();
     _load();
     _checkRole();
+    _fetchOwnerName();
+  }
+
+  String _ownerName = '';
+
+  Future<void> _fetchOwnerName() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.classModel.creatorUid).get();
+    if (doc.exists && mounted) {
+      setState(() {
+        _ownerName = doc.data()?['displayName'] ?? 'Unknown Admin';
+      });
+    }
   }
 
   Future<void> _checkRole() async {
@@ -96,7 +109,22 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       child: Scaffold(
         backgroundColor: U.bg,
       appBar: AppBar(
-        title: Text(widget.classModel.name, style: GoogleFonts.outfit()),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.classModel.name, style: GoogleFonts.outfit()),
+            if (_ownerName.isNotEmpty)
+              Text(
+                'Owned by $_ownerName',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: U.sub,
+                ),
+              ),
+          ],
+        ),
         backgroundColor: U.bg,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: U.text),

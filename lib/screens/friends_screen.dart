@@ -94,18 +94,6 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     splashRadius: 20,
                     visualDensity: VisualDensity.compact,
                   ),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MapScreen()),
-                      );
-                    },
-                    icon: Icon(Icons.map_outlined, color: U.primary, size: 20),
-                    tooltip: 'Map',
-                    splashRadius: 20,
-                    visualDensity: VisualDensity.compact,
-                  ),
                 ],
               ),
             ),
@@ -126,6 +114,56 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
                   );
                 },
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MapScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: U.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: U.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.map_rounded, color: U.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Utopia Map',
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w600,
+                                color: U.primary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'See where your friends are right now',
+                              style: GoogleFonts.outfit(
+                                color: U.primary.withValues(alpha: 0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: U.primary, size: 20),
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 12),

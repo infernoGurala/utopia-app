@@ -50,6 +50,13 @@ service cloud.firestore {
         request.auth.uid == resource.data.creatorUid;
     }
 
+    match /attendance_cache/{uid} {
+      allow read, write: if isOwner(uid);
+      match /records/{rollNumber} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
     match /notifications/{notificationId} {
       allow read, write: if isSignedIn() &&
         request.auth.uid == resource.data.uid;

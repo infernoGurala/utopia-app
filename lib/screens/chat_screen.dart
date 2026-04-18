@@ -679,27 +679,39 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 },
               ),
+              // Composer Container
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
                 decoration: BoxDecoration(
                   color: U.bg,
-                  border: Border(top: BorderSide(color: U.border, width: 0.5)),
                 ),
                 child: SafeArea(
                   top: false,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: U.card,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: U.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        onPressed: _toggleEmojiPicker,
+                        splashRadius: 22,
+                        padding: const EdgeInsets.only(bottom: 12),
+                        icon: Icon(
+                          _emojiPickerOpen
+                              ? Icons.keyboard_rounded
+                              : Icons.emoji_emotions_outlined,
+                          color: U.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: U.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                          ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,7 +785,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                                 overflow: TextOverflow.ellipsis,
                                                 fontSize: 12,
                                                 textColor: U.sub,
-                                                emojiSize: 16,
+                                                emojiSize: 18,
                                               ),
                                           ],
                                         ),
@@ -816,8 +828,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                               ),
                                               child: Image.asset(
                                                 emoji.assetPath,
-                                                width: 22,
-                                                height: 22,
+                                                width: 28,
+                                                height: 28,
                                                 fit: BoxFit.contain,
                                               ),
                                             ),
@@ -864,16 +876,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                 maxLines: 5,
                                 style: GoogleFonts.outfit(
                                   color: U.text,
-                                  fontSize: 14,
+                                  fontSize: 15,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
                                   hintText: _isEditing
                                       ? 'Edit message'
-                                      : 'Type a message',
+                                      : 'Message...',
                                   hintStyle: GoogleFonts.outfit(
                                     color: U.sub,
-                                    fontSize: 14,
+                                    fontSize: 15,
                                   ),
                                 ),
                               ),
@@ -890,26 +904,23 @@ class _ChatScreenState extends State<ChatScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: _toggleEmojiPicker,
-                          splashRadius: 22,
-                          icon: Icon(
-                            _emojiPickerOpen
-                                ? Icons.keyboard_rounded
-                                : Icons.emoji_emotions_outlined,
-                            color: U.primary,
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: U.primary,
+                          shape: BoxShape.circle,
                         ),
-                        IconButton(
+                        child: IconButton(
                           onPressed: _sending ? null : _send,
-                          splashRadius: 22,
                           icon: _sending
-                              ? SizedBox(
+                              ? const SizedBox(
                                   width: 18,
                                   height: 18,
                                   child: CircularProgressIndicator(
-                                    color: U.primary,
+                                    color: Colors.white,
                                     strokeWidth: 1.6,
                                   ),
                                 )
@@ -917,11 +928,12 @@ class _ChatScreenState extends State<ChatScreen> {
                                   _isEditing
                                       ? Icons.check_rounded
                                       : Icons.send_rounded,
-                                  color: U.primary,
+                                  color: Colors.white,
+                                  size: 20,
                                 ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1267,15 +1279,15 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                           ),
                                         ),
                                         const SizedBox(height: 2),
-                                        ChatEmojiCatalog.buildInlinePreview(
-                                          (widget.replyTo?['text'] ?? '')
-                                              .toString(),
-                                          fontSize: 12,
-                                          textColor: U.sub,
-                                          emojiSize: 16,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                          ChatEmojiCatalog.buildInlinePreview(
+                                            (widget.replyTo?['text'] ?? '')
+                                                .toString(),
+                                            fontSize: 12,
+                                            textColor: U.sub,
+                                            emojiSize: 18,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -1360,9 +1372,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
     }
     return ChatEmojiCatalog.buildInlinePreview(
       widget.text,
-      fontSize: 14,
+      fontSize: 15,
       textColor: U.text,
-      emojiSize: 16,
+      emojiSize: 22,
     );
   }
 

@@ -411,14 +411,14 @@ class GitHubGlobalService {
         final data = jsonDecode(oldRes.body);
         
         if (data is List) { // It's a directory
-          final futures = data.map((item) {
+          // Process children sequentially to avoid Git 409 conflicts
+          // (parallel commits to the same branch cause race conditions)
+          for (final item in data) {
             final childOldPath = item['path'] as String;
             final childName = item['name'] as String;
             final childNewPath = '$newPath/$childName';
-            return renameItem(childOldPath, childNewPath);
-          }).toList();
-          
-          await Future.wait(futures);
+            await renameItem(childOldPath, childNewPath);
+          }
           
           _memoryCache.remove(oldPath);
           if (oldPath.contains('/')) _memoryCache.remove(oldPath.substring(0, oldPath.lastIndexOf('/')));
@@ -519,6 +519,58 @@ class GitHubGlobalService {
       return '';
     } catch (_) {
       return '';
+    }
+  }
+
+  /// In-memory cache for last-modified dates: path → (DateTime, fetchedAt).
+  static final Map<String, (DateTime, DateTime)> _lastModifiedCache = {};
+  static const _lastModifiedCacheDuration = Duration(minutes: 5);
+
+  /// Fetch the date of the most recent commit that touched [path].
+  /// Returns `null` if the date cannot be determined.
+  Future<DateTime?> getLastModified(String path) async {
+    // 1. Check in-memory cache
+    final cached = _lastModifiedCache[path];
+    if (cached != null &&
+        DateTime.now().difference(cached.$2) < _lastModifiedCacheDuration) {
+      return cached.$1;
+    }
+
+    try {
+      final config = await _getConfig();
+      if (config == null || config['repo']!.isEmpty || config['pat']!.isEmpty) {
+        return null;
+      }
+
+      final repo = config['repo']!;
+      final branch = config['branch']!;
+      final pat = config['pat']!;
+
+      // Use the Commits API with path filter, limited to 1 result
+      final url = Uri.parse(
+        'https://api.github.com/repos/$repo/commits?sha=$branch&path=$path&per_page=1',
+      );
+      final headers = {
+        'Authorization': 'Bearer $pat',
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
+
+      final res = await http.get(url, headers: headers);
+      if (res.statusCode == 200) {
+        final List<dynamic> commits = jsonDecode(res.body);
+        if (commits.isNotEmpty) {
+          final dateStr = commits[0]['commit']?['committer']?['date'] as String?;
+          if (dateStr != null) {
+            final dt = DateTime.parse(dateStr);
+            _lastModifiedCache[path] = (dt, DateTime.now());
+            return dt;
+          }
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 

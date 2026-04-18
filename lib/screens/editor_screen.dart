@@ -126,9 +126,10 @@ class _EditorScreenState extends State<EditorScreen> {
           text.substring(0, insertPos) +
           '[[$suggestion]]' +
           text.substring(cursorPos);
-      _controller.text = newText;
-      _controller.selection = TextSelection.collapsed(
-        offset: insertPos + suggestion.length + 4,
+      final newCursor = insertPos + suggestion.length + 4;
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newCursor),
       );
     }
     _hideAutocomplete();
@@ -201,8 +202,10 @@ class _EditorScreenState extends State<EditorScreen> {
       newText = currentText + text;
       newCursorPos = newText.length;
     }
-    _controller.text = newText;
-    _controller.selection = TextSelection.collapsed(offset: newCursorPos);
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newCursorPos),
+    );
     _editorFocusNode.requestFocus();
   }
 
@@ -219,15 +222,20 @@ class _EditorScreenState extends State<EditorScreen> {
       selection.end,
       '$prefix$selectedText$suffix',
     );
-    _controller.text = newText;
     if (selectedText.isEmpty) {
-      _controller.selection = TextSelection.collapsed(
-        offset: selection.start + prefix.length,
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: selection.start + prefix.length,
+        ),
       );
     } else {
-      _controller.selection = TextSelection(
-        baseOffset: selection.start + prefix.length,
-        extentOffset: selection.end + prefix.length,
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection(
+          baseOffset: selection.start + prefix.length,
+          extentOffset: selection.end + prefix.length,
+        ),
       );
     }
     _editorFocusNode.requestFocus();

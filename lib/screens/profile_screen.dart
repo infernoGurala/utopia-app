@@ -12,8 +12,8 @@ import '../services/platform_support.dart';
 import '../widgets/game_champion_badge.dart';
 import '../services/role_service.dart';
 import '../services/game_champion_service.dart';
+import 'about_utopia_screen.dart';
 import 'developer_panel_screen.dart';
-import 'sciwordle_screen.dart';
 import 'university_selection_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -27,14 +27,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _updatingName = false;
   bool _updatingTheme = false;
 
-  @override
-  void initState() {
-    super.initState();
-    RoleService().isWriter().then((v) {
-      if (mounted) setState(() => _isWriter = v);
-    });
-  }
-
   Future<void> _signOut() async {
     RoleService().clearCache();
     if (PlatformSupport.supportsGoogleSignIn) {
@@ -45,53 +37,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await GoogleSignIn.instance.signOut();
     }
     await FirebaseAuth.instance.signOut();
-  }
-
-  Future<void> _editDisplayName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _updatingName) {
-      return;
-    }
-
-    final nextName = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) =>
-          _EditDisplayNameDialog(initialValue: user.displayName ?? ''),
-    );
-
-    if (nextName == null || nextName.isEmpty || nextName == user.displayName) {
-      return;
-    }
-
-    setState(() => _updatingName = true);
-    try {
-      await user.updateDisplayName(nextName);
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'displayName': nextName,
-        'email': user.email ?? '',
-        'photoUrl': user.photoURL,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      await user.reload();
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: U.red,
-            content: Text(
-              'Could not update display name',
-              style: GoogleFonts.outfit(color: U.bg),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _updatingName = false);
-      }
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 
@@ -143,19 +90,72 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _restartApp() async {
-    // Use platform channel to restart app on Android
     try {
       const platform = MethodChannel('utopia_app/app_update');
       await platform.invokeMethod('restartApp');
     } catch (e) {
-      // Fallback to system navigator
       SystemNavigator.pop();
     }
   }
 
   @override
+  void initState() {
+    super.initState();
+    RoleService().isWriter().then((v) {
+      if (mounted) setState(() => _isWriter = v);
+    });
+  }
+
+  Future<void> _editDisplayName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _updatingName) {
+      return;
+    }
+
+    final nextName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) =>
+          _EditDisplayNameDialog(initialValue: user.displayName ?? ''),
+    );
+
+    if (nextName == null || nextName.isEmpty || nextName == user.displayName) {
+      return;
+    }
+
+    setState(() => _updatingName = true);
+    try {
+      await user.updateDisplayName(nextName);
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'displayName': nextName,
+        'email': user.email ?? '',
+        'photoUrl': user.photoURL,
+        'lastSeen': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await user.reload();
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: U.red,
+            content: Text(
+              'Could not update display name',
+              style: GoogleFonts.outfit(color: U.bg),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _updatingName = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final styleLabel = U.themeForKey(U.currentThemeKey).label;
     final user = FirebaseAuth.instance.currentUser;
     final userDocStream = user == null
         ? null
@@ -321,43 +321,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
-                if (_isWriter) ...[
-                  _tile(
-                    icon: Icons.developer_mode_outlined,
-                    label: 'Developer Panel',
-                    sub: 'Manage notifications and timetable',
-                    color: U.primary,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DeveloperPanelScreen(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                _tile(
-                  icon: Icons.science_outlined,
-                  label: 'SciWordle',
-                  sub: 'Daily science word game',
-                  color: U.primary,
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SciwordleScreen()),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // ── Settings Section ──
-                Text(
-                  'Settings',
-                  style: GoogleFonts.outfit(
-                    color: U.sub,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-                const SizedBox(height: 10),
                 Container(
                   decoration: BoxDecoration(
                     color: U.card,
@@ -366,13 +329,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Column(
                     children: [
+                      if (_isWriter) ...[
+                        _groupedTile(
+                          icon: Icons.admin_panel_settings_outlined,
+                          label: 'Admin Control Panel',
+                          sub: 'Manage announcements, notifications, and timetable',
+                          color: U.primary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const DeveloperPanelScreen(),
+                            ),
+                          ),
+                        ),
+                        Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: U.border.withValues(alpha: 0.5),
+                        ),
+                      ],
+                      _groupedTile(
+                        icon: Icons.info_outline_rounded,
+                        label: 'About UTOPIA',
+                        sub: 'Version 3.0.0 · Early Access Rollout',
+                        color: U.teal,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AboutUtopiaScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
                       // Color Style
                       _groupedTile(
                         icon: Icons.palette_outlined,
                         label: 'Color Style',
-                        sub: _updatingTheme
-                            ? 'Updating theme...'
-                            : '$styleLabel theme',
+                        sub: _updatingTheme ? 'Updating theme...' : '${U.themeForKey(U.currentThemeKey).label} theme',
                         color: U.primary,
                         onTap: _selectThemeStyle,
                       ),
@@ -405,10 +404,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         builder: (context, iaaEnabled, _) {
                           return _groupedToggleTile(
                             icon: Icons.auto_awesome_rounded,
-                            label: 'IAA Assistant',
+                            label: 'Intelligent Academic Assistant',
                             sub: iaaEnabled
-                                ? 'Enabled · Shows in bottom navigation'
-                                : 'Disabled · Hidden from bottom navigation',
+                                ? 'Enabled · Shows in bottom nav'
+                                : 'Disabled · Hidden from bottom nav',
                             color: iaaEnabled ? U.primary : U.dim,
                             value: iaaEnabled,
                             onChanged: (v) async {
@@ -419,8 +418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   v.toString(),
                                 ),
                               );
-                              final uid =
-                                  FirebaseAuth.instance.currentUser?.uid;
+                              final uid = FirebaseAuth.instance.currentUser?.uid;
                               if (uid != null) {
                                 unawaited(
                                   FirebaseFirestore.instance
@@ -466,59 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _tile({
-    required IconData icon,
-    required String label,
-    required String sub,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: U.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: U.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.outfit(
-                      color: U.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    sub,
-                    style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: U.dim, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   Widget _groupedTile({
     required IconData icon,
@@ -707,9 +653,9 @@ class _ThemeStyleSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.74,
+      initialChildSize: 0.80,
       minChildSize: 0.48,
-      maxChildSize: 0.92,
+      maxChildSize: 0.95,
       expand: false,
       builder: (context, scrollController) {
         return Container(
@@ -718,7 +664,7 @@ class _ThemeStyleSheet extends StatelessWidget {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(color: U.border),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
           child: SafeArea(
             top: false,
             child: Column(
@@ -739,99 +685,35 @@ class _ThemeStyleSheet extends StatelessWidget {
                   'Theme',
                   style: GoogleFonts.outfit(
                     color: U.text,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
-                  'Choose your preferred theme',
+                  'Choose your vibe',
                   style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
                 ),
                 const SizedBox(height: 18),
                 Expanded(
-                  child: ListView.builder(
+                  child: GridView.builder(
                     controller: scrollController,
+                    padding: const EdgeInsets.only(bottom: 24),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                      childAspectRatio: 0.78,
+                    ),
                     itemCount: appThemes.length,
                     itemBuilder: (context, index) {
                       final theme = appThemes[index];
                       final selected = theme.key == currentKey;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => Navigator.pop(context, theme.key),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: U.surface,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: selected ? theme.primary : U.border,
-                                width: selected ? 1.2 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 42,
-                                  height: 42,
-                                  decoration: BoxDecoration(
-                                    color: theme.primary.withValues(
-                                      alpha: 0.18,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: theme.primary.withValues(
-                                        alpha: 0.55,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    selected
-                                        ? Icons.radio_button_checked_rounded
-                                        : Icons.dark_mode_rounded,
-                                    color: theme.primary,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        theme.label,
-                                        style: GoogleFonts.outfit(
-                                          color: U.text,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        theme.description,
-                                        style: GoogleFonts.outfit(
-                                          color: U.sub,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: theme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      return _ThemePreviewCard(
+                        theme: theme,
+                        selected: selected,
+                        onTap: () => Navigator.pop(context, theme.key),
                       );
                     },
                   ),
@@ -841,6 +723,311 @@ class _ThemeStyleSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// A mini preview card that renders a realistic miniature of the theme.
+class _ThemePreviewCard extends StatelessWidget {
+  const _ThemePreviewCard({
+    required this.theme,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AppTheme theme;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: theme.bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? theme.primary : theme.border,
+            width: selected ? 2.0 : 1.0,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: theme.primary.withValues(alpha: 0.30),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(19),
+          child: Stack(
+            children: [
+              // ── Mini UI mockup ──
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top bar (mock app bar)
+                    Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: theme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Container(
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: theme.text.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Container(
+                          width: 14,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: theme.dim.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    // Mock card 1
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: theme.border.withValues(alpha: 0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            height: 5,
+                            width: 50,
+                            decoration: BoxDecoration(
+                              color: theme.text.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Container(
+                            height: 4,
+                            width: 80,
+                            decoration: BoxDecoration(
+                              color: theme.sub.withValues(alpha: 0.4),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Accent color dots row
+                          Row(
+                            children: [
+                              _dot(theme.primary, 8),
+                              const SizedBox(width: 4),
+                              _dot(theme.teal, 8),
+                              const SizedBox(width: 4),
+                              _dot(theme.peach, 8),
+                              const SizedBox(width: 4),
+                              _dot(theme.blue, 8),
+                              const SizedBox(width: 4),
+                              _dot(theme.green, 8),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Mock card 2 — mini list items
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.card,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: theme.border.withValues(alpha: 0.5),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          _mockListItem(theme, theme.primary),
+                          const SizedBox(height: 5),
+                          _mockListItem(theme, theme.teal),
+                          const SizedBox(height: 5),
+                          _mockListItem(theme, theme.peach),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Mock button
+                    Container(
+                      width: double.infinity,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: theme.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Center(
+                        child: Container(
+                          height: 4,
+                          width: 30,
+                          decoration: BoxDecoration(
+                            color: theme.bg.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                  ],
+                ),
+              ),
+              // ── Theme name label at bottom ──
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        theme.bg.withValues(alpha: 0.0),
+                        theme.bg.withValues(alpha: 0.85),
+                        theme.bg,
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              theme.label,
+                              style: GoogleFonts.outfit(
+                                color: theme.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              theme.description,
+                              style: GoogleFonts.outfit(
+                                color: theme.sub,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: theme.primary,
+                          size: 18,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dot(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _mockListItem(AppTheme t, Color accent) {
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: t.text.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Container(
+          width: 8,
+          height: 4,
+          decoration: BoxDecoration(
+            color: t.dim.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,0 +1,1 @@
+the code block take the code of any language and displays it as a code and colors for the systax also displayed for various languages.

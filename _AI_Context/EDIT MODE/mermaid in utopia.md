@@ -1,0 +1,3 @@
+mermaids are converted into simple blocks, rather than some code. 
+- user can choose which type of mermaid he want like top to bottom, let to right etc...
+- mermaid is named as simple "flow chat" in utopia

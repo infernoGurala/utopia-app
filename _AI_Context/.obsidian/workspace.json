@@ -20,8 +20,26 @@
               "icon": "lucide-file",
               "title": "Stage Manager"
             }
+          },
+          {
+            "id": "a29dca8215b0377d",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "EDIT MODE/EDIT_MODE_UTOPIA.canvas",
+                "viewState": {
+                  "x": 1194.2218733855182,
+                  "y": 78.75070644088083,
+                  "zoom": -0.5263524796666978
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "EDIT_MODE_UTOPIA"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -78,7 +96,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 338.5086555480957
   },
   "right": {
     "id": "a503fea53daed837",
@@ -183,22 +201,35 @@
       "bases:Create new base": false
     }
   },
-  "active": "c0db544de3e637f1",
+  "active": "1bd88b57c8e83355",
   "lastOpenFiles": [
-    "Pending Features & Ideas.md",
-    "new Edit mode.md",
-    "AUS_PORTAL_LOGIC.md",
-    "Attandance v3.md",
+    "choose type of input.md",
+    "EDIT MODE/Upload a file.md",
+    "EDIT MODE/EDIT_MODE_UTOPIA.canvas",
+    "EDIT MODE/Save the file.md",
+    "EDIT MODE/File Upload Storage System in UTOPIA.md",
+    "3.0 MAIN.md",
     "ACET_PORTAL_LOGIC.md",
+    "Attandance v3.md",
+    "AUS_PORTAL_LOGIC.md",
     "Bottom Navigation Bar (v3).md",
     "class settings.md",
     "Community notes v3.md",
     "handover.md",
     "LIBRARY v3.md",
     "LOGIN FLOWCHAT.canvas",
+    "Pending Features & Ideas.md",
     "Stage Manager.md",
     "Super User v3.md",
     "Timetable v3.md",
-    "3.0 MAIN.md"
+    "Untitled.md",
+    "EDIT MODE",
+    "EDIT MODE/add a question&answer in utopia.md",
+    "EDIT MODE/some text block in utopia.md",
+    "EDIT MODE/special blocks.md",
+    "EDIT MODE/mermaid in utopia.md",
+    "EDIT MODE/code blocks in utopia.md",
+    "EDIT MODE/editmode screen opens.md",
+    "EDIT MODE/EDIT FILE icon.md"
   ]
 }

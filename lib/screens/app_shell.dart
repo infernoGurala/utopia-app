@@ -236,7 +236,7 @@ class _FeaturedAIDestinationIcon extends StatelessWidget {
   }
 }
 
-class _BottomNavItem extends StatelessWidget {
+class _BottomNavItem extends StatefulWidget {
   const _BottomNavItem({
     required this.icon,
     required this.selectedIcon,
@@ -252,29 +252,100 @@ class _BottomNavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    final iconWidget = Icon(
-      selected ? selectedIcon : icon,
-      size: 22,
-      color: selected ? U.primary : U.dim,
-    );
+  State<_BottomNavItem> createState() => _BottomNavItemState();
+}
 
+class _BottomNavItemState extends State<_BottomNavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.65, end: 1.18).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.18, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 50,
+      ),
+    ]).animate(_controller);
+
+    if (widget.selected) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _BottomNavItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected && !oldWidget.selected) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
-      onTap: onTap,
+      onTap: widget.onTap,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.only(top: 6),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            iconWidget,
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: GoogleFonts.outfit(
-                color: selected ? U.primary : U.sub,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            AnimatedBuilder(
+              animation: _scaleAnimation,
+              builder: (context, child) {
+                final scale = widget.selected ? _scaleAnimation.value : 1.0;
+                return Transform.scale(
+                  scale: scale,
+                  child: child,
+                );
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.selected ? 18 : 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: widget.selected
+                      ? U.primary.withValues(alpha: 0.12)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  widget.selected ? widget.selectedIcon : widget.icon,
+                  size: 22,
+                  color: widget.selected ? U.primary : U.dim,
+                ),
               ),
+            ),
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: GoogleFonts.outfit(
+                color: widget.selected ? U.primary : U.sub,
+                fontSize: 11,
+                fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+              child: Text(widget.label),
             ),
           ],
         ),
