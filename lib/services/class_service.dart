@@ -19,25 +19,31 @@ class ClassService {
   Future<List<ClassModel>> getClassesForUser(
     String uid, {
     String? universityId,
+    bool fromCache = false,
   }) async {
     debugPrint(
-      'CLASSSERVICE: getClassesForUser uid=$uid, universityId=$universityId',
+      'CLASSSERVICE: getClassesForUser uid=$uid, universityId=$universityId, cache=$fromCache',
     );
 
-    final membershipsSnapshot = await _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('memberships')
-        .get();
+    final getOpts = fromCache
+        ? const GetOptions(source: Source.cache)
+        : null;
+
+    final membershipsSnapshot = fromCache
+        ? await _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('memberships')
+            .get(const GetOptions(source: Source.cache))
+        : await _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('memberships')
+            .get();
+
     debugPrint(
       'CLASSSERVICE: memberships count=${membershipsSnapshot.docs.length}',
     );
-
-    for (var doc in membershipsSnapshot.docs) {
-      debugPrint(
-        'CLASSSERVICE: membership doc id=${doc.id}, data=${doc.data()}',
-      );
-    }
 
     final List<ClassModel> classes = [];
 
@@ -49,10 +55,9 @@ class ClassService {
 
     final futures = filteredDocs.map((membershipDoc) async {
       final classId = membershipDoc.id;
-      final classDoc = await _firestore
-          .collection('classes')
-          .doc(classId)
-          .get();
+      final classDoc = fromCache
+          ? await _firestore.collection('classes').doc(classId).get(getOpts!)
+          : await _firestore.collection('classes').doc(classId).get();
       if (classDoc.exists && classDoc.data() != null) {
         return ClassModel.fromMap(classDoc.data()!, classDoc.id);
       }

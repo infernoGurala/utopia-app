@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 200
   },
   "right": {
     "id": "a503fea53daed837",
@@ -185,9 +185,20 @@
   },
   "active": "c0db544de3e637f1",
   "lastOpenFiles": [
-    "new bottom NAV BAR.md",
-    "Stage Manager.md",
+    "Pending Features & Ideas.md",
+    "new Edit mode.md",
+    "AUS_PORTAL_LOGIC.md",
+    "Attandance v3.md",
+    "ACET_PORTAL_LOGIC.md",
+    "Bottom Navigation Bar (v3).md",
+    "class settings.md",
+    "Community notes v3.md",
     "handover.md",
+    "LIBRARY v3.md",
+    "LOGIN FLOWCHAT.canvas",
+    "Stage Manager.md",
+    "Super User v3.md",
+    "Timetable v3.md",
     "3.0 MAIN.md"
   ]
 }

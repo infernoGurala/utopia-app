@@ -43,7 +43,11 @@ service cloud.firestore {
     
     match /classes/{classId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        request.auth.uid in resource.data.writerUids;
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.creatorUid;
     }
 
     match /notifications/{notificationId} {

@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 
-const String _adminEmail = 'johnmosesg150@gmail.com';
-
-bool isAdminUser(String? email) =>
-    email != null && email.toLowerCase() == _adminEmail;
 
 const LinearGradient _legendGradient = LinearGradient(
   colors: [
@@ -62,25 +58,13 @@ const LinearGradient _silverGradient = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-const LinearGradient _adminGradient = LinearGradient(
-  colors: [
-    Color(0xFFE1BEE7),
-    Color(0xFFCE93D8),
-    Color(0xFFBA68C8),
-    Color(0xFFAB47BC),
-  ],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-
-enum ChampionType { admin, topDog, legend, goat, sapphire, silver, none }
+enum ChampionType { topDog, legend, goat, sapphire, silver, none }
 
 ChampionType _typeFromScoreAndStreakRank(
   int? scoreRank,
   int? streakRank, {
   String? email,
 }) {
-  if (isAdminUser(email)) return ChampionType.admin;
   if (scoreRank == null && streakRank == null) return ChampionType.none;
 
   final isTopScore = scoreRank != null && scoreRank <= 3;
@@ -97,7 +81,6 @@ ChampionType _typeFromScoreAndStreakRank(
 }
 
 LinearGradient _gradientForType(ChampionType type) => switch (type) {
-  ChampionType.admin => _adminGradient,
   ChampionType.topDog => _topDogGradient,
   ChampionType.legend => _legendGradient,
   ChampionType.goat => _goatGradient,
@@ -107,7 +90,6 @@ LinearGradient _gradientForType(ChampionType type) => switch (type) {
 };
 
 Color _accentForType(ChampionType type) => switch (type) {
-  ChampionType.admin => const Color(0xFFCE93D8),
   ChampionType.topDog => const Color(0xFFE8B85C),
   ChampionType.legend => const Color(0xFFF0C86D),
   ChampionType.goat => const Color(0xFFD97857),
@@ -117,7 +99,6 @@ Color _accentForType(ChampionType type) => switch (type) {
 };
 
 Color _darkBgForType(ChampionType type) => switch (type) {
-  ChampionType.admin => const Color(0xFF1A0533),
   ChampionType.topDog => const Color(0xFF1F1A05),
   ChampionType.legend => const Color(0xFF1F1A05),
   ChampionType.goat => const Color(0xFF1A0A00),
@@ -127,7 +108,6 @@ Color _darkBgForType(ChampionType type) => switch (type) {
 };
 
 String _labelForType(ChampionType type) => switch (type) {
-  ChampionType.admin => 'ADMIN',
   ChampionType.topDog => 'ALPHA',
   ChampionType.legend => 'PRIME',
   ChampionType.goat => 'FIRE',
@@ -137,7 +117,6 @@ String _labelForType(ChampionType type) => switch (type) {
 };
 
 IconData _iconForType(ChampionType type) => switch (type) {
-  ChampionType.admin => Icons.verified_rounded,
   ChampionType.topDog => Icons.local_fire_department_rounded,
   ChampionType.legend => Icons.workspace_premium_rounded,
   ChampionType.goat => Icons.whatshot_rounded,
@@ -163,8 +142,7 @@ class GameChampionStar extends StatelessWidget {
     final frameSize = size + 14;
     final shouldGlow =
         glow &&
-        (type == ChampionType.admin ||
-            type == ChampionType.legend ||
+        (type == ChampionType.legend ||
             type == ChampionType.goat ||
             type == ChampionType.topDog);
     return Container(
@@ -361,8 +339,7 @@ class ChampionAvatarBadge extends StatelessWidget {
             shape: BoxShape.circle,
             boxShadow:
                 showGlow &&
-                    (_type == ChampionType.admin ||
-                        _type == ChampionType.legend ||
+                    (_type == ChampionType.legend ||
                         _type == ChampionType.goat ||
                         _type == ChampionType.topDog)
                 ? [
@@ -399,35 +376,6 @@ class ChampionAvatarBadge extends StatelessWidget {
             child: child,
           ),
         ),
-        if (_type == ChampionType.admin)
-          Positioned(
-            right: 0,
-            top: 0,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF15111D),
-                border: Border.all(
-                  color: const Color(0xFF2A2436).withValues(alpha: 0.9),
-                ),
-                boxShadow:
-                    showGlow &&
-                        (_type == ChampionType.admin ||
-                            _type == ChampionType.legend ||
-                            _type == ChampionType.goat ||
-                            _type == ChampionType.topDog)
-                    ? [
-                        BoxShadow(
-                          color: _accentForType(_type).withValues(alpha: 0.14),
-                          blurRadius: 8,
-                          spreadRadius: 0.2,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: GameChampionStar(size: 10, glow: false, type: _type),
-            ),
-          ),
       ],
     );
   }

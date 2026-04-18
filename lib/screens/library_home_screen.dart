@@ -11,6 +11,7 @@ import '../services/class_service.dart';
 import '../services/github_global_service.dart';
 import 'class_detail_screen.dart';
 import 'community_notes_screen.dart';
+import 'sciwordle_screen.dart';
 
 class LibraryHomeScreen extends StatefulWidget {
   const LibraryHomeScreen({super.key});
@@ -41,6 +42,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   List<ClassModel> _classes = [];
   bool _isLoading = true;
   bool _isSyncing = false;
+  bool _isLoadingActive = false;
 
   @override
   void initState() {
@@ -49,6 +51,10 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
+    // Guard against duplicate concurrent calls
+    if (_isLoadingActive) return;
+    _isLoadingActive = true;
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
@@ -64,22 +70,45 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
         }
       });
 
-      // Fetch user doc first to get the universityId
+      // ── Phase 1: Cache-first (instant) ──
+      if (!forceRefresh) {
+        try {
+          final cachedUserDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get(const GetOptions(source: Source.cache));
+
+          final cachedUniId =
+              cachedUserDoc.data()?['selectedUniversityId'] as String?;
+          if (cachedUniId != null) {
+            _universityId = cachedUniId;
+            final cachedClasses =
+                await _classService.getClassesForUser(user.uid, fromCache: true);
+            if (mounted && cachedClasses.isNotEmpty) {
+              setState(() {
+                _classes = cachedClasses;
+                _isLoading = false;
+              });
+            }
+          }
+        } catch (_) {
+          // Cache miss — fall through to server fetch
+        }
+      }
+
+      // ── Phase 2: Server sync ──
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
       final uniId = userDoc.data()?['selectedUniversityId'] as String?;
-      debugPrint('LIBRARY: selectedUniversityId=$uniId');
 
       if (uniId != null) {
         _universityId = uniId;
         unawaited(_githubGlobalService.ensureUniversityFolderExists(uniId));
       }
 
-      // Fetch all classes for user
-      debugPrint('LIBRARY: Fetching all classes for user');
       final classes = await _classService.getClassesForUser(user.uid);
 
       if (mounted) {
@@ -96,6 +125,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           _isSyncing = false;
         });
       }
+    } finally {
+      _isLoadingActive = false;
     }
   }
 
@@ -185,53 +216,26 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         childAspectRatio: 1.0,
                         children: [
-                          _buildCard(
-                            title: 'Community Notes',
-                            icon: Icons.groups_rounded,
-                            backgroundColor: U.card,
-                            iconColor: U.teal,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => CommunityNotesScreen(
-                                    universityFolderName: _universityId,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                          // ── Community Notes (Design A) ──
+                          _buildCommunityTile(context),
+
+                          // ── SciWordle (Design I) ──
+                          _buildSciWordleTile(context),
+
+                          // ── User classes ──
                           ..._classes.map(
-                            (c) => _buildCard(
-                              title: c.name,
-                              icon: Icons.folder_rounded,
-                              backgroundColor: U.surface,
-                              iconColor: U.primary,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ClassDetailScreen(
-                                      classModel: c,
-                                      universityFolderName: _universityId,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                            (c) => _buildClassTile(context, c),
                           ),
-                          _buildCard(
-                            title: 'Create a Class',
+
+                          // ── Create / Join ──
+                          _buildActionTile(
+                            label: 'CREATE',
                             icon: Icons.add_circle_outline,
-                            backgroundColor: U.surface,
-                            iconColor: U.sub,
                             onTap: _showCreateClassSheet,
                           ),
-                          _buildCard(
-                            title: 'Join a Class',
+                          _buildActionTile(
+                            label: 'JOIN',
                             icon: Icons.group_add_outlined,
-                            backgroundColor: U.surface,
-                            iconColor: U.sub,
                             onTap: _showJoinClassSheet,
                           ),
                         ],
@@ -244,40 +248,263 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     );
   }
 
-  Widget _buildCard({
-    required String title,
+  // ──────────────────────────────────────────────────────────────────
+  // Community Notes — Design A "Centered Ring"
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildCommunityTile(BuildContext context) {
+    final accent = U.teal;
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CommunityNotesScreen(
+              universityFolderName: _universityId,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              U.surface,
+              Color.lerp(U.surface, U.bg, 0.65)!,
+            ],
+          ),
+          border: Border.all(color: U.border.withValues(alpha: 0.6), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(17),
+          child: Stack(
+            children: [
+              Positioned(
+                right: -10, bottom: -10,
+                child: Icon(Icons.groups_rounded, size: 75, color: accent.withValues(alpha: 0.05)),
+              ),
+              Positioned(
+                top: 0, left: 20, right: 20,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    gradient: LinearGradient(colors: [
+                      accent.withValues(alpha: 0.0),
+                      accent.withValues(alpha: 0.45),
+                      accent.withValues(alpha: 0.0),
+                    ]),
+                  ),
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accent.withValues(alpha: 0.08),
+                          border: Border.all(color: accent.withValues(alpha: 0.22), width: 1),
+                        ),
+                        child: Icon(Icons.groups_rounded, color: accent, size: 26),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'COMMUNITY',
+                        style: GoogleFonts.outfit(
+                          color: U.text, fontSize: 11.5,
+                          letterSpacing: 1.8, fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // SciWordle — Design I "Radial Glow"
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildSciWordleTile(BuildContext context) {
+    final accent = U.primary;
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SciwordleScreen()),
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: Color.lerp(U.bg, U.surface, 0.3),
+          border: Border.all(color: U.border.withValues(alpha: 0.4), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(17),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          accent.withValues(alpha: 0.12),
+                          accent.withValues(alpha: 0.03),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bolt_rounded, color: accent, size: 32),
+                    const SizedBox(height: 14),
+                    Text(
+                      'SCIWORDLE',
+                      style: GoogleFonts.outfit(
+                        color: U.text, fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Class card — Design K "Corner Bracket"
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildClassTile(BuildContext context, ClassModel c) {
+    final accent = U.peach;
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ClassDetailScreen(
+              classModel: c,
+              universityFolderName: _universityId,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: U.surface,
+          border: Border.all(color: U.border.withValues(alpha: 0.45), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(17),
+          child: CustomPaint(
+            painter: _CornerBracketPainter(accent.withValues(alpha: 0.4)),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.menu_book_rounded, color: accent, size: 30),
+                  const SizedBox(height: 12),
+                  Text(
+                    c.name.toUpperCase(),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      color: U.text, fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Action tiles — Create / Join
+  // ──────────────────────────────────────────────────────────────────
+  Widget _buildActionTile({
+    required String label,
     required IconData icon,
-    required Color backgroundColor,
-    required Color iconColor,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
+          color: U.surface,
+          border: Border.all(color: U.border.withValues(alpha: 0.35), width: 1),
         ),
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: iconColor, size: 32),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    color: U.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: U.sub, size: 28),
+              const SizedBox(height: 10),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  color: U.sub, fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -561,4 +788,34 @@ class UpperCaseTextFormatter extends TextInputFormatter {
       selection: newValue.selection,
     );
   }
+}
+
+
+
+class _CornerBracketPainter extends CustomPainter {
+  _CornerBracketPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    const len = 22.0;
+    const inset = 14.0;
+
+    // Top-left bracket
+    canvas.drawLine(const Offset(inset, inset), const Offset(inset + len, inset), paint);
+    canvas.drawLine(const Offset(inset, inset), const Offset(inset, inset + len), paint);
+
+    // Bottom-right bracket
+    canvas.drawLine(Offset(size.width - inset, size.height - inset), Offset(size.width - inset - len, size.height - inset), paint);
+    canvas.drawLine(Offset(size.width - inset, size.height - inset), Offset(size.width - inset, size.height - inset - len), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
