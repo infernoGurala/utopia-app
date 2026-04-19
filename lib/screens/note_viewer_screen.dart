@@ -131,6 +131,8 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     final uploadedFiles = <Map<String, dynamic>>[];
     final contentLines = <String>[];
     final lines = raw.split('\n');
+    final sectionHeadingRegex = RegExp(r'^#{2,3}\s+(.+)$');
+    final sectionLinkRegex = RegExp(r'^(?:[-*+]\s+)?\[(.+?)\]\((.+?)\)$');
     String? section;
     bool inFrontmatter = false;
     bool frontmatterDone = false;
@@ -155,9 +157,8 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
         frontmatterDone = true;
       }
 
-      final sectionHeading = RegExp(
-        r'^#{2,3}\s+(.+)$',
-      ).firstMatch(t)?.group(1)?.trim().toUpperCase();
+      final sectionHeading =
+          sectionHeadingRegex.firstMatch(t)?.group(1)?.trim().toUpperCase();
       if (sectionHeading == 'NOTES' || sectionHeading == 'RESOURCES') {
         section = 'NOTES';
         continue;
@@ -175,7 +176,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       }
 
       if (section != null) {
-        final m = RegExp(r'^(?:[-*+]\s+)?\[(.+?)\]\((.+?)\)$').firstMatch(t);
+        final m = sectionLinkRegex.firstMatch(t);
         if (m != null) {
           final entry = {
             'name': m.group(1) ?? '',
