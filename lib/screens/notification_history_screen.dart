@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../widgets/notification_dialog.dart';
 import '../widgets/utopia_snackbar.dart';
+import '../main.dart';
 
 class NotificationHistoryScreen extends StatefulWidget {
   const NotificationHistoryScreen({super.key});
@@ -241,159 +242,164 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
         .where('uid', isEqualTo: currentUserUid)
         .limit(50);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF181825),
-        foregroundColor: const Color(0xFFCDD6F4),
-        title: const Text('Notifications'),
-        actions: [
-          IconButton(
-            onPressed: _clearAll,
-            tooltip: 'Clear all',
-            icon: const Icon(
-              Icons.delete_outline_rounded,
-              color: Color(0xFFF38BA8),
-            ),
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: appThemeNotifier,
+      builder: (context, theme, child) {
+        return Scaffold(
+          backgroundColor: U.bg,
+          appBar: AppBar(
+            backgroundColor: U.surface,
+            foregroundColor: U.text,
+            title: const Text('Notifications'),
+            actions: [
+              IconButton(
+                onPressed: _clearAll,
+                tooltip: 'Clear all',
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: U.red,
+                ),
+              ),
+              TextButton(
+                onPressed: _markAllRead,
+                child: Text(
+                  'Mark all read',
+                  style: TextStyle(color: U.primary),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: _markAllRead,
-            child: const Text(
-              'Mark all read',
-              style: TextStyle(color: Color(0xFFCBA6F7)),
-            ),
-          ),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: query.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            final error = snapshot.error;
-            if (error is FirebaseException &&
-                error.code == 'failed-precondition') {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted) {
-                  return;
+          body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: query.snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                final error = snapshot.error;
+                if (error is FirebaseException &&
+                    error.code == 'failed-precondition') {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) {
+                      return;
+                    }
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Please wait, setting up notifications index...',
+                      tone: UtopiaSnackBarTone.info,
+                    );
+                  });
                 }
-                showUtopiaSnackBar(
-                  context,
-                  message: 'Please wait, setting up notifications index...',
-                  tone: UtopiaSnackBarTone.info,
+                return Center(
+                  child: Text(
+                    'Notifications are not ready yet.',
+                    style: TextStyle(color: U.sub),
+                  ),
                 );
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                  child: CircularProgressIndicator(color: U.primary),
+                );
+              }
+
+              final docs = [...(snapshot.data?.docs ?? [])]..sort((a, b) {
+                final aTimestamp = a.data()['receivedAt'] as Timestamp?;
+                final bTimestamp = b.data()['receivedAt'] as Timestamp?;
+                final aMicros =
+                    aTimestamp?.microsecondsSinceEpoch ?? DateTime(1970).microsecondsSinceEpoch;
+                final bMicros =
+                    bTimestamp?.microsecondsSinceEpoch ?? DateTime(1970).microsecondsSinceEpoch;
+                return bMicros.compareTo(aMicros);
               });
-            }
-            return const Center(
-              child: Text(
-                'Notifications are not ready yet.',
-                style: TextStyle(color: Color(0xFFA6ADC8)),
-              ),
-            );
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFCBA6F7)),
-            );
-          }
-
-          final docs = [...(snapshot.data?.docs ?? [])]..sort((a, b) {
-            final aTimestamp = a.data()['receivedAt'] as Timestamp?;
-            final bTimestamp = b.data()['receivedAt'] as Timestamp?;
-            final aMicros =
-                aTimestamp?.microsecondsSinceEpoch ?? DateTime(1970).microsecondsSinceEpoch;
-            final bMicros =
-                bTimestamp?.microsecondsSinceEpoch ?? DateTime(1970).microsecondsSinceEpoch;
-            return bMicros.compareTo(aMicros);
-          });
-          if (docs.isEmpty) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_none,
-                    color: Color(0xFF6C7086),
-                    size: 48,
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'No notifications yet',
-                    style: TextStyle(color: Color(0xFFA6ADC8)),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          String? lastSection;
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data();
-              final bool isUnread = !(data['read'] as bool? ?? false);
-              final title = (data['title'] ?? '').toString();
-              final body = (data['body'] ?? '').toString();
-              final type = (data['type'] ?? 'general').toString();
-              final receivedAt = data['receivedAt'] as Timestamp?;
-              final section = _sectionLabel(receivedAt);
-              final showSection = section != lastSection;
-              lastSection = section;
-
-              return Padding(
-                padding: EdgeInsets.only(top: showSection ? 0 : 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (showSection) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10, left: 4),
-                        child: Text(
-                          section,
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: const Color(0xFFCBA6F7),
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.notifications_none,
+                        color: U.dim,
+                        size: 48,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No notifications yet',
+                        style: TextStyle(color: U.sub),
                       ),
                     ],
-                    Dismissible(
-                      key: ValueKey(doc.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF312127),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFF38BA8)),
+                  ),
+                );
+              }
+
+              String? lastSection;
+              return ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                itemCount: docs.length,
+                itemBuilder: (context, index) {
+                  final doc = docs[index];
+                  final data = doc.data();
+                  final bool isUnread = !(data['read'] as bool? ?? false);
+                  final title = (data['title'] ?? '').toString();
+                  final body = (data['body'] ?? '').toString();
+                  final type = (data['type'] ?? 'general').toString();
+                  final receivedAt = data['receivedAt'] as Timestamp?;
+                  final section = _sectionLabel(receivedAt);
+                  final showSection = section != lastSection;
+                  lastSection = section;
+
+                  return Padding(
+                    padding: EdgeInsets.only(top: showSection ? 0 : 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (showSection) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10, left: 4),
+                            child: Text(
+                              section,
+                              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: U.primary,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                        Dismissible(
+                          key: ValueKey(doc.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            decoration: BoxDecoration(
+                              color: U.red.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: U.red),
+                            ),
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Icon(
+                              Icons.delete_outline_rounded,
+                              color: U.red,
+                            ),
+                          ),
+                          onDismissed: (_) => _deleteNotification(doc.id),
+                          child: _NotificationCard(
+                            title: title,
+                            body: body,
+                            type: type,
+                            isUnread: isUnread,
+                            timeLabel: _formatTime(receivedAt),
+                            icon: _notificationIcon(type),
+                            onTap: () => _openNotification(doc),
+                          ),
                         ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: Color(0xFFF5B0C3),
-                        ),
-                      ),
-                      onDismissed: (_) => _deleteNotification(doc.id),
-                      child: _NotificationCard(
-                        title: title,
-                        body: body,
-                        type: type,
-                        isUnread: isUnread,
-                        timeLabel: _formatTime(receivedAt),
-                        icon: _notificationIcon(type),
-                        onTap: () => _openNotification(doc),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               );
             },
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -419,29 +425,28 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF313244),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: appThemeNotifier,
+      builder: (context, theme, child) {
+        return Material(
+          color: U.card,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isUnread
-                  ? const Color(0xFF4D4567)
-                  : const Color(0xFF3C3E52),
-            ),
-            gradient: LinearGradient(
-              colors: isUnread
-                  ? const [Color(0xFF34364A), Color(0xFF2D3043)]
-                  : const [Color(0xFF313244), Color(0xFF2A2C3C)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isUnread
+                      ? U.primary.withValues(alpha: 0.3)
+                      : U.border,
+                ),
+                color: isUnread
+                    ? U.primary.withValues(alpha: 0.05)
+                    : U.card,
+              ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -501,7 +506,7 @@ class _NotificationCard extends StatelessWidget {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFFAEB3CD),
+                        color: U.sub,
                         height: 1.35,
                       ),
                     ),
@@ -514,7 +519,7 @@ class _NotificationCard extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF25263A),
+                            color: U.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
@@ -524,15 +529,15 @@ class _NotificationCard extends StatelessWidget {
                               _ => 'General',
                             },
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: const Color(0xFFCBA6F7),
+                              color: U.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                         const Spacer(),
-                        const Icon(
+                        Icon(
                           Icons.swipe_left_rounded,
-                          color: Color(0xFF6C7086),
+                          color: U.dim,
                           size: 16,
                         ),
                       ],
@@ -544,6 +549,8 @@ class _NotificationCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

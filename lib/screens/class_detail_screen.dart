@@ -185,6 +185,11 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'THIS FEATURE IS UNDER DEVELOPMENT.',
+                  style: GoogleFonts.outfit(color: U.red.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                ),
               ],
             ),
           ),
@@ -241,6 +246,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                                     title: name.replaceAll('.md', ''),
                                     filePath: item['path'] as String,
                                     isEditable: _userRole == 'writer',
+                                    useGlobalRepo: true,
                                   ),
                                 ),
                               );

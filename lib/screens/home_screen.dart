@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _loading = true;
   bool _syncing = false;
   bool _offlineWarmupScheduled = false;
-  bool _isWriter = false;
+  bool _isSuperUser = false;
   late final String _subtitleWord;
 
   static final _subjectInfo = {
@@ -77,9 +77,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _libraryMoodWords[DateTime.now().microsecondsSinceEpoch %
             _libraryMoodWords.length];
     WidgetsBinding.instance.addObserver(this);
-    RoleService().isWriter().then((v) {
+    RoleService().isSuperUser().then((v) {
       if (mounted) {
-        setState(() => _isWriter = v);
+        setState(() => _isSuperUser = v);
         _loadCached();
         _load();
       }
@@ -96,9 +96,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      RoleService().isWriter().then((v) {
+      RoleService().isSuperUser().then((v) {
         if (mounted) {
-          setState(() => _isWriter = v);
+          setState(() => _isSuperUser = v);
           _load();
         }
       });
@@ -117,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadCached() async {
-    final folders = await CacheService().getFolders(includeHidden: _isWriter);
+    final folders = await CacheService().getFolders(includeHidden: _isSuperUser);
     if (!mounted || folders.isEmpty) return;
     setState(() {
       _folders = folders.where((f) {
@@ -130,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _load() async {
     if (mounted) setState(() => _syncing = true);
-    final folders = await _github.getFolders(isWriter: _isWriter);
+    final folders = await _github.getFolders(isWriter: _isSuperUser);
     _scheduleOfflineWarmup();
     if (!mounted) return;
     setState(() {
@@ -166,8 +166,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           content: Text(
             success
                 ? (newHidden
-                      ? 'Folder hidden from readers'
-                      : 'Folder shown to all')
+                      ? 'Folder hidden from users'
+                      : 'Folder visible to all')
                 : 'Failed to update (check internet)',
             style: GoogleFonts.outfit(),
           ),
@@ -469,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_isWriter)
+          if (_isSuperUser)
             Container(
               decoration: BoxDecoration(
                 color: U.card,
@@ -492,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-          if (_isWriter) const SizedBox(height: 8),
+          if (_isSuperUser) const SizedBox(height: 8),
           _SciWordleFAB(),
         ],
       ),
@@ -559,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: info.$2,
                             index: index,
                             isHidden: isHidden,
-                            isWriter: _isWriter,
+                            isWriter: _isSuperUser,
                             onTap: () => Navigator.push(
                               context,
                               buildForwardRoute(
@@ -900,7 +900,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
   String? _indexFilePath;
   String _indexRawContent = '';
   bool _loading = true;
-  bool _isWriter = false;
+  bool _isSuperUser = false;
 
   @override
   void initState() {
@@ -919,8 +919,8 @@ class _TopicListScreenState extends State<TopicListScreen> {
     }
     _loadCached();
     unawaited(_load());
-    RoleService().isWriter().then((v) {
-      if (mounted) setState(() => _isWriter = v);
+    RoleService().isSuperUser().then((v) {
+      if (mounted) setState(() => _isSuperUser = v);
     });
   }
 
@@ -1203,7 +1203,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
                       ),
                     ),
                   ),
-                  if (_isWriter && _indexFilePath != null)
+                  if (_isSuperUser && _indexFilePath != null)
                     IconButton(
                       icon: Icon(
                         Icons.edit_outlined,
@@ -1227,7 +1227,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
                         }
                       },
                     ),
-                  if (_isWriter) ...[
+                  if (_isSuperUser) ...[
                     const SizedBox(width: 8),
                     IconButton(
                       icon: Icon(Icons.add, color: U.primary, size: 20),
@@ -1363,7 +1363,7 @@ class _TopicListScreenState extends State<TopicListScreen> {
                                       ),
                                     ),
                                   ),
-                                  if (_isWriter)
+                                  if (_isSuperUser)
                                     PopupMenuButton<String>(
                                       icon: Icon(
                                         Icons.more_vert,

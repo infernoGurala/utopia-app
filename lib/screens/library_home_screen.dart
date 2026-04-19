@@ -13,7 +13,9 @@ import '../services/github_global_service.dart';
 import 'class_detail_screen.dart';
 import 'class_settings_screen.dart';
 import 'community_notes_screen.dart';
+import 'notification_history_screen.dart';
 import 'sciwordle_screen.dart';
+import 'timetable_screen.dart';
 
 class LibraryHomeScreen extends StatefulWidget {
   const LibraryHomeScreen({super.key});
@@ -212,7 +214,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'Utopia',
@@ -241,6 +242,32 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             ),
                           ),
                         ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.calendar_today_rounded, color: U.sub, size: 20),
+                        tooltip: 'Timetable',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                          );
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: Icon(Icons.notifications_none_rounded, color: U.sub, size: 22),
+                        tooltip: 'Notifications',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
+                          );
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       ),
                     ],
                   ),
@@ -499,8 +526,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     final accent = U.peach;
     final isPinned = _pinnedClassIds.contains(c.classId);
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ClassDetailScreen(
@@ -509,6 +536,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
             ),
           ),
         );
+        if (mounted) {
+          _loadData(forceRefresh: true);
+        }
       },
       onLongPress: () => _showClassLongPressMenu(c),
       borderRadius: BorderRadius.circular(18),

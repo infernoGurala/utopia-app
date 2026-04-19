@@ -11,9 +11,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'note_viewer_screen.dart';
 
-/// Number of approvals required before a community deletion is executed.
-/// Set to 2 for now (requester counts as the first approval automatically).
-const int kDeletionApprovalsRequired = 2;
+/// Dynamic approvals: Root items need 10, sub items need 3.
+int _getRequiredApprovals(String path) {
+  if (path.isEmpty) return 3;
+  final parts = path.split('/').where((p) => p.trim().isNotEmpty).toList();
+  final cIdx = parts.indexOf('Community');
+  if (cIdx != -1) {
+    final depthAfterCommunity = parts.length - 1 - cIdx;
+    // depth 1 means directly inside Community (e.g. aditya-university/Community/ProgramFolder)
+    if (depthAfterCommunity <= 1) return 10;
+  }
+  return 3;
+}
 
 /// Fun loading messages — gen-z style.
 const List<String> _kLoadingMessages = [
@@ -207,6 +216,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   bool _warningShown = false;
   bool _editModeEnabled = false;
   List<QueryDocumentSnapshot> _pendingDeletions = [];
+  final ScrollController _breadcrumbController = ScrollController();
 
   /// Cached folder-icon overrides: folderPath → iconKey from kFolderIconCatalogue.
   final Map<String, String> _folderIcons = {};
@@ -798,6 +808,21 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     });
     // Fetch last-modified dates in the background after items are available
     _fetchLastModifiedDates();
+    if (_depth >= 1) {
+      _prefetchSubfolders();
+    }
+  }
+
+  /// Automatically fetch contents of subfolders in the background to warm the cache.
+  void _prefetchSubfolders() {
+    for (final item in _items) {
+      if (item['type'] == 'dir') {
+        final path = item['path'] as String? ?? '';
+        if (path.isNotEmpty) {
+          _github.getDirectoryContents(path).catchError((_) => <Map<String, dynamic>>[]);
+        }
+      }
+    }
   }
 
   void _navigateToFolder(String folderName) {
@@ -809,6 +834,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       _loading = true;
     });
     _load();
+    _scrollToBreadcrumbEnd();
   }
 
   void _navigateBack() {
@@ -824,6 +850,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       _loading = true;
     });
     _load();
+    _scrollToBreadcrumbEnd();
   }
 
   /// Jump to a specific depth in the navigation hierarchy.
@@ -838,6 +865,19 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       _loading = true;
     });
     _load();
+    _scrollToBreadcrumbEnd();
+  }
+
+  void _scrollToBreadcrumbEnd() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted && _breadcrumbController.hasClients) {
+        _breadcrumbController.animateTo(
+          _breadcrumbController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
   }
 
   void _showAddBranchDialog() {
@@ -1121,6 +1161,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         ),
       ),
       child: SingleChildScrollView(
+        controller: _breadcrumbController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -1677,6 +1718,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                 max(0, approvals.length - rejections.length),
                                                 isExecuting,
                                                 isFailed,
+                                                _getRequiredApprovals(item['path'] as String? ?? ''),
                                               ),
                                             ),
                                           if (!isPendingDeletion &&
@@ -1833,7 +1875,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Deletion requested (1/$kDeletionApprovalsRequired approvals).',
+              'Deletion requested (1/${_getRequiredApprovals(item['path'] as String? ?? '')} approvals).',
             ),
             backgroundColor: U.primary,
           ),
@@ -2017,7 +2059,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         approvals.add(user.uid);
         newApprovalCount = max(0, approvals.length - rejections.length);
 
-        if ((approvals.length - rejections.length) >= kDeletionApprovalsRequired) {
+        final reqApprovals = _getRequiredApprovals(data['path'] as String? ?? '');
+        if ((approvals.length - rejections.length) >= reqApprovals) {
           // This client wins the race — transition to executing
           txn.update(deletionDoc.reference, {
             'approvals': approvals,
@@ -2075,7 +2118,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Deletion approved ($newApprovalCount/$kDeletionApprovalsRequired).',
+              'Deletion approved ($newApprovalCount/${_getRequiredApprovals((deletionDoc.data() as Map<String, dynamic>?)?['path'] as String? ?? '')}).',
             ),
             backgroundColor: U.primary,
           ),
@@ -2612,7 +2655,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           vertical: 4,
                         ),
                         child: Text(
-                          '$approvalCount/$kDeletionApprovalsRequired approvals',
+                          '$approvalCount/${_getRequiredApprovals(folderPath)} approvals',
                           style: GoogleFonts.outfit(
                             color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 11,
@@ -2621,8 +2664,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         ),
                       ),
                       LinearProgressIndicator(
-                        value: kDeletionApprovalsRequired > 0
-                            ? approvalCount / kDeletionApprovalsRequired
+                        value: _getRequiredApprovals(folderPath) > 0
+                            ? approvalCount / _getRequiredApprovals(folderPath)
                             : 0.0,
                         backgroundColor: Colors.white.withValues(alpha: 0.2),
                         valueColor: const AlwaysStoppedAnimation<Color>(
@@ -2658,6 +2701,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     int approvalCount,
     bool isExecuting,
     bool isFailed,
+    int reqApprovals,
   ) {
     if (isExecuting) {
       return Text(
@@ -2676,13 +2720,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          'Pending Deletion ($approvalCount/$kDeletionApprovalsRequired approvals)',
+          'Pending Deletion ($approvalCount/$reqApprovals approvals)',
           style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
         ),
         const SizedBox(height: 4),
         LinearProgressIndicator(
-          value: kDeletionApprovalsRequired > 0
-              ? approvalCount / kDeletionApprovalsRequired
+          value: reqApprovals > 0
+              ? approvalCount / reqApprovals
               : 0.0,
           backgroundColor: U.border,
           valueColor: const AlwaysStoppedAnimation<Color>(Colors.grey),

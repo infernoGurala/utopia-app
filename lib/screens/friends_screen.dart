@@ -31,6 +31,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   Map<String, Map<String, dynamic>> _recentChats = const {};
   Map<String, int> _streaks = {};
 
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +43,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
       setState(() => _recentChats = value);
     });
     _loadStreaks();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _loadStreaks() async {
@@ -54,6 +60,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   @override
   void dispose() {
     _recentChatsSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -69,53 +76,124 @@ class _FriendsScreenState extends State<FriendsScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Friends',
-                      style: GoogleFonts.outfit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: U.text,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _isSearching
+                    ? Row(
+                        key: const ValueKey('search'),
+                        children: [
+                          Expanded(
+                            child: Container(
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: U.card,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: U.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  const SizedBox(width: 12),
+                                  Icon(Icons.search, color: U.sub, size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _searchController,
+                                      autofocus: true,
+                                      style: GoogleFonts.outfit(
+                                          color: U.text, fontSize: 14),
+                                      decoration: InputDecoration(
+                                        hintText: 'Search people...',
+                                        hintStyle: GoogleFonts.outfit(
+                                            color: U.dim),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_searchController.text.isNotEmpty)
+                                    IconButton(
+                                      icon: Icon(Icons.close,
+                                          color: U.sub, size: 16),
+                                      onPressed: _searchController.clear,
+                                      padding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isSearching = false;
+                                _searchController.clear();
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  color: U.primary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        key: const ValueKey('title'),
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Friends',
+                              style: GoogleFonts.outfit(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                color: U.text,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () {
+                              setState(() => _isSearching = true);
+                            },
+                            icon: Icon(
+                              Icons.search_rounded,
+                              color: U.primary,
+                              size: 20,
+                            ),
+                            tooltip: 'Search',
+                            splashRadius: 20,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      // TODO: Implement search functionality or screen
-                    },
-                    icon: Icon(
-                      Icons.search_rounded,
-                      color: U.primary,
-                      size: 20,
-                    ),
-                    tooltip: 'Search',
-                    splashRadius: 20,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
               ),
             ),
-            const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _usersStream,
-                builder: (context, snapshot) {
-                  final total = snapshot.data?.docs
-                      .where((doc) => doc.id != currentUid)
-                      .length;
-                  final countText = total != null && total > 0
-                      ? '  •  $total people'
-                      : '';
-                  return Text(
-                    'Everyone using UTOPIA$countText',
-                    style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
-                  );
-                },
+            if (!_isSearching) const SizedBox(height: 2),
+            if (!_isSearching)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: _usersStream,
+                  builder: (context, snapshot) {
+                    final total = snapshot.data?.docs
+                        .where((doc) => doc.id != currentUid)
+                        .length;
+                    final countText = total != null && total > 0
+                        ? '  •  $total people'
+                        : '';
+                    return Text(
+                      'Everyone using UTOPIA$countText',
+                      style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
+                    );
+                  },
+                ),
               ),
-            ),
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -191,10 +269,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
                             );
                           }
 
+                          final query = _searchController.text.trim().toLowerCase();
                           final users =
                               usersSnapshot.data?.docs
                                   .map((doc) => {'uid': doc.id, ...doc.data()})
-                                  .where((user) => user['uid'] != currentUid)
+                                  .where((user) {
+                                    if (user['uid'] == currentUid) return false;
+                                    if (query.isEmpty) return true;
+                                    final displayName = (user['displayName'] ?? '').toString().toLowerCase();
+                                    final email = (user['email'] ?? '').toString().toLowerCase();
+                                    return displayName.contains(query) || email.contains(query);
+                                  })
                                   .toList() ??
                               <Map<String, dynamic>>[];
 
@@ -381,6 +466,7 @@ class _FriendRow extends StatelessWidget {
                     scoreRank: scoreRank,
                     streakRank: streakRank,
                     email: email,
+                    isSuperUser: user['role'] == 'superuser',
                     style: GoogleFonts.outfit(
                       color: U.text,
                       fontSize: 15,

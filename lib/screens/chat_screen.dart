@@ -462,6 +462,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       scoreRank: scoreRank,
                                       streakRank: streakRank,
                                       email: widget.email,
+                                      isSuperUser: userData?['role'] == 'superuser',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.outfit(

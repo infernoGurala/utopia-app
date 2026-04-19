@@ -1,3 +1,10 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:utopia_app/services/platform_support.dart';
+import 'package:utopia_app/main.dart';
+
 class _MermaidBlock extends StatefulWidget {
   final String code;
   const _MermaidBlock({required this.code});

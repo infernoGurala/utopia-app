@@ -13,6 +13,7 @@ import 'package:utopia_app/main.dart';
 import 'package:utopia_app/services/chat_emoji_catalog.dart';
 import 'package:utopia_app/services/platform_support.dart';
 import 'package:utopia_app/screens/chat_screen.dart';
+import 'package:utopia_app/screens/sciwordle_screen.dart';
 import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/notification_dialog.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
@@ -134,6 +135,14 @@ class NotificationService {
               isForegroundChat && chatId.isNotEmpty && _activeChatId == chatId;
 
           if (isActiveChat) {
+            return;
+          }
+
+          if (type == 'morning_notification' && !U.morningNotifEnabled) {
+            return;
+          }
+
+          if (type == 'sci_wordle' && !U.sciWordleNotifEnabled) {
             return;
           }
 
@@ -584,6 +593,14 @@ class NotificationService {
       return;
     }
 
+    if (type == 'sci_wordle') {
+      final navigator = navigatorKey.currentState;
+      if (navigator != null) {
+        unawaited(navigator.push(buildForwardRoute(const SciwordleScreen())));
+      }
+      return;
+    }
+
     showNotificationDialog(title: title, body: body);
   }
 
@@ -678,6 +695,12 @@ class NotificationService {
     required String body,
   }) {
     if (type == 'chat') {
+      return false;
+    }
+    if (type == 'morning_notification' && !U.morningNotifEnabled) {
+      return false;
+    }
+    if (type == 'sci_wordle' && !U.sciWordleNotifEnabled) {
       return false;
     }
     return title.trim().isNotEmpty || body.trim().isNotEmpty;

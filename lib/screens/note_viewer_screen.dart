@@ -29,6 +29,7 @@ class NoteViewerScreen extends StatefulWidget {
   final List<String>? wikiCandidates;
   final String? initialSegmentId;
   final bool isEditable;
+  final bool useGlobalRepo;
   const NoteViewerScreen({
     super.key,
     required this.title,
@@ -38,6 +39,7 @@ class NoteViewerScreen extends StatefulWidget {
     this.wikiCandidates,
     this.initialSegmentId,
     this.isEditable = false,
+    this.useGlobalRepo = false,
   });
   @override
   State<NoteViewerScreen> createState() => _NoteViewerScreenState();
@@ -53,21 +55,20 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   List<_Segment> _segments = const [];
   final Map<String, GlobalKey> _segmentKeys = {};
   bool _loading = true;
-  bool _isWriter = false;
+  bool _isSuperUser = false;
   bool _didScrollToInitialSegment = false;
 
   @override
   void initState() {
     super.initState();
     _load();
-    RoleService().isWriter().then((v) {
+    RoleService().isSuperUser().then((v) {
       if (mounted) {
         setState(() {
           // For community notes, editing is gated solely by isEditable (the Edit Mode
-          // toggle in CommunityNotesScreen). For non-community notes, editing requires
-          // the global writer role (_isWriter). isEditable has no effect for non-community
-          // notes because it defaults to false and is never set true outside community context.
-          _isWriter = v;
+          // toggle in CommunityNotesScreen — everyone can edit community notes).
+          // For non-community notes, editing requires the super user role.
+          _isSuperUser = v;
         });
       }
     });
@@ -89,7 +90,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       }
     }
 
-    final isCommunityNote = widget.filePath.contains('/Community/');
+    final isCommunityNote = widget.filePath.contains('/Community/') || widget.useGlobalRepo;
     final globalGitHub = GitHubGlobalService();
 
     for (final candidate in allCandidates) {
@@ -866,11 +867,14 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // Community notes: only show edit when Edit Mode is active (isEditable).
-                  // Non-community notes: only show edit if the user has the writer role.
-                  if (widget.filePath.contains('/Community/')
+                  // Community notes: everyone can edit (gated by Edit Mode toggle).
+                  // Class notes: writers can edit (raw markdown).
+                  // Non-community notes: only super users can edit.
+                  if (widget.useGlobalRepo
                       ? widget.isEditable
-                      : _isWriter)
+                      : widget.filePath.contains('/Community/')
+                          ? widget.isEditable
+                          : _isSuperUser)
                     IconButton(
                       icon: Icon(
                         Icons.edit_outlined,
@@ -878,24 +882,46 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                         size: 20,
                       ),
                       onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditorScreen(
-                              title: widget.title,
-                              filePath: widget.filePath,
-                              initialContent: _rawContent,
+                        if (widget.useGlobalRepo && !widget.filePath.contains('/Community/')) {
+                          // Class notes → raw markdown editor
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => _RawMarkdownEditor(
+                                title: widget.title,
+                                filePath: widget.filePath,
+                                initialContent: _rawContent,
+                              ),
                             ),
-                          ),
-                        );
-                        if (result is String) {
-                          setState(() {
-                            _rawContent = result;
-                            _segments = _parseSegments(result);
-                            _loading = false;
-                          });
-                        } else if (result == true) {
-                          _load();
+                          );
+                          if (result is String) {
+                            setState(() {
+                              _rawContent = result;
+                              _segments = _parseSegments(result);
+                              _loading = false;
+                            });
+                          }
+                        } else {
+                          // Community / personal notes → block editor
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditorScreen(
+                                title: widget.title,
+                                filePath: widget.filePath,
+                                initialContent: _rawContent,
+                              ),
+                            ),
+                          );
+                          if (result is String) {
+                            setState(() {
+                              _rawContent = result;
+                              _segments = _parseSegments(result);
+                              _loading = false;
+                            });
+                          } else if (result == true) {
+                            _load();
+                          }
                         }
                       },
                     ),
@@ -3300,6 +3326,171 @@ class _FullscreenImageViewer extends StatelessWidget {
         alt ?? 'Image failed to load',
         style: GoogleFonts.outfit(color: Colors.white70, fontSize: 14),
         textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Raw Markdown Editor (for Class notes)
+// ─────────────────────────────────────────────────────────────
+
+class _RawMarkdownEditor extends StatefulWidget {
+  final String title;
+  final String filePath;
+  final String initialContent;
+  const _RawMarkdownEditor({
+    required this.title,
+    required this.filePath,
+    required this.initialContent,
+  });
+
+  @override
+  State<_RawMarkdownEditor> createState() => _RawMarkdownEditorState();
+}
+
+class _RawMarkdownEditorState extends State<_RawMarkdownEditor> {
+  late TextEditingController _controller;
+  bool _hasChanges = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialContent);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_hasChanges) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final content = _controller.text;
+
+    // Pop immediately for responsiveness
+    Navigator.pop(context, content);
+
+    // Background save to global repo
+    try {
+      await GitHubGlobalService().updateFile(
+        path: widget.filePath,
+        content: content,
+        message:
+            'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+      );
+      await GitHubService.primeFileContentCache(widget.filePath, content);
+    } catch (e) {
+      debugPrint('RawMarkdownEditor: background save failed: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: U.bg,
+      appBar: AppBar(
+        backgroundColor: U.surface,
+        foregroundColor: U.text,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_hasChanges) {
+              showDialog(
+                context: context,
+                builder: (_) => AlertDialog(
+                  backgroundColor: U.card,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  title: Text('Unsaved changes',
+                      style: GoogleFonts.outfit(
+                          color: U.text, fontWeight: FontWeight.w600)),
+                  content: Text('Leave without saving?',
+                      style: GoogleFonts.outfit(color: U.sub)),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Stay',
+                          style: GoogleFonts.outfit(color: U.primary)),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.pop(context);
+                      },
+                      child: Text('Leave',
+                          style: GoogleFonts.outfit(color: U.red)),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
+        title: Text(
+          widget.title,
+          style: GoogleFonts.outfit(
+              color: U.text, fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        actions: [
+          if (_hasChanges)
+            _saving
+                ? Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: U.green)),
+                  )
+                : IconButton(
+                    icon: Icon(Icons.check_rounded, color: U.green),
+                    onPressed: _save,
+                  ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: TextField(
+          controller: _controller,
+          onChanged: (_) {
+            if (!_hasChanges) setState(() => _hasChanges = true);
+          },
+          maxLines: null,
+          expands: true,
+          textAlignVertical: TextAlignVertical.top,
+          style: GoogleFonts.sourceCodePro(
+            color: U.text,
+            fontSize: 13,
+            height: 1.6,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Write markdown here...',
+            hintStyle: GoogleFonts.sourceCodePro(color: U.dim, fontSize: 13),
+            filled: true,
+            fillColor: U.card,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: U.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: U.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: U.primary, width: 1.2),
+            ),
+            contentPadding: const EdgeInsets.all(16),
+          ),
+        ),
       ),
     );
   }

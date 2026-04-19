@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
 import '../services/platform_support.dart';
@@ -23,7 +24,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  bool _isWriter = false;
+  bool _isSuperUser = false;
   bool _updatingName = false;
   bool _updatingTheme = false;
 
@@ -89,6 +90,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _launchBugReport() async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'johnmosesg150@gmail.com',
+      query: 'subject=UTOPIA Bug Report / Suggestion',
+    );
+    try {
+      if (!await launchUrl(emailLaunchUri)) {
+        throw Exception('Could not launch email');
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: U.red,
+            content: Text(
+              'Could not open email app. Please email johnmosesg150@gmail.com directly.',
+              style: GoogleFonts.outfit(color: U.bg, fontSize: 13),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   void _restartApp() async {
     try {
       const platform = MethodChannel('utopia_app/app_update');
@@ -101,8 +127,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    RoleService().isWriter().then((v) {
-      if (mounted) setState(() => _isWriter = v);
+    RoleService().isSuperUser().then((v) {
+      if (mounted) setState(() => _isSuperUser = v);
     });
   }
 
@@ -246,6 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       scoreRank: scoreRank,
                                       streakRank: streakRank,
                                       email: user?.email,
+                                      isSuperUser: _isSuperUser,
                                       style: GoogleFonts.outfit(
                                         color: U.text,
                                         fontSize: 16,
@@ -292,32 +319,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _isWriter
-                                      ? U.primary.withValues(alpha: 0.15)
-                                      : U.border,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  _isWriter ? 'Writer' : 'Reader',
-                                  style: GoogleFonts.outfit(
-                                    color: _isWriter ? U.primary : U.sub,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
                             ],
                           ),
                         );
                       },
                     );
+
                   },
                 ),
                 const SizedBox(height: 24),
@@ -329,7 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (_isWriter) ...[
+                      if (_isSuperUser) ...[
                         _groupedTile(
                           icon: Icons.admin_panel_settings_outlined,
                           label: 'Admin Control Panel',
@@ -432,6 +439,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             },
                           );
                         },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // Morning Notification Toggle
+                      ValueListenableBuilder<bool>(
+                        valueListenable: morningNotifEnabledNotifier,
+                        builder: (context, notifEnabled, _) {
+                          return _groupedToggleTile(
+                            icon: Icons.wb_sunny_outlined,
+                            label: 'Morning Notification',
+                            sub: notifEnabled
+                                ? 'Enabled · Receive daily morning alerts'
+                                : 'Disabled · No morning alerts',
+                            color: notifEnabled ? U.peach : U.dim,
+                            value: notifEnabled,
+                            onChanged: (v) async {
+                              morningNotifEnabledNotifier.value = v;
+                              unawaited(
+                                CacheService().saveAppSetting(
+                                  'morning_notif_enabled',
+                                  v.toString(),
+                                ),
+                              );
+                              final uid = FirebaseAuth.instance.currentUser?.uid;
+                              if (uid != null) {
+                                unawaited(
+                                  FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(uid)
+                                      .set({
+                                        'morningNotificationEnabled': v,
+                                      }, SetOptions(merge: true)),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // Sci-Wordle Notification Toggle
+                      ValueListenableBuilder<bool>(
+                        valueListenable: sciWordleNotifEnabledNotifier,
+                        builder: (context, notifEnabled, _) {
+                          return _groupedToggleTile(
+                            icon: Icons.games_outlined,
+                            label: 'SCI-Wordle Notification',
+                            sub: notifEnabled
+                                ? 'Enabled · Receive daily game alerts'
+                                : 'Disabled · No game alerts',
+                            color: notifEnabled ? U.primary : U.dim,
+                            value: notifEnabled,
+                            onChanged: (v) async {
+                              sciWordleNotifEnabledNotifier.value = v;
+                              unawaited(
+                                CacheService().saveAppSetting(
+                                  'sci_wordle_notif_enabled',
+                                  v.toString(),
+                                ),
+                              );
+                              final uid = FirebaseAuth.instance.currentUser?.uid;
+                              if (uid != null) {
+                                unawaited(
+                                  FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(uid)
+                                      .set({
+                                        'sciWordleNotificationEnabled': v,
+                                      }, SetOptions(merge: true)),
+                                );
+                              }
+                            },
+                          );
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
+                      // Report Bugs & Suggestions
+                      _groupedTile(
+                        icon: Icons.bug_report_outlined,
+                        label: 'Report Bugs & Suggestions',
+                        sub: 'Help us improve UTOPIA',
+                        color: U.teal,
+                        onTap: _launchBugReport,
                       ),
                       Divider(
                         height: 1,

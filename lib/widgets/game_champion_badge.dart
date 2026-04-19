@@ -200,6 +200,7 @@ class ChampionNameText extends StatelessWidget {
     this.style,
     this.maxLines = 1,
     this.overflow = TextOverflow.ellipsis,
+    this.isSuperUser = false,
   });
 
   final String name;
@@ -209,6 +210,7 @@ class ChampionNameText extends StatelessWidget {
   final TextStyle? style;
   final int maxLines;
   final TextOverflow overflow;
+  final bool isSuperUser;
 
   ChampionType get _type =>
       _typeFromScoreAndStreakRank(scoreRank, streakRank, email: email);
@@ -269,6 +271,17 @@ class ChampionNameText extends StatelessWidget {
                   style: baseStyle,
                 ),
         ),
+        if (isSuperUser) ...[
+          const SizedBox(width: 4),
+          Tooltip(
+            message: 'Super User',
+            child: const Icon(
+              Icons.verified_rounded,
+              color: Color(0xFF0095F6),
+              size: 16,
+            ),
+          ),
+        ],
         if (_type != ChampionType.none) ...[
           const SizedBox(width: 6),
           Container(

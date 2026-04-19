@@ -358,9 +358,11 @@ class GitHubGlobalService {
         final data = jsonDecode(checkRes.body);
         
         if (data is List) {
-          // It's a directory, delete all contents recursively
-          final futures = data.map((item) => deleteItem(item['path'])).toList();
-          await Future.wait(futures);
+          // It's a directory, delete all contents recursively.
+          // Process sequentially to avoid Git 409 conflicts (parallel commits to the same branch).
+          for (final item in data) {
+            await deleteItem(item['path']);
+          }
         } else if (data is Map) {
           // It's a single file
           final sha = data['sha'];

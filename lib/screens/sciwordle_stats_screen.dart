@@ -50,6 +50,7 @@ class _SciwordleStatsScreenState extends State<SciwordleStatsScreen> {
           'maxStreak': score.bestStreak,
           'totalScore': score.totalScore,
         };
+        _guessDistribution = score.guessDistribution;
         _loading = false;
       });
     } catch (e) {
@@ -231,14 +232,6 @@ class _SciwordleStatsScreenState extends State<SciwordleStatsScreen> {
   }
 
   Widget _buildNextPuzzle() {
-    final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
-    final diff = tomorrow.difference(now);
-
-    final hours = diff.inHours;
-    final minutes = diff.inMinutes % 60;
-    final seconds = diff.inSeconds % 60;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -247,77 +240,60 @@ class _SciwordleStatsScreenState extends State<SciwordleStatsScreen> {
         border: Border.all(color: U.border),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Next Puzzle',
+            'Next Puzzle Drops',
             style: GoogleFonts.outfit(
-              color: U.sub,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+              color: U.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
           ),
+          const SizedBox(height: 16),
+          _buildInfoRow('Morning Edition', '1:00 AM - 2:00 AM IST', Icons.wb_twilight_rounded),
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildTimeUnit(hours.toString().padLeft(2, '0'), 'HR'),
-              const SizedBox(width: 8),
-              Text(
-                ':',
-                style: GoogleFonts.outfit(
-                  color: U.dim,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
+          _buildInfoRow('Afternoon Edition', '11:00 AM - 12:00 PM IST', Icons.wb_sunny_rounded),
+          const SizedBox(height: 8),
+          _buildInfoRow('Evening Edition', '4:00 PM - 5:00 PM IST', Icons.nights_stay_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String time, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: U.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: U.primary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(width: 8),
-              _buildTimeUnit(minutes.toString().padLeft(2, '0'), 'MIN'),
-              const SizedBox(width: 8),
-              Text(
-                ':',
-                style: GoogleFonts.outfit(
-                  color: U.dim,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 8),
-              _buildTimeUnit(seconds.toString().padLeft(2, '0'), 'SEC'),
-            ],
+            ),
+          ),
+          Text(
+            time,
+            style: GoogleFonts.outfit(
+              color: U.sub,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTimeUnit(String value, String label) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: U.surface,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: GoogleFonts.outfit(
-              color: U.text,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            color: U.dim,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
+
 }

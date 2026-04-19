@@ -224,6 +224,11 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
             widget.classModel.classCode,
             style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w800, color: U.primary, letterSpacing: 8),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'THIS FEATURE IS UNDER DEVELOPMENT.',
+            style: GoogleFonts.outfit(color: U.red.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+          ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
@@ -322,7 +327,7 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
             children: [
               Icon(Icons.calendar_today_rounded, color: U.dim, size: 32),
               const SizedBox(height: 12),
-              Text('Coming in Stage 6', style: GoogleFonts.outfit(color: U.sub, fontSize: 14)),
+              Text('Coming soon', style: GoogleFonts.outfit(color: U.sub, fontSize: 14)),
               const SizedBox(height: 4),
               Text('Sync class workflows with your local timetable.', style: GoogleFonts.outfit(color: U.dim, fontSize: 12), textAlign: TextAlign.center),
             ],

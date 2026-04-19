@@ -25,17 +25,14 @@
             "id": "a29dca8215b0377d",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "EDIT MODE/EDIT_MODE_UTOPIA.canvas",
-                "viewState": {
-                  "x": 1194.2218733855182,
-                  "y": 78.75070644088083,
-                  "zoom": -0.5263524796666978
-                }
+                "file": "trash.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "EDIT_MODE_UTOPIA"
+              "icon": "lucide-file",
+              "title": "trash"
             }
           }
         ],
@@ -201,11 +198,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "1bd88b57c8e83355",
+  "active": "a29dca8215b0377d",
   "lastOpenFiles": [
+    "Timetable v3.md",
     "choose type of input.md",
-    "EDIT MODE/Upload a file.md",
     "EDIT MODE/EDIT_MODE_UTOPIA.canvas",
+    "trash.md",
+    "EDIT MODE/Upload a file.md",
     "EDIT MODE/Save the file.md",
     "EDIT MODE/File Upload Storage System in UTOPIA.md",
     "3.0 MAIN.md",
@@ -221,8 +220,6 @@
     "Pending Features & Ideas.md",
     "Stage Manager.md",
     "Super User v3.md",
-    "Timetable v3.md",
-    "Untitled.md",
     "EDIT MODE",
     "EDIT MODE/add a question&answer in utopia.md",
     "EDIT MODE/some text block in utopia.md",

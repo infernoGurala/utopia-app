@@ -120,12 +120,14 @@ class _RolloutReleasesScreenState extends State<RolloutReleasesScreen> {
   Future<void> _fetchMarkdown() async {
     try {
       final response = await http.get(Uri.parse(
-          'https://raw.githubusercontent.com/theutopiadomain/utopia-global/main/Utopiarollout.md'));
+          'https://raw.githubusercontent.com/theutopiadomain/utopia-global/main/Utopiarollout.md'
+          '?cb=${DateTime.now().millisecondsSinceEpoch}'));
       if (response.statusCode == 200) {
         if (mounted) {
           setState(() {
             _markdownContent = response.body;
             _isLoading = false;
+            _error = null;
           });
         }
       } else {
@@ -163,29 +165,130 @@ class _RolloutReleasesScreenState extends State<RolloutReleasesScreen> {
           ? Center(child: CircularProgressIndicator(color: U.primary))
           : _error != null
               ? Center(
-                  child: Text(
-                    _error!,
-                    style: GoogleFonts.outfit(color: U.red, fontSize: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.cloud_off_rounded, color: U.dim, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() { _isLoading = true; _error = null; });
+                          _fetchMarkdown();
+                        },
+                        icon: Icon(Icons.refresh_rounded, color: U.primary, size: 18),
+                        label: Text('Retry', style: GoogleFonts.outfit(color: U.primary)),
+                      ),
+                    ],
                   ),
                 )
-              : Markdown(
-                  data: _markdownContent ?? '',
-                  builders: {
-                    'pre': _CodeElementBuilder(),
-                  },
-                  styleSheet: MarkdownStyleSheet(
-                    p: GoogleFonts.outfit(color: U.text, fontSize: 15),
-                    h1: GoogleFonts.outfit(color: U.text, fontSize: 26, fontWeight: FontWeight.w700),
-                    h2: GoogleFonts.outfit(color: U.text, fontSize: 22, fontWeight: FontWeight.w700),
-                    h3: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
-                    listBullet: GoogleFonts.outfit(color: U.text, fontSize: 16),
-                    a: GoogleFonts.outfit(color: U.primary, fontSize: 15, fontWeight: FontWeight.w500),
-                    strong: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700),
-                    blockquote: GoogleFonts.outfit(color: U.sub, fontStyle: FontStyle.italic),
-                  ),
+              : RefreshIndicator(
+                  color: U.primary,
+                  backgroundColor: U.card,
+                  onRefresh: _fetchMarkdown,
+                  child: _buildMarkdownBody(),
                 ),
     );
   }
+
+  Widget _buildMarkdownBody() {
+    final content = _markdownContent ?? '';
+
+    // Pre-parse: split content into segments (markdown vs mermaid)
+    final segments = _parseSegments(content);
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
+      itemCount: segments.length,
+      itemBuilder: (context, index) {
+        final seg = segments[index];
+        if (seg.isMermaid) {
+          return _MermaidBlock(code: seg.content);
+        }
+
+        // Regular markdown – render with links disabled
+        return MarkdownBody(
+          data: seg.content,
+          extensionSet: md.ExtensionSet.gitHubFlavored,
+          builders: {
+            'pre': _CodeElementBuilder(),
+          },
+          // ignore: missing_return
+          onTapLink: (text, href, title) {
+            // Links disabled — do nothing
+          },
+          styleSheet: MarkdownStyleSheet(
+            p: GoogleFonts.outfit(color: U.text, fontSize: 15),
+            h1: GoogleFonts.outfit(color: U.text, fontSize: 26, fontWeight: FontWeight.w700),
+            h2: GoogleFonts.outfit(color: U.text, fontSize: 22, fontWeight: FontWeight.w700),
+            h3: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+            listBullet: GoogleFonts.outfit(color: U.text, fontSize: 16),
+            // Render links as plain text style (no underline, same color as body)
+            a: GoogleFonts.outfit(color: U.text, fontSize: 15),
+            strong: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700),
+            blockquote: GoogleFonts.outfit(color: U.sub, fontStyle: FontStyle.italic),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Split raw markdown into alternating markdown / mermaid segments.
+  List<_RolloutSegment> _parseSegments(String raw) {
+    final segments = <_RolloutSegment>[];
+    final lines = raw.split('\n');
+    final buffer = StringBuffer();
+    bool inMermaid = false;
+    final mermaidBuffer = StringBuffer();
+
+    for (final line in lines) {
+      if (!inMermaid && line.trim() == '```mermaid') {
+        // Flush any markdown before this
+        if (buffer.isNotEmpty) {
+          segments.add(_RolloutSegment(buffer.toString(), isMermaid: false));
+          buffer.clear();
+        }
+        inMermaid = true;
+        mermaidBuffer.clear();
+        continue;
+      }
+
+      if (inMermaid) {
+        if (line.trim() == '```') {
+          segments.add(_RolloutSegment(mermaidBuffer.toString().trim(), isMermaid: true));
+          mermaidBuffer.clear();
+          inMermaid = false;
+        } else {
+          mermaidBuffer.writeln(line);
+        }
+        continue;
+      }
+
+      buffer.writeln(line);
+    }
+
+    // Flush remainder
+    if (inMermaid && mermaidBuffer.isNotEmpty) {
+      // Unclosed mermaid block – treat as code
+      segments.add(_RolloutSegment(mermaidBuffer.toString().trim(), isMermaid: true));
+    }
+    if (buffer.isNotEmpty) {
+      segments.add(_RolloutSegment(buffer.toString(), isMermaid: false));
+    }
+
+    return segments;
+  }
+}
+
+class _RolloutSegment {
+  final String content;
+  final bool isMermaid;
+  const _RolloutSegment(this.content, {required this.isMermaid});
 }
 
 class EmptyPlaceholderScreen extends StatelessWidget {
@@ -219,21 +322,7 @@ class EmptyPlaceholderScreen extends StatelessWidget {
 class _CodeElementBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    final codeElement = element.children != null && element.children!.isNotEmpty
-        ? element.children!.first
-        : null;
-    final languageClass = codeElement is md.Element
-        ? codeElement.attributes['class']
-        : null;
-    final language = languageClass != null && languageClass.startsWith('language-')
-        ? languageClass.substring('language-'.length)
-        : null;
-
-    if (language == 'mermaid') {
-      return _MermaidBlock(code: element.textContent);
-    }
-    
-    // For normal code blocks
+    // For normal code blocks (mermaid is handled outside the Markdown widget)
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -289,18 +378,15 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 
   String _buildHtml(String code) {
     final escaped = const HtmlEscape().convert(code);
-    final bgHex = U.mermaidBackground.replaceAll('#', '');
-    final primaryHex = U.mermaidPrimary.replaceAll('#', '');
-    final lineHex = U.mermaidLine.replaceAll('#', '');
     return '''
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #${bgHex};
+    background: transparent;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -314,27 +400,28 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   .mermaid svg {
     max-width: 100%;
     height: auto;
+    font-family: 'Outfit', sans-serif !important;
   }
 </style>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
   mermaid.initialize({
     startOnLoad: true,
-    theme: 'dark',
+    theme: 'base',
     themeVariables: {
-      primaryColor: '#${primaryHex}',
-      primaryTextColor: '#CDD6F4',
-      primaryBorderColor: '#45475A',
-      lineColor: '#${lineHex}',
-      secondaryColor: '#${bgHex}',
-      tertiaryColor: '#${bgHex}',
-      background: '#${bgHex}',
-      mainBkg: '#${primaryHex}',
-      nodeBorder: '#${lineHex}',
-      clusterBkg: '#${bgHex}',
-      titleColor: '#CDD6F4',
-      edgeLabelBackground: '#${bgHex}',
-      fontFamily: 'sans-serif',
+      primaryColor: '#282A36',
+      primaryTextColor: '#F8F8F2',
+      primaryBorderColor: '#6272A4',
+      lineColor: '#6272A4',
+      secondaryColor: '#1E1F29',
+      tertiaryColor: '#1E1F29',
+      background: 'transparent',
+      mainBkg: '#282A36',
+      nodeBorder: '#6272A4',
+      clusterBkg: '#1E1F29',
+      titleColor: '#F8F8F2',
+      edgeLabelBackground: '#282A36',
+      fontFamily: 'Outfit, sans-serif',
     }
   });
   window.addEventListener('load', () => {
@@ -405,5 +492,3 @@ $escaped
     );
   }
 }
-
-

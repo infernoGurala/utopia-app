@@ -49,6 +49,7 @@ class SciwordlePlayerScore {
     required this.lastScore,
     required this.lastPlayedDate,
     required this.gamesPlayed,
+    required this.guessDistribution,
     this.scoreTimestamp,
     this.streakTimestamp,
   });
@@ -60,9 +61,9 @@ class SciwordlePlayerScore {
   final int bestStreak;
   final int lastScore;
 
-  /// "YYYY-MM-DD" string of the last day they played, or empty string.
   final String lastPlayedDate;
   final int gamesPlayed;
+  final Map<String, int> guessDistribution;
 
   /// Timestamp when the current totalScore was achieved (for tiebreaker)
   final int? scoreTimestamp;
@@ -81,6 +82,7 @@ class SciwordlePlayerScore {
       lastScore: 0,
       lastPlayedDate: '',
       gamesPlayed: 0,
+      guessDistribution: const {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0},
       scoreTimestamp: null,
       streakTimestamp: null,
     );
@@ -99,9 +101,22 @@ class SciwordlePlayerScore {
       lastScore: (data['lastScore'] as num?)?.toInt() ?? 0,
       lastPlayedDate: (data['lastPlayedDate'] as String? ?? '').trim(),
       gamesPlayed: (data['gamesPlayed'] as num?)?.toInt() ?? 0,
+      guessDistribution: _parseGuessDistribution(data['guessDistribution']),
       scoreTimestamp: (data['scoreTimestamp'] as num?)?.toInt(),
       streakTimestamp: (data['streakTimestamp'] as num?)?.toInt(),
     );
+  }
+
+  static Map<String, int> _parseGuessDistribution(dynamic raw) {
+    final map = <String, int>{'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, '6': 0};
+    if (raw is Map) {
+      for (final key in map.keys) {
+        if (raw.containsKey(key)) {
+          map[key] = (raw[key] as num).toInt();
+        }
+      }
+    }
+    return map;
   }
 }
 

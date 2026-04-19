@@ -7,7 +7,7 @@ class RoleService {
   factory RoleService() => _instance;
   RoleService._internal();
 
-  bool? _isWriter;
+  bool? _isSuperUser;
   String? _cachedUid;
 
   Future<bool> _isOnline() async {
@@ -15,19 +15,23 @@ class RoleService {
     return results.any((result) => result != ConnectivityResult.none);
   }
 
-  Future<bool> isWriter() async {
+  /// Check whether the current user has the "superuser" role.
+  /// Super users get access to the Admin Control Panel, library management,
+  /// editing the About UTOPIA / Rollout Releases section, and note editing
+  /// outside of class-scoped writer roles.
+  Future<bool> isSuperUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return false;
     }
 
     if (_cachedUid != user.uid) {
-      _isWriter = null;
+      _isSuperUser = null;
       _cachedUid = user.uid;
     }
 
-    if (_isWriter != null) {
-      return _isWriter!;
+    if (_isSuperUser != null) {
+      return _isSuperUser!;
     }
 
     if (!await _isOnline()) {
@@ -39,16 +43,18 @@ class RoleService {
           .collection('users')
           .doc(user.uid)
           .get();
-      _isWriter = doc.exists && doc.data()?['role'] == 'writer';
-      return _isWriter!;
+      _isSuperUser = doc.exists && doc.data()?['role'] == 'superuser';
+      return _isSuperUser!;
     } catch (e) {
-      _isWriter = false;
+      _isSuperUser = false;
       return false;
     }
   }
 
+
+
   void clearCache() {
-    _isWriter = null;
+    _isSuperUser = null;
     _cachedUid = null;
   }
 }

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../services/notification_service.dart';
 import '../services/writer_github_service.dart';
 import '../widgets/utopia_snackbar.dart';
@@ -369,7 +370,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
       child: Text(
         text,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: const Color(0xFFCBA6F7),
+          color: U.primary,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -384,25 +385,25 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     Widget? trailing,
   }) {
     return Card(
-      color: const Color(0xFF313244),
+      color: U.card,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFFCBA6F7)),
+        leading: Icon(icon, color: U.primary),
         title: Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFFCDD6F4),
+          style: TextStyle(
+            color: U.text,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(color: Color(0xFFA6ADC8)),
+          style: TextStyle(color: U.sub),
         ),
         trailing:
             trailing ??
-            const Icon(Icons.chevron_right, color: Color(0xFF6C7086)),
+            Icon(Icons.chevron_right, color: U.dim),
         onTap: onTap,
       ),
     );
@@ -414,26 +415,26 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
       title: 'Tomorrow is a Holiday',
       subtitle: 'Toggle to send holiday notification tomorrow',
       trailing: _savingHoliday
-          ? const SizedBox(
+          ? SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Color(0xFFCBA6F7),
+                color: U.primary,
               ),
             )
           : _holidayLoading
-          ? const SizedBox(
+          ? SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Color(0xFF6C7086),
+                color: U.dim,
               ),
             )
           : Switch(
               value: _holidayTomorrow,
-              activeThumbColor: const Color(0xFFCBA6F7),
+              activeThumbColor: U.primary,
               onChanged: _toggleHoliday,
             ),
       onTap: (_savingHoliday || _holidayLoading)
@@ -444,117 +445,123 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2E),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E2E),
-        foregroundColor: const Color(0xFFCDD6F4),
-        title: const Row(
-          children: [
-            Icon(Icons.edit, size: 18, color: Color(0xFFCBA6F7)),
-            SizedBox(width: 8),
-            Text('Developer Mode'),
-          ],
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader('🚀 Quick Actions', isFirst: true),
-          _toolCard(
-            icon: Icons.send,
-            title: 'Send Morning Notification Now',
-            subtitle: 'Manually trigger today\'s schedule to all students',
-            trailing: _sendingMorningNotification
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      color: Color(0xFFCBA6F7),
-                    ),
-                  )
-                : const Icon(Icons.chevron_right, color: Color(0xFF6C7086)),
-            onTap: _sendingMorningNotification
-                ? null
-                : _confirmAndSendMorningNotification,
-          ),
-          const SizedBox(height: 12),
-          _toolCard(
-            icon: Icons.wb_twilight_outlined,
-            title: 'Send Personal Morning Notification',
-            subtitle: 'Trigger today\'s morning notification only for you',
-            trailing: _sendingPersonalMorningNotification
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      color: Color(0xFFCBA6F7),
-                    ),
-                  )
-                : const Icon(Icons.chevron_right, color: Color(0xFF6C7086)),
-            onTap: _sendingPersonalMorningNotification
-                ? null
-                : _sendPersonalMorningNotification,
-          ),
-          const SizedBox(height: 12),
-          _toolCard(
-            icon: Icons.notifications_active_outlined,
-            title: 'Send Personal Test Notification',
-            subtitle: 'Send a custom push notification only to your account',
-            trailing: _sendingPersonalNotification
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      color: Color(0xFFCBA6F7),
-                    ),
-                  )
-                : const Icon(Icons.chevron_right, color: Color(0xFF6C7086)),
-            onTap: _sendingPersonalNotification
-                ? null
-                : _sendPersonalNotification,
-          ),
-          const SizedBox(height: 12),
-          _sectionHeader('📢 Announcements'),
-          _toolCard(
-            icon: Icons.campaign,
-            title: 'Broadcast Message',
-            subtitle: 'Send urgent notification to all students',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const BroadcastScreen()),
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: appThemeNotifier,
+      builder: (context, theme, child) {
+        return Scaffold(
+          backgroundColor: U.bg,
+          appBar: AppBar(
+            backgroundColor: U.bg,
+            foregroundColor: U.text,
+            title: Row(
+              children: [
+                Icon(Icons.edit, size: 18, color: U.primary),
+                const SizedBox(width: 8),
+                const Text('Developer Mode'),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          _sectionHeader('📅 Timetable'),
-          _toolCard(
-            icon: Icons.edit_calendar,
-            title: 'Edit Timetable',
-            subtitle: 'Update subjects and times for each day',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const TimetableEditorScreen()),
-            ),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _sectionHeader('🚀 Quick Actions', isFirst: true),
+              _toolCard(
+                icon: Icons.send,
+                title: 'Send Morning Notification Now',
+                subtitle: 'Manually trigger today\'s schedule to all students',
+                trailing: _sendingMorningNotification
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: U.primary,
+                        ),
+                      )
+                    : Icon(Icons.chevron_right, color: U.dim),
+                onTap: _sendingMorningNotification
+                    ? null
+                    : _confirmAndSendMorningNotification,
+              ),
+              const SizedBox(height: 12),
+              _toolCard(
+                icon: Icons.wb_twilight_outlined,
+                title: 'Send Personal Morning Notification',
+                subtitle: 'Trigger today\'s morning notification only for you',
+                trailing: _sendingPersonalMorningNotification
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: U.primary,
+                        ),
+                      )
+                    : Icon(Icons.chevron_right, color: U.dim),
+                onTap: _sendingPersonalMorningNotification
+                    ? null
+                    : _sendPersonalMorningNotification,
+              ),
+              const SizedBox(height: 12),
+              _toolCard(
+                icon: Icons.notifications_active_outlined,
+                title: 'Send Personal Test Notification',
+                subtitle: 'Send a custom push notification only to your account',
+                trailing: _sendingPersonalNotification
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: U.primary,
+                        ),
+                      )
+                    : Icon(Icons.chevron_right, color: U.dim),
+                onTap: _sendingPersonalNotification
+                    ? null
+                    : _sendPersonalNotification,
+              ),
+              const SizedBox(height: 12),
+              _sectionHeader('📢 Announcements'),
+              _toolCard(
+                icon: Icons.campaign,
+                title: 'Broadcast Message',
+                subtitle: 'Send urgent notification to all students',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BroadcastScreen()),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _sectionHeader('📅 Timetable'),
+              _toolCard(
+                icon: Icons.edit_calendar,
+                title: 'Edit Timetable',
+                subtitle: 'Update subjects and times for each day',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TimetableEditorScreen()),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _sectionHeader('💬 Quotes'),
+              _toolCard(
+                icon: Icons.format_quote,
+                title: 'Quotes Pool',
+                subtitle: 'Add or remove daily motivational quotes',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const QuotesEditorScreen()),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _sectionHeader('🏖️ Holiday'),
+              _holidayCard(),
+            ],
           ),
-          const SizedBox(height: 12),
-          _sectionHeader('💬 Quotes'),
-          _toolCard(
-            icon: Icons.format_quote,
-            title: 'Quotes Pool',
-            subtitle: 'Add or remove daily motivational quotes',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QuotesEditorScreen()),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _sectionHeader('🏖️ Holiday'),
-          _holidayCard(),
-        ],
-      ),
+        );
+      },
     );
   }
 }
+

@@ -400,6 +400,15 @@ class _TimetableScreenState extends State<TimetableScreen>
                   color: U.text,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Custom timetables coming in v3.2',
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: U.primary.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -425,73 +434,78 @@ class _TimetableScreenState extends State<TimetableScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: U.bg,
-      appBar: AppBar(
-        backgroundColor: U.bg,
-        foregroundColor: U.text,
-        title: const Text('Timetable'),
-        actions: [
-          IconButton(
-            onPressed: _refreshing ? null : () => _loadTimetable(refresh: true),
-            tooltip: 'Refresh',
-            icon: _refreshing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(58),
-          child: Container(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: U.surface.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: U.border),
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: appThemeNotifier,
+      builder: (context, theme, child) {
+        return Scaffold(
+          backgroundColor: U.bg,
+          appBar: AppBar(
+            backgroundColor: U.bg,
+            foregroundColor: U.text,
+            title: const Text('Timetable'),
+            actions: [
+              IconButton(
+                onPressed: _refreshing ? null : () => _loadTimetable(refresh: true),
+                tooltip: 'Refresh',
+                icon: _refreshing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
               ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                labelColor: U.bg,
-                unselectedLabelColor: U.sub,
-                indicator: BoxDecoration(
-                  color: U.primary,
-                  borderRadius: BorderRadius.circular(999),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(58),
+              child: Container(
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: U.surface.withValues(alpha: 0.78),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: U.border),
+                  ),
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: U.bg,
+                    unselectedLabelColor: U.sub,
+                    indicator: BoxDecoration(
+                      color: U.primary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    dividerColor: Colors.transparent,
+                    splashBorderRadius: BorderRadius.circular(999),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                    labelStyle: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    unselectedLabelStyle: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    tabs: _dayLabels.map((label) => Tab(text: label)).toList(),
+                  ),
                 ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                splashBorderRadius: BorderRadius.circular(999),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                labelStyle: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-                unselectedLabelStyle: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-                tabs: _dayLabels.map((label) => Tab(text: label)).toList(),
               ),
             ),
           ),
-        ),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFCBA6F7)),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: _dayKeys.map(_buildDayView).toList(),
-            ),
+          body: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFCBA6F7)),
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: _dayKeys.map(_buildDayView).toList(),
+                ),
+        );
+      },
     );
   }
 }

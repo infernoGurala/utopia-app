@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:app_links/app_links.dart';
 import 'firebase_options.dart';
 import 'services/app_update_service.dart';
 import 'services/cache_service.dart';
@@ -15,7 +16,9 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/platform_support.dart';
 import 'screens/app_shell.dart';
+import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
+import 'services/class_service.dart';
 import 'widgets/app_update_prompt.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -397,6 +400,8 @@ final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
 );
 
 final ValueNotifier<bool> iaaEnabledNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<bool> morningNotifEnabledNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<bool> sciWordleNotifEnabledNotifier = ValueNotifier<bool>(true);
 
 final ValueNotifier<int> appLoadingCounter = ValueNotifier<int>(0);
 
@@ -521,10 +526,18 @@ Future<String?> _loadInitialAccent() async {
   return cached;
 }
 
-Future<void> _loadIAASetting() async {
-  final cached = await CacheService().getAppSetting('iaa_enabled');
-  if (cached != null) {
-    iaaEnabledNotifier.value = cached == 'true';
+Future<void> _loadAppToggleSettings() async {
+  final cachedIaa = await CacheService().getAppSetting('iaa_enabled');
+  if (cachedIaa != null) {
+    iaaEnabledNotifier.value = cachedIaa == 'true';
+  }
+  final cachedMorning = await CacheService().getAppSetting('morning_notif_enabled');
+  if (cachedMorning != null) {
+    morningNotifEnabledNotifier.value = cachedMorning == 'true';
+  }
+  final cachedWordle = await CacheService().getAppSetting('sci_wordle_notif_enabled');
+  if (cachedWordle != null) {
+    sciWordleNotifEnabledNotifier.value = cachedWordle == 'true';
   }
 }
 
@@ -532,7 +545,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _initialAccentKey = await _loadInitialAccent();
   U.applyTheme(_initialAccentKey);
-  await _loadIAASetting();
+  await _loadAppToggleSettings();
   appInitialization = _initializeApp();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -582,6 +595,8 @@ class U {
   static String get currentThemeKey => appThemeNotifier.value.key;
 
   static bool get iaaEnabled => iaaEnabledNotifier.value;
+  static bool get morningNotifEnabled => morningNotifEnabledNotifier.value;
+  static bool get sciWordleNotifEnabled => sciWordleNotifEnabledNotifier.value;
 
   static AppTheme themeForKey(String? key) {
     for (final theme in appThemes) {
@@ -692,6 +707,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   bool _greetingCyclePassed = false;
   bool _updateDismissed = false;
   AppUpdateInfo? _pendingUpdate;
+  StreamSubscription<Uri>? _linkSub;
 
   @override
   void initState() {
@@ -702,6 +718,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       unawaited(NotificationService.ensureNotificationPermissions());
     }
     _loadUpdateInfo();
+    _initDeepLinks();
     Future.delayed(SplashScreen.minimumDisplayDuration, () {
       if (mounted) {
         setState(() => _greetingCyclePassed = true);
@@ -711,6 +728,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _linkSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     NotificationService.setAppForeground(false);
     super.dispose();
@@ -738,6 +756,32 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     setState(() {
       _pendingUpdate = updateInfo;
     });
+  }
+
+  void _initDeepLinks() {
+    final appLinks = AppLinks();
+    appLinks.getInitialLink().then((uri) {
+      if (uri != null) _handleLink(uri);
+    });
+    _linkSub = appLinks.uriLinkStream.listen(_handleLink);
+  }
+
+  void _handleLink(Uri uri) {
+    if (uri.path.startsWith('/join/')) {
+      final classCode = uri.pathSegments.last;
+      if (classCode.isEmpty) return;
+      // Wait for navigator to be ready, then push the join screen
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final nav = navigatorKey.currentState;
+        if (nav != null) {
+          nav.push(
+            MaterialPageRoute(
+              builder: (_) => JoinClassScreen(classCode: classCode),
+            ),
+          );
+        }
+      });
+    }
   }
 
   @override

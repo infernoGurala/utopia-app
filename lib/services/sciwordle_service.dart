@@ -68,9 +68,9 @@ class SciwordleService {
       scoreTimestamp = (data['scoreTimestamp'] as num?)?.toInt();
       streakTimestamp = (data['streakTimestamp'] as num?)?.toInt();
 
-      if (lastPlayed == today) {
+      if (lastPlayed.startsWith(today)) {
         return;
-      } else if (lastPlayed == getYesterdayDateIST()) {
+      } else if (lastPlayed.startsWith(getYesterdayDateIST())) {
         // Played yesterday → continue the streak
         streak = streak + 1;
       } else {
@@ -117,11 +117,11 @@ class SciwordleService {
   int _nextStreakForPlayedGame(SciwordlePlayerScore existing) {
     if (existing.gamesPlayed == 0) return 1;
     // Only continue the streak if they played yesterday
-    if (existing.lastPlayedDate == getYesterdayDateIST()) {
+    if (existing.lastPlayedDate.startsWith(getYesterdayDateIST())) {
       return existing.streak + 1;
     }
-    // If they already played today (shouldn't reach here due to guard), keep same
-    if (existing.lastPlayedDate == todayKey) {
+    // If they already played today (another slot)
+    if (existing.lastPlayedDate.startsWith(getTodayDateIST())) {
       return existing.streak;
     }
     // Missed a day or more → reset
@@ -132,14 +132,30 @@ class SciwordleService {
   /// Use this to decide whether to show the fire icon.
   bool isStreakActive(String? lastPlayedDate) {
     if (lastPlayedDate == null || lastPlayedDate.isEmpty) return false;
-    return lastPlayedDate == todayKey ||
-        lastPlayedDate == getYesterdayDateIST();
+    return lastPlayedDate.startsWith(getTodayDateIST()) ||
+        lastPlayedDate.startsWith(getYesterdayDateIST());
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  /// Today's Firestore document key, e.g. "2026-04-01"
-  String get todayKey => getTodayDateIST();
+  /// Today's Firestore document key, e.g. "2026-04-01-m"
+  String get todayKey {
+    final now = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final hour = now.hour;
+    
+    // From 00:00 to 00:59, the 1 AM game hasn't generated yet. 
+    // They are still playing the previous day's evening game.
+    if (hour < 1) {
+      final yDay = now.subtract(const Duration(days: 1));
+      final yDate = '${yDay.year.toString().padLeft(4, '0')}-${yDay.month.toString().padLeft(2, '0')}-${yDay.day.toString().padLeft(2, '0')}';
+      return '$yDate-e';
+    }
+
+    final date = getTodayDateIST();
+    if (hour < 11) return '$date-m'; // 1:00 AM to 10:59 AM
+    if (hour < 16) return '$date-a'; // 11:00 AM to 3:59 PM
+    return '$date-e';                // 4:00 PM to 11:59 PM
+  }
 
   String get _uid {
     final user = _auth.currentUser;
@@ -204,7 +220,8 @@ class SciwordleService {
 
       // ── Word score ──
       // 1st try = 6 pts, 2nd = 5 ... 6th = 1, failed = 0
-      final wordScore = attemptNumber != null ? (7 - attemptNumber) : 0;
+      // User requested 3x score.
+      final wordScore = attemptNumber != null ? (7 - attemptNumber) * 3 : 0;
 
       // Any completed game counts toward the streak.
       // Missed days pause the streak instead of resetting it.
@@ -219,6 +236,12 @@ class SciwordleService {
       final roundPoints = wordScore + streakBonus;
       final newTotal = existing.totalScore + roundPoints;
 
+      final updatedDist = Map<String, int>.from(existing.guessDistribution);
+      if (attemptNumber != null) {
+        final key = attemptNumber.toString();
+        updatedDist[key] = (updatedDist[key] ?? 0) + 1;
+      }
+
       await _db.collection(_scoresCol).doc(uid).set({
         'name': _displayName,
         'totalScore': newTotal,
@@ -227,6 +250,7 @@ class SciwordleService {
         'lastScore': roundPoints,
         'lastPlayedDate': today,
         'gamesPlayed': existing.gamesPlayed + 1,
+        'guessDistribution': updatedDist,
         'scoreTimestamp': newTotal > existing.totalScore
             ? DateTime.now().millisecondsSinceEpoch
             : existing.scoreTimestamp,
