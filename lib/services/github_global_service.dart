@@ -406,7 +406,7 @@ class GitHubGlobalService {
           // Process sequentially to avoid Git 409 conflicts (parallel commits to the same branch).
           for (final item in data) {
             final ok = await deleteItem(
-              item['path'],
+              item['path'] as String,
               preserveParentFolders: false,
             );
             if (!ok) return false;
