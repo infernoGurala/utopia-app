@@ -151,7 +151,14 @@ class FileUploadService {
     final publicId = 'uploads/$universityId/${user.uid}/${timestamp}_$safeName';
     final unixTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
-    final signaturePayload = 'public_id=$publicId&timestamp=$unixTs$apiSecret';
+    final signedParams = <String, String>{
+      'public_id': publicId,
+      'timestamp': unixTs.toString(),
+    };
+    final sortedKeys = signedParams.keys.toList()..sort();
+    final signaturePayload = [
+      for (final key in sortedKeys) '$key=${signedParams[key]}',
+    ].join('&') + apiSecret;
     final signature = sha1.convert(utf8.encode(signaturePayload)).toString();
 
     final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/raw/upload');
