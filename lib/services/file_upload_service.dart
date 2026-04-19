@@ -161,6 +161,8 @@ class FileUploadService {
     ].join('&') + apiSecret;
     final signature = sha1.convert(utf8.encode(signaturePayload)).toString();
 
+    onProgress?.call(0.0);
+
     final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/raw/upload');
     final request = http.MultipartRequest('POST', uri)
       ..fields['api_key'] = apiKey
@@ -185,6 +187,7 @@ class FileUploadService {
       throw FileUploadException('Failed to upload file. Please try again.');
     }
 
+    onProgress?.call(1.0);
     return '${publicBaseUrl.replaceFirst(RegExp(r'/+$'), '')}/$publicId';
   }
 
