@@ -351,11 +351,14 @@ class GitHubGlobalService {
       }
 
       final slashIndex = keepPath.lastIndexOf('/');
-      final parentForMessage = slashIndex > 0
+      final parentForMessage = slashIndex >= 0
           ? keepPath.substring(0, slashIndex)
           : keepPath;
+      final safeParentForMessage = parentForMessage.isEmpty
+          ? '(root)'
+          : parentForMessage;
       final body = <String, dynamic>{
-        'message': 'Preserve folder marker for $parentForMessage',
+        'message': 'Preserve folder marker for $safeParentForMessage',
         'content': base64Encode(utf8.encode('keep')),
         'branch': branch,
       };
@@ -413,7 +416,9 @@ class GitHubGlobalService {
           if (preserveParentFolders &&
               path.contains('/Community/') &&
               !path.endsWith('/.keep')) {
-            final parentPath = path.substring(0, path.lastIndexOf('/'));
+            final parentSlashIndex = path.lastIndexOf('/');
+            if (parentSlashIndex <= 0) return false;
+            final parentPath = path.substring(0, parentSlashIndex);
             final keepPath = '$parentPath/.keep';
             final keepOk = await _ensureKeepMarker(
               repo: repo,
