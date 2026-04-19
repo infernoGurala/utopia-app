@@ -397,56 +397,59 @@ class GitHubGlobalService {
 
       final checkRes = await http.get(url, headers: headers);
       if (checkRes.statusCode == 404) return true; // Already deleted
-      
-      if (checkRes.statusCode == 200) {
-        final data = jsonDecode(checkRes.body);
-        
-        if (data is List) {
-          // It's a directory, delete all contents recursively.
-          // Process sequentially to avoid Git 409 conflicts (parallel commits to the same branch).
-          for (final item in data) {
-            final ok = await deleteItem(
-              item['path'] as String,
-              preserveParentFolders: false,
-            );
-            if (!ok) return false;
-          }
-        } else if (data is Map) {
-          // It's a single file
-          final isCommunityPath =
-              path.startsWith('Community/') || path.contains('/Community/');
-          if (preserveParentFolders &&
-              isCommunityPath &&
-              !path.endsWith('/.keep')) {
-            final parentSlashIndex = path.lastIndexOf('/');
-            if (parentSlashIndex < 0) return false;
-            final parentPath = path.substring(0, parentSlashIndex);
-            final keepPath = '$parentPath/.keep';
-            final keepOk = await _ensureKeepMarker(
-              repo: repo,
-              branch: branch,
-              headers: headers,
-              keepPath: keepPath,
-            );
-            if (!keepOk) return false;
-          }
+      if (checkRes.statusCode != 200) {
+        // Non-404 error (e.g. 403 Forbidden, 422, etc.) — treat as failure.
+        return false;
+      }
 
-          final sha = data['sha'];
-          final deleteRes = await http.delete(
-            Uri.parse('https://api.github.com/repos/$repo/contents/$path'),
-            headers: headers,
-            body: jsonEncode({
-              'message': 'Delete $path',
-              'sha': sha,
-              'branch': branch,
-            }),
+      final data = jsonDecode(checkRes.body);
+
+      if (data is List) {
+        // It's a directory — delete all contents recursively.
+        // Process sequentially to avoid Git 409 conflicts.
+        for (final item in data) {
+          final ok = await deleteItem(
+            item['path'] as String,
+            preserveParentFolders: false,
           );
-          if (deleteRes.statusCode != 200 && deleteRes.statusCode != 204) {
-            return false;
-          }
+          if (!ok) return false; // Propagate child failure immediately.
+        }
+      } else if (data is Map) {
+        // It's a single file.
+        final isCommunityPath =
+            path.startsWith('Community/') || path.contains('/Community/');
+        if (preserveParentFolders &&
+            isCommunityPath &&
+            !path.endsWith('/.keep')) {
+          final parentSlashIndex = path.lastIndexOf('/');
+          if (parentSlashIndex < 0) return false;
+          final parentPath = path.substring(0, parentSlashIndex);
+          final keepPath = '$parentPath/.keep';
+          final keepOk = await _ensureKeepMarker(
+            repo: repo,
+            branch: branch,
+            headers: headers,
+            keepPath: keepPath,
+          );
+          if (!keepOk) return false;
+        }
+
+        final sha = data['sha'];
+        final deleteRes = await http.delete(
+          Uri.parse('https://api.github.com/repos/$repo/contents/$path'),
+          headers: headers,
+          body: jsonEncode({
+            'message': 'Delete $path',
+            'sha': sha,
+            'branch': branch,
+          }),
+        );
+        if (deleteRes.statusCode < 200 || deleteRes.statusCode >= 300) {
+          return false;
         }
       }
 
+      // Invalidate caches only after successful deletion.
       await invalidateCache(path);
       if (path.contains('/')) {
         final parentPath = path.substring(0, path.lastIndexOf('/'));
