@@ -353,31 +353,39 @@ class GitHubGlobalService {
 
       final checkRes = await http.get(url, headers: headers);
       if (checkRes.statusCode == 404) return true; // Already deleted
-      
-      if (checkRes.statusCode == 200) {
-        final data = jsonDecode(checkRes.body);
-        
-        if (data is List) {
-          // It's a directory, delete all contents recursively.
-          // Process sequentially to avoid Git 409 conflicts (parallel commits to the same branch).
-          for (final item in data) {
-            await deleteItem(item['path']);
-          }
-        } else if (data is Map) {
-          // It's a single file
-          final sha = data['sha'];
-          await http.delete(
-            Uri.parse('https://api.github.com/repos/$repo/contents/$path'),
-            headers: headers,
-            body: jsonEncode({
-              'message': 'Delete $path',
-              'sha': sha,
-              'branch': branch,
-            }),
-          );
+
+      if (checkRes.statusCode != 200) {
+        // Non-404 error (e.g. 403 Forbidden, 422, etc.) — treat as failure.
+        return false;
+      }
+
+      final data = jsonDecode(checkRes.body);
+
+      if (data is List) {
+        // It's a directory — delete all contents recursively.
+        // Process sequentially to avoid Git 409 conflicts.
+        for (final item in data) {
+          final ok = await deleteItem(item['path'] as String);
+          if (!ok) return false; // Propagate child failure immediately.
+        }
+      } else if (data is Map) {
+        // It's a single file.
+        final sha = data['sha'];
+        final deleteRes = await http.delete(
+          Uri.parse('https://api.github.com/repos/$repo/contents/$path'),
+          headers: headers,
+          body: jsonEncode({
+            'message': 'Delete $path',
+            'sha': sha,
+            'branch': branch,
+          }),
+        );
+        if (deleteRes.statusCode < 200 || deleteRes.statusCode >= 300) {
+          return false;
         }
       }
 
+      // Invalidate caches only after successful deletion.
       await invalidateCache(path);
       if (path.contains('/')) {
         final parentPath = path.substring(0, path.lastIndexOf('/'));

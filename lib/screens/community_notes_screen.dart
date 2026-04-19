@@ -2084,7 +2084,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             );
             return;
           }
-          await _github.deleteItem(path);
+          final deleted = await _github.deleteItem(path);
+          if (!deleted) {
+            throw Exception('GitHub deletion failed — check permissions or network and try again.');
+          }
           await deletionDoc.reference.update({
             'isDeleted': true,
             'status': 'executed',
@@ -2093,11 +2096,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('File deleted successfully.'),
+                content: Text('Item deleted successfully.'),
                 backgroundColor: U.green,
               ),
             );
-            _load();
+            _load(forceRefresh: true);
             _scheduleReload();
           }
         } catch (e) {
@@ -2108,7 +2111,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Deletion failed. Please try again.'),
+                content: Text('Deletion failed: $e'),
                 backgroundColor: U.red,
               ),
             );
