@@ -52,6 +52,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   String _rawContent = '';
   List<Map<String, dynamic>> _noteFiles = [];
   List<Map<String, dynamic>> _assignmentFiles = [];
+  List<Map<String, dynamic>> _uploadedFiles = [];
   List<_Segment> _segments = const [];
   final Map<String, GlobalKey> _segmentKeys = {};
   bool _loading = true;
@@ -127,8 +128,13 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   void _parse(String raw) {
     final noteFiles = <Map<String, dynamic>>[];
     final assignmentFiles = <Map<String, dynamic>>[];
+    final uploadedFiles = <Map<String, dynamic>>[];
     final contentLines = <String>[];
     final lines = raw.split('\n');
+    final sectionHeadingRegex = RegExp(r'^#{2,3}\s+(.+)$');
+    final sectionLinkRegex = RegExp(
+      r'^(?:[-*+]\s+)?\[(.+?)\]\((.+?)\)\s*$',
+    );
     String? section;
     bool inFrontmatter = false;
     bool frontmatterDone = false;
@@ -153,20 +159,26 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
         frontmatterDone = true;
       }
 
-      if (t == '### NOTES' || t == '### RESOURCES') {
+      final sectionHeading =
+          sectionHeadingRegex.firstMatch(t)?.group(1)?.trim().toUpperCase();
+      if (sectionHeading == 'NOTES' || sectionHeading == 'RESOURCES') {
         section = 'NOTES';
         continue;
       }
-      if (t == '### ASSIGNMENTS') {
+      if (sectionHeading == 'ASSIGNMENTS') {
         section = 'ASSIGNMENTS';
         continue;
       }
-      if (t.startsWith('### ') && section != null) {
+      if (sectionHeading == 'FILES') {
+        section = 'FILES';
+        continue;
+      }
+      if (sectionHeading != null && section != null) {
         section = null;
       }
 
-      if (section != null && t.startsWith('[')) {
-        final m = RegExp(r'\[(.+?)\]\((.+?)\)').firstMatch(t);
+      if (section != null) {
+        final m = sectionLinkRegex.firstMatch(t);
         if (m != null) {
           final entry = {
             'name': m.group(1) ?? '',
@@ -175,8 +187,10 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
           };
           if (section == 'NOTES') {
             noteFiles.add(entry);
-          } else {
+          } else if (section == 'ASSIGNMENTS') {
             assignmentFiles.add(entry);
+          } else if (section == 'FILES') {
+            uploadedFiles.add(entry);
           }
           continue;
         }
@@ -215,6 +229,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       final highlighted = _applyHighlight(content);
       _noteFiles = noteFiles;
       _assignmentFiles = assignmentFiles;
+      _uploadedFiles = uploadedFiles;
       _segments = _parseSegments(highlighted);
       _loading = false;
     });
@@ -779,7 +794,12 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     if (_assignmentFiles.isNotEmpty) {
       count += _assignmentFiles.length + 2;
     }
-    if (_noteFiles.isNotEmpty || _assignmentFiles.isNotEmpty) {
+    if (_uploadedFiles.isNotEmpty) {
+      count += _uploadedFiles.length + 2;
+    }
+    if (_noteFiles.isNotEmpty ||
+        _assignmentFiles.isNotEmpty ||
+        _uploadedFiles.isNotEmpty) {
       count += 1;
     }
     return count;
@@ -822,7 +842,26 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       cursor -= 1;
     }
 
-    if (_noteFiles.isNotEmpty || _assignmentFiles.isNotEmpty) {
+    if (_uploadedFiles.isNotEmpty) {
+      if (cursor == 0) {
+        return const _SecLabel('FILES');
+      }
+      cursor -= 1;
+
+      if (cursor < _uploadedFiles.length) {
+        return _FileBar(file: _uploadedFiles[cursor]);
+      }
+      cursor -= _uploadedFiles.length;
+
+      if (cursor == 0) {
+        return const SizedBox(height: 4);
+      }
+      cursor -= 1;
+    }
+
+    if (_noteFiles.isNotEmpty ||
+        _assignmentFiles.isNotEmpty ||
+        _uploadedFiles.isNotEmpty) {
       if (cursor == 0) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
