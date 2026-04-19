@@ -2084,7 +2084,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             );
             return;
           }
-          await _github.deleteItem(path);
+          final deleted = await _github.deleteItem(path);
+          if (!deleted) {
+            throw Exception('GitHub delete failed for $path');
+          }
           await deletionDoc.reference.update({
             'isDeleted': true,
             'status': 'executed',

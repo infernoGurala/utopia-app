@@ -331,7 +331,44 @@ class GitHubGlobalService {
     }
   }
 
-  Future<bool> deleteItem(String path) async {
+  Future<bool> _ensureKeepMarker({
+    required String repo,
+    required String branch,
+    required Map<String, String> headers,
+    required String keepPath,
+  }) async {
+    try {
+      String? sha;
+      final checkRes = await http.get(
+        Uri.parse('https://api.github.com/repos/$repo/contents/$keepPath?ref=$branch'),
+        headers: headers,
+      );
+      if (checkRes.statusCode == 200) {
+        final existing = jsonDecode(checkRes.body);
+        if (existing is Map<String, dynamic>) {
+          sha = existing['sha'] as String?;
+        }
+      }
+
+      final body = <String, dynamic>{
+        'message': 'Preserve folder marker for ${keepPath.substring(0, keepPath.lastIndexOf('/'))}',
+        'content': base64Encode(utf8.encode('keep')),
+        'branch': branch,
+      };
+      if (sha != null) body['sha'] = sha;
+
+      final putRes = await http.put(
+        Uri.parse('https://api.github.com/repos/$repo/contents/$keepPath'),
+        headers: headers,
+        body: jsonEncode(body),
+      );
+      return putRes.statusCode == 200 || putRes.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteItem(String path, {bool preserveParentFolders = true}) async {
     try {
       final config = await _getConfig();
       if (config == null || config['repo']!.isEmpty || config['pat']!.isEmpty) {
@@ -361,12 +398,31 @@ class GitHubGlobalService {
           // It's a directory, delete all contents recursively.
           // Process sequentially to avoid Git 409 conflicts (parallel commits to the same branch).
           for (final item in data) {
-            await deleteItem(item['path']);
+            final ok = await deleteItem(
+              item['path'],
+              preserveParentFolders: false,
+            );
+            if (!ok) return false;
           }
         } else if (data is Map) {
           // It's a single file
+          if (preserveParentFolders &&
+              path.contains('/Community/') &&
+              path.contains('/') &&
+              !path.endsWith('/.keep')) {
+            final parentPath = path.substring(0, path.lastIndexOf('/'));
+            final keepPath = '$parentPath/.keep';
+            final keepOk = await _ensureKeepMarker(
+              repo: repo,
+              branch: branch,
+              headers: headers,
+              keepPath: keepPath,
+            );
+            if (!keepOk) return false;
+          }
+
           final sha = data['sha'];
-          await http.delete(
+          final deleteRes = await http.delete(
             Uri.parse('https://api.github.com/repos/$repo/contents/$path'),
             headers: headers,
             body: jsonEncode({
@@ -375,6 +431,9 @@ class GitHubGlobalService {
               'branch': branch,
             }),
           );
+          if (deleteRes.statusCode != 200 && deleteRes.statusCode != 204) {
+            return false;
+          }
         }
       }
 
