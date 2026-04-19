@@ -39,6 +39,7 @@ class AppTheme {
     required this.key,
     required this.label,
     required this.description,
+    required this.isDark,
     required this.bg,
     required this.surface,
     required this.card,
@@ -73,6 +74,7 @@ class AppTheme {
   final String key;
   final String label;
   final String description;
+  final bool isDark;
   final Color bg;
   final Color surface;
   final Color card;
@@ -108,6 +110,7 @@ const _orchidTheme = AppTheme(
   key: 'orchid',
   label: 'Orchid',
   description: 'Soft purple with warm undertones',
+  isDark: true,
   bg: Color(0xFF0F0F17),
   surface: Color(0xFF1A1A27),
   card: Color(0xFF1F1F2E),
@@ -143,6 +146,7 @@ const _tokyonightTheme = AppTheme(
   key: 'tokyonight',
   label: 'Tokyo Night',
   description: 'Elegant dark theme with blue undertones',
+  isDark: true,
   bg: Color(0xFF1A1B26),
   surface: Color(0xFF24283B),
   card: Color(0xFF292E42),
@@ -178,6 +182,7 @@ const _catppuccinMochaTheme = AppTheme(
   key: 'catppuccin-mocha',
   label: 'Catppuccin Mocha',
   description: 'Lavender meets chocolate',
+  isDark: true,
   bg: Color(0xFF1E1E2E),
   surface: Color(0xFF313244),
   card: Color(0xFF45475A),
@@ -213,6 +218,7 @@ const _gruvboxTheme = AppTheme(
   key: 'gruvbox',
   label: 'Gruvbox',
   description: 'Retro warmth with dark background',
+  isDark: true,
   bg: Color(0xFF282828),
   surface: Color(0xFF32302F),
   card: Color(0xFF3C3836),
@@ -248,6 +254,7 @@ const _everforestTheme = AppTheme(
   key: 'everforest',
   label: 'Everforest',
   description: 'Low contrast forest theme',
+  isDark: true,
   bg: Color(0xFF272E33),
   surface: Color(0xFF333C43),
   card: Color(0xFF3E474C),
@@ -283,6 +290,7 @@ const _ayuTheme = AppTheme(
   key: 'ayu',
   label: 'Ayu',
   description: 'Fast, clean and modern',
+  isDark: true,
   bg: Color(0xFF0D1117),
   surface: Color(0xFF161B22),
   card: Color(0xFF21262D),
@@ -318,6 +326,7 @@ const _poimandresAccessibleTheme = AppTheme(
   key: 'poimandres-accessible',
   label: 'Poimandres Accessible',
   description: 'High contrast variant',
+  isDark: true,
   bg: Color(0xFF0D1117),
   surface: Color(0xFF161B22),
   card: Color(0xFF21262D),
@@ -353,6 +362,7 @@ const _githubDarkTheme = AppTheme(
   key: 'github-dark',
   label: 'GitHub Dark',
   description: 'GitHub dark mode inspired',
+  isDark: true,
   bg: Color(0xFF0D1117),
   surface: Color(0xFF161B22),
   card: Color(0xFF21262D),
@@ -384,7 +394,44 @@ const _githubDarkTheme = AppTheme(
   mermaidLine: '#58A6FF',
 );
 
+const _catppuccinLatteTheme = AppTheme(
+  key: 'catppuccin-latte',
+  label: 'Catppuccin Latte',
+  description: 'Soft daylight with balanced contrast',
+  isDark: false,
+  bg: Color(0xFFEFF1F5),
+  surface: Color(0xFFDCE0E8),
+  card: Color(0xFFCCD0DA),
+  border: Color(0xFFBCC0CC),
+  text: Color(0xFF4C4F69),
+  sub: Color(0xFF6C6F85),
+  dim: Color(0xFF8C8FA1),
+  primary: Color(0xFF8839EF),
+  teal: Color(0xFF179299),
+  red: Color(0xFFD20F39),
+  green: Color(0xFF40A02B),
+  peach: Color(0xFFFE640B),
+  blue: Color(0xFF1E66F5),
+  gold: Color(0xFFDF8E1D),
+  sky: Color(0xFF04A5E5),
+  lavender: Color(0xFF7287FD),
+  gray: Color(0xFF9CA0B0),
+  mdH1: Color(0xFF8839EF),
+  mdH2: Color(0xFF179299),
+  mdH3: Color(0xFF7287FD),
+  mdBold: Color(0xFFFE640B),
+  mdItalic: Color(0xFF40A02B),
+  mdCode: Color(0xFFD20F39),
+  mdLink: Color(0xFF1E66F5),
+  mdBlockquote: Color(0xFF8839EF),
+  mdDel: Color(0xFF8C8FA1),
+  mermaidPrimary: '#8839EF',
+  mermaidBackground: '#CCD0DA',
+  mermaidLine: '#8839EF',
+);
+
 const appThemes = [
+  _catppuccinLatteTheme,
   _orchidTheme,
   _tokyonightTheme,
   _catppuccinMochaTheme,
@@ -404,6 +451,23 @@ final ValueNotifier<bool> morningNotifEnabledNotifier = ValueNotifier<bool>(true
 final ValueNotifier<bool> sciWordleNotifEnabledNotifier = ValueNotifier<bool>(true);
 
 final ValueNotifier<int> appLoadingCounter = ValueNotifier<int>(0);
+
+void _applySystemUiForTheme(AppTheme theme) {
+  final usesLightIcons = theme.isDark;
+  SystemChrome.setSystemUIOverlayStyle(
+    SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness:
+          usesLightIcons ? Brightness.light : Brightness.dark,
+      statusBarBrightness:
+          usesLightIcons ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: theme.bg,
+      systemNavigationBarIconBrightness:
+          usesLightIcons ? Brightness.light : Brightness.dark,
+      systemNavigationBarDividerColor: theme.border,
+    ),
+  );
+}
 
 void showAppLoading() {
   appLoadingCounter.value = appLoadingCounter.value + 1;
@@ -547,14 +611,7 @@ void main() async {
   U.applyTheme(_initialAccentKey);
   await _loadAppToggleSettings();
   appInitialization = _initializeApp();
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0F0F17),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ),
-  );
+  _applySystemUiForTheme(appThemeNotifier.value);
   runApp(const UtopiaApp());
 }
 
@@ -613,6 +670,7 @@ class U {
       return;
     }
     appThemeNotifier.value = next;
+    _applySystemUiForTheme(next);
   }
 }
 
@@ -625,26 +683,40 @@ class UtopiaApp extends StatelessWidget {
     return ValueListenableBuilder<AppTheme>(
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
+        final isDark = theme.isDark;
         return MaterialApp(
           title: 'UTOPIA',
           debugShowCheckedModeBanner: false,
           navigatorKey: navigatorKey,
           theme: ThemeData(
             useMaterial3: true,
-            brightness: Brightness.dark,
+            brightness: isDark ? Brightness.dark : Brightness.light,
             textTheme: base.apply(bodyColor: U.text, displayColor: U.text),
-            colorScheme: ColorScheme.dark(
-              primary: U.primary,
-              onPrimary: U.bg,
-              secondary: U.teal,
-              onSecondary: U.bg,
-              surface: U.surface,
-              onSurface: U.text,
-              background: U.bg,
-              onBackground: U.text,
-              error: U.red,
-              outline: U.border,
-            ),
+            colorScheme: isDark
+                ? ColorScheme.dark(
+                    primary: U.primary,
+                    onPrimary: U.bg,
+                    secondary: U.teal,
+                    onSecondary: U.bg,
+                    surface: U.surface,
+                    onSurface: U.text,
+                    background: U.bg,
+                    onBackground: U.text,
+                    error: U.red,
+                    outline: U.border,
+                  )
+                : ColorScheme.light(
+                    primary: U.primary,
+                    onPrimary: Colors.white,
+                    secondary: U.teal,
+                    onSecondary: Colors.white,
+                    surface: U.surface,
+                    onSurface: U.text,
+                    background: U.bg,
+                    onBackground: U.text,
+                    error: U.red,
+                    outline: U.border,
+                  ),
             scaffoldBackgroundColor: U.bg,
             navigationBarTheme: NavigationBarThemeData(
               backgroundColor: U.surface,
@@ -676,9 +748,12 @@ class UtopiaApp extends StatelessWidget {
               backgroundColor: U.bg,
               elevation: 0,
               scrolledUnderElevation: 0,
-              systemOverlayStyle: const SystemUiOverlayStyle(
+              systemOverlayStyle: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.light,
+                statusBarIconBrightness:
+                    isDark ? Brightness.light : Brightness.dark,
+                statusBarBrightness:
+                    isDark ? Brightness.dark : Brightness.light,
               ),
               titleTextStyle: GoogleFonts.outfit(
                 color: U.text,
