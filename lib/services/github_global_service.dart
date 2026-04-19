@@ -413,11 +413,13 @@ class GitHubGlobalService {
           }
         } else if (data is Map) {
           // It's a single file
+          final isCommunityPath =
+              path.startsWith('Community/') || path.contains('/Community/');
           if (preserveParentFolders &&
-              path.contains('/Community/') &&
+              isCommunityPath &&
               !path.endsWith('/.keep')) {
             final parentSlashIndex = path.lastIndexOf('/');
-            if (parentSlashIndex <= 0) return false;
+            if (parentSlashIndex < 0) return false;
             final parentPath = path.substring(0, parentSlashIndex);
             final keepPath = '$parentPath/.keep';
             final keepOk = await _ensureKeepMarker(
