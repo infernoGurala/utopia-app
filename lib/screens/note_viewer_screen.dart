@@ -132,7 +132,9 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     final contentLines = <String>[];
     final lines = raw.split('\n');
     final sectionHeadingRegex = RegExp(r'^#{2,3}\s+(.+)$');
-    final sectionLinkRegex = RegExp(r'^(?:[-*+]\s+)?\[(.+?)\]\((.+?)\)$');
+    final sectionLinkRegex = RegExp(
+      r'^(?:[-*+]\s+)?\[(.+?)\]\((.+?)\)\s*$',
+    );
     String? section;
     bool inFrontmatter = false;
     bool frontmatterDone = false;
@@ -187,7 +189,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
             noteFiles.add(entry);
           } else if (section == 'ASSIGNMENTS') {
             assignmentFiles.add(entry);
-          } else {
+          } else if (section == 'FILES') {
             uploadedFiles.add(entry);
           }
           continue;
