@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 /// Maximum file size allowed for upload (20 MB).
 const int kMaxUploadBytes = 20 * 1024 * 1024;
@@ -12,34 +15,69 @@ const int kMaxUploadBytes = 20 * 1024 * 1024;
 /// Hard limit — reject files above 30 MB outright.
 const int kHardLimitBytes = 30 * 1024 * 1024;
 
-/// Service for uploading files to Firebase Storage using a multi-bucket
-/// architecture. Reads the active bucket from Firestore `app_config/storage_config`
-/// and uploads to that bucket. When a bucket fills up (5 GB free tier), the admin
-/// updates the Firestore config to point at a new bucket — no code changes needed.
+/// Service for uploading files to Cloudinary using signed uploads.
 class FileUploadService {
   static final FileUploadService _instance = FileUploadService._internal();
   factory FileUploadService() => _instance;
   FileUploadService._internal();
 
-  String? _cachedBucketUrl;
+  String? _cachedCloudName;
+  String? _cachedPublicBaseUrl;
+  String? _cachedRemoteCloudName;
+  String? _cachedApiKey;
+  String? _cachedApiSecret;
 
-  /// Fetch the active storage bucket URL from Firestore.
-  Future<String?> _getActiveBucketUrl() async {
-    if (_cachedBucketUrl != null) return _cachedBucketUrl;
+  /// Fetch Cloudinary public configuration from Firestore.
+  Future<(String?, String?)> _getStorageConfig() async {
+    if (_cachedCloudName != null && _cachedPublicBaseUrl != null) {
+      return (_cachedCloudName, _cachedPublicBaseUrl);
+    }
     try {
       final doc = await FirebaseFirestore.instance
           .collection('app_config')
           .doc('storage_config')
           .get();
-      if (!doc.exists) return null;
-      final url = doc.data()?['bucket_url'] as String?;
-      if (url != null && url.isNotEmpty) {
-        _cachedBucketUrl = url;
+      if (!doc.exists) return (null, null);
+      final cloudName = doc.data()?['cloud_name'] as String?;
+      final publicBaseUrl = doc.data()?['public_base_url'] as String?;
+      if (cloudName != null && cloudName.isNotEmpty) {
+        _cachedCloudName = cloudName;
       }
-      return url;
+      if (publicBaseUrl != null && publicBaseUrl.isNotEmpty) {
+        _cachedPublicBaseUrl = publicBaseUrl;
+      }
+      return (cloudName, publicBaseUrl);
     } catch (e) {
       debugPrint('FileUploadService: Failed to fetch storage config: $e');
-      return null;
+      return (null, null);
+    }
+  }
+
+  /// Fetch Cloudinary signed-upload credentials from Remote Config.
+  Future<(String?, String?, String?)> _getCloudinarySecrets() async {
+    if (_cachedApiKey != null &&
+        _cachedApiSecret != null &&
+        _cachedRemoteCloudName != null) {
+      return (_cachedApiKey, _cachedApiSecret, _cachedRemoteCloudName);
+    }
+
+    try {
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      await remoteConfig.fetchAndActivate();
+
+      final apiKey = remoteConfig.getString('cloudinary_api_key');
+      final apiSecret = remoteConfig.getString('cloudinary_api_secret');
+      final remoteCloudName = remoteConfig.getString('cloudinary_cloud_name');
+
+      _cachedApiKey = apiKey.isNotEmpty ? apiKey : null;
+      _cachedApiSecret = apiSecret.isNotEmpty ? apiSecret : null;
+      _cachedRemoteCloudName =
+          remoteCloudName.isNotEmpty ? remoteCloudName : null;
+
+      return (_cachedApiKey, _cachedApiSecret, _cachedRemoteCloudName);
+    } catch (e) {
+      debugPrint('FileUploadService: Failed to fetch remote config: $e');
+      return (null, null, null);
     }
   }
 
@@ -76,7 +114,7 @@ class FileUploadService {
     return (file, picked.name);
   }
 
-  /// Upload a file to Firebase Storage and return the permanent download URL.
+  /// Upload a file to Cloudinary and return the permanent download URL.
   ///
   /// [file] — the file to upload.
   /// [originalFilename] — original name of the file.
@@ -91,46 +129,66 @@ class FileUploadService {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) throw FileUploadException('Not signed in.');
 
-    final bucketUrl = await _getActiveBucketUrl();
-    if (bucketUrl == null || bucketUrl.isEmpty) {
+    final (firestoreCloudName, publicBaseUrl) = await _getStorageConfig();
+    final (apiKey, apiSecret, remoteCloudName) = await _getCloudinarySecrets();
+
+    final cloudName = (firestoreCloudName != null && firestoreCloudName.isNotEmpty)
+        ? firestoreCloudName
+        : remoteCloudName;
+
+    if (cloudName == null || cloudName.isEmpty || publicBaseUrl == null || publicBaseUrl.isEmpty) {
       throw FileUploadException(
         'Storage is not configured yet. Contact the admin.',
       );
     }
-
-    // Build a unique path inside the bucket
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final safeName = originalFilename.replaceAll(RegExp(r'[^\w.\-]'), '_');
-    final storagePath = 'uploads/$universityId/${user.uid}/${timestamp}_$safeName';
-
-    // Get a FirebaseStorage instance pointing at the active bucket
-    final storage = FirebaseStorage.instanceFor(bucket: bucketUrl);
-    final ref = storage.ref().child(storagePath);
-
-    final uploadTask = ref.putFile(
-      file,
-      SettableMetadata(
-        contentType: _mimeType(originalFilename),
-        customMetadata: {
-          'uploadedBy': user.uid,
-          'originalName': originalFilename,
-          'university': universityId,
-        },
-      ),
-    );
-
-    // Listen for progress
-    if (onProgress != null) {
-      uploadTask.snapshotEvents.listen((snap) {
-        if (snap.totalBytes > 0) {
-          onProgress(snap.bytesTransferred / snap.totalBytes);
-        }
-      });
+    if (apiKey == null || apiKey.isEmpty || apiSecret == null || apiSecret.isEmpty) {
+      throw FileUploadException('Upload service credentials are missing.');
     }
 
-    await uploadTask;
-    final downloadUrl = await ref.getDownloadURL();
-    return downloadUrl;
+    // Build a unique path inside Cloudinary.
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final safeName = originalFilename.replaceAll(RegExp(r'[^\w.\-]'), '_');
+    final publicId = 'uploads/$universityId/${user.uid}/${timestamp}_$safeName';
+    final unixTs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    final signedParams = <String, String>{
+      'public_id': publicId,
+      'timestamp': unixTs.toString(),
+    };
+    final sortedKeys = signedParams.keys.toList()..sort();
+    final signaturePayload = [
+      for (final key in sortedKeys) '$key=${signedParams[key]}',
+    ].join('&') + apiSecret;
+    final signature = sha1.convert(utf8.encode(signaturePayload)).toString();
+
+    onProgress?.call(0.0);
+
+    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/raw/upload');
+    final request = http.MultipartRequest('POST', uri)
+      ..fields['api_key'] = apiKey
+      ..fields['timestamp'] = unixTs.toString()
+      ..fields['signature'] = signature
+      ..fields['public_id'] = publicId
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          filename: originalFilename,
+        ),
+      );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      debugPrint(
+        'FileUploadService: Cloudinary upload failed (${response.statusCode}): ${response.body}',
+      );
+      throw FileUploadException('Failed to upload file. Please try again.');
+    }
+
+    onProgress?.call(1.0);
+    return '${publicBaseUrl.replaceFirst(RegExp(r'/+$'), '')}/$publicId';
   }
 
   /// Guess MIME type from filename extension.
@@ -164,9 +222,13 @@ class FileUploadService {
     }
   }
 
-  /// Invalidate cached bucket URL (e.g. when admin switches bucket).
+  /// Invalidate cached config values.
   void clearCache() {
-    _cachedBucketUrl = null;
+    _cachedCloudName = null;
+    _cachedPublicBaseUrl = null;
+    _cachedRemoteCloudName = null;
+    _cachedApiKey = null;
+    _cachedApiSecret = null;
   }
 }
 
