@@ -350,8 +350,12 @@ class GitHubGlobalService {
         }
       }
 
+      final slashIndex = keepPath.lastIndexOf('/');
+      final parentForMessage = slashIndex > 0
+          ? keepPath.substring(0, slashIndex)
+          : keepPath;
       final body = <String, dynamic>{
-        'message': 'Preserve folder marker for ${keepPath.substring(0, keepPath.lastIndexOf('/'))}',
+        'message': 'Preserve folder marker for $parentForMessage',
         'content': base64Encode(utf8.encode('keep')),
         'branch': branch,
       };
@@ -408,7 +412,6 @@ class GitHubGlobalService {
           // It's a single file
           if (preserveParentFolders &&
               path.contains('/Community/') &&
-              path.contains('/') &&
               !path.endsWith('/.keep')) {
             final parentPath = path.substring(0, path.lastIndexOf('/'));
             final keepPath = '$parentPath/.keep';
