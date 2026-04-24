@@ -8,6 +8,7 @@ import '../services/attendance_cache_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
+import 'total_attendance_screen.dart';
 
 enum _AttendanceViewState { initial, loading, loaded, error }
 
@@ -836,6 +837,61 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         detail: studentName.isEmpty ? null : studentName,
                         accent: overallColor,
                         subtitleColor: belowTarget > 0 ? U.red : null,
+                      ),
+                      const SizedBox(height: 12),
+                      // ── Total Attendance page button ──────────────────────
+                      GestureDetector(
+                        onTap: () {
+                          debugPrint(
+                            '[Attendance] Navigating to TotalAttendanceScreen',
+                          );
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => TotalAttendanceScreen(
+                                attendanceData: data,
+                                credentials: _savedCredentials ?? const {},
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 13,
+                          ),
+                          decoration: BoxDecoration(
+                            color: U.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: U.border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.bar_chart_rounded,
+                                color: U.primary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'View Total Attendance',
+                                  style: GoogleFonts.outfit(
+                                    color: U.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: U.sub,
+                                size: 14,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(

@@ -1,14 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'attendance_cache_service.dart';
-import 'aus_attendance_service.dart';
-import 'acet_attendance_service.dart';
+import 'gas_attendance_service.dart';
 
 export 'attendance_cache_service.dart' show CachedAttendance;
 
 enum AttendanceRangeMode { period, tillNow }
 
 class AttendanceService {
-  /// Fetches attendance from the portal.
+  /// Fetches attendance via the Google Apps Script middleware.
   /// On success → saves to Firestore cache.
   /// On failure → falls back to Firestore cache.
   ///
@@ -23,25 +22,20 @@ class AttendanceService {
     String toDate = '',
     AttendanceRangeMode mode = AttendanceRangeMode.period,
   }) async {
+    debugPrint(
+      '[AttendanceService] fetchAttendance: college=$college, '
+      'roll=$rollNumber, fromDate=$fromDate, toDate=$toDate, mode=$mode',
+    );
     try {
-      // ── Live fetch ──
+      // ── Live fetch via Google Apps Script middleware ──
       final Map<String, dynamic> result;
-      if (college == 'acet') {
-        result = await AcetAttendanceService.fetchAttendance(
-          rollNumber,
-          password,
-          fromDate: fromDate,
-          toDate: toDate,
-          mode: mode,
-        );
-      } else {
-        result = await AusAttendanceService.fetchAttendance(
-          rollNumber,
-          password,
-          fromDate: fromDate,
-          toDate: toDate,
-        );
-      }
+      result = await GasAttendanceService.fetchAttendance(
+        rollNumber,
+        password,
+        college: college,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
 
       // Save to cache (non-blocking)
       AttendanceCacheService.save(
