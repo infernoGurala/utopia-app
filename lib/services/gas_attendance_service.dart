@@ -12,6 +12,10 @@ class GasAttendanceService {
   // ★  Update these URLs after deploying your Google Apps Script web apps  ★
   // Both URLs MUST use HTTPS (as all script.google.com URLs do) so that
   // credentials are encrypted in transit.
+  //
+  // IMPORTANT: Once you have real script IDs, do NOT commit them to a public
+  // repository. Store them in a local config file or environment variable that
+  // is listed in .gitignore.
   // ──────────────────────────────────────────────────────────────────────────
   static const String ausGasUrl =
       'https://script.google.com/macros/s/YOUR_AUS_SCRIPT_ID/exec';
