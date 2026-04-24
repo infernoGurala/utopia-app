@@ -446,7 +446,7 @@ final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
   _orchidTheme,
 );
 
-final ValueNotifier<bool> iaaEnabledNotifier = ValueNotifier<bool>(true);
+final ValueNotifier<bool> iaaEnabledNotifier = ValueNotifier<bool>(false);
 final ValueNotifier<bool> morningNotifEnabledNotifier = ValueNotifier<bool>(true);
 final ValueNotifier<bool> sciWordleNotifEnabledNotifier = ValueNotifier<bool>(true);
 
@@ -704,7 +704,7 @@ class UtopiaApp extends StatelessWidget {
                     onBackground: U.text,
                     error: U.red,
                     outline: U.border,
-                  )
+                )
                 : ColorScheme.light(
                     primary: U.primary,
                     onPrimary: Colors.white,
@@ -716,8 +716,116 @@ class UtopiaApp extends StatelessWidget {
                     onBackground: U.text,
                     error: U.red,
                     outline: U.border,
-                  ),
+                ),
             scaffoldBackgroundColor: U.bg,
+            cardTheme: CardThemeData(
+              color: U.surface,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+              ),
+              margin: EdgeInsets.zero,
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: U.primary,
+                foregroundColor: U.bg,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.3,
+                ),
+                minimumSize: const Size(double.infinity, 54),
+              ),
+            ),
+            outlinedButtonTheme: OutlinedButtonThemeData(
+              style: OutlinedButton.styleFrom(
+                elevation: 0,
+                foregroundColor: U.text,
+                backgroundColor: isDark
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : Colors.black.withValues(alpha: 0.02),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.3,
+                ),
+                minimumSize: const Size(double.infinity, 54),
+              ),
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.02),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: U.primary.withValues(alpha: 0.5)),
+              ),
+              hintStyle: GoogleFonts.outfit(
+                color: U.sub.withValues(alpha: 0.6),
+                fontSize: 14,
+              ),
+            ),
+            chipTheme: ChipThemeData(
+              backgroundColor: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.02),
+              labelStyle: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.06),
+                ),
+              ),
+            ),
+            dividerTheme: DividerThemeData(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.06),
+              thickness: 1,
+              space: 1,
+            ),
             navigationBarTheme: NavigationBarThemeData(
               backgroundColor: U.surface,
               indicatorColor: U.primary.withValues(alpha: 0.15),
@@ -1013,6 +1121,13 @@ class _SplashScreenState extends State<SplashScreen>
                       fontWeight: FontWeight.w700,
                       fontStyle: FontStyle.italic,
                       color: U.primary,
+                      shadows: [
+                        Shadow(
+                          color: U.primary.withValues(alpha: 0.3),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1026,17 +1141,35 @@ class _SplashScreenState extends State<SplashScreen>
                 fontWeight: FontWeight.w600,
                 color: U.sub,
                 letterSpacing: 4,
+                shadows: [
+                  Shadow(
+                    color: U.sub.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: 100,
-              child: LinearProgressIndicator(
-                backgroundColor: U.border,
-                valueColor: AlwaysStoppedAnimation<Color>(U.primary),
-                minHeight: 1.5,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            const SizedBox(height: 48),
+            AnimatedBuilder(
+              animation: _ac,
+              builder: (context, _) {
+                return Container(
+                  width: 4 + (20 * _fade.value),
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
+                    borderRadius: BorderRadius.circular(2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: U.primary.withValues(alpha: 0.3 * _fade.value),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -1142,6 +1275,14 @@ class _LoginScreenState extends State<LoginScreen>
                       color: U.primary,
                       fontStyle: FontStyle.italic,
                       height: 1,
+                      letterSpacing: -1,
+                      shadows: [
+                        Shadow(
+                          color: U.primary.withValues(alpha: 0.2),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1151,7 +1292,7 @@ class _LoginScreenState extends State<LoginScreen>
                       fontSize: 15,
                       color: U.sub,
                       fontWeight: FontWeight.w400,
-                      letterSpacing: 0.5,
+                      letterSpacing: 0.2,
                     ),
                   ),
                   const Spacer(flex: 3),
@@ -1161,42 +1302,52 @@ class _LoginScreenState extends State<LoginScreen>
                       decoration: BoxDecoration(
                         color: U.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: U.red.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: U.red.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
                       ),
                       child: Text(
                         _error!,
-                        style: GoogleFonts.outfit(color: U.red, fontSize: 13),
+                        style: GoogleFonts.outfit(
+                          color: U.red,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                   ],
-                  SizedBox(
+                  // Animated container for the button state
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
                     width: double.infinity,
                     height: 54,
-                    child: _loading
-                        ? Center(
-                            child: SizedBox(
-                              width: 22,
-                              height: 22,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: U.primary.withValues(alpha: 0.2),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton(
+                      onPressed: _loading || !PlatformSupport.supportsGoogleSignIn
+                          ? null
+                          : _signIn,
+                      child: _loading
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
-                                color: U.primary,
-                                strokeWidth: 1.5,
+                                color: U.bg,
+                                strokeWidth: 2,
                               ),
-                            ),
-                          )
-                        : OutlinedButton(
-                            onPressed: PlatformSupport.supportsGoogleSignIn
-                                ? _signIn
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: U.text,
-                              side: BorderSide(color: U.border, width: 1),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              backgroundColor: U.surface,
-                            ),
-                            child: Row(
+                            )
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 const _GoogleIcon(),
@@ -1205,20 +1356,20 @@ class _LoginScreenState extends State<LoginScreen>
                                   PlatformSupport.supportsGoogleSignIn
                                       ? 'Continue with Google'
                                       : 'Google sign-in unavailable',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                  ),
                                 ),
                               ],
                             ),
-                          ),
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   Center(
                     child: Text(
                       'UTOPIA · designed by Inferno',
-                      style: GoogleFonts.outfit(fontSize: 12, color: U.dim),
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: U.dim,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                   const Spacer(flex: 1),

@@ -8,7 +8,8 @@ import '../services/class_service.dart';
 
 class ClassSettingsScreen extends StatefulWidget {
   final ClassModel classModel;
-  const ClassSettingsScreen({super.key, required this.classModel});
+  final String userRole;
+  const ClassSettingsScreen({super.key, required this.classModel, required this.userRole});
 
   @override
   State<ClassSettingsScreen> createState() => _ClassSettingsScreenState();
@@ -16,28 +17,34 @@ class ClassSettingsScreen extends StatefulWidget {
 
 class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
   final ClassService _classService = ClassService();
-  List<Map<String, dynamic>> _writers = [];
-  bool _loadingWriters = true;
+  List<Map<String, dynamic>> _members = [];
+  bool _loadingMembers = true;
   bool _isDeleting = false;
 
   @override
   void initState() {
     super.initState();
-    _loadWriters();
+    _loadMembers();
   }
 
-  Future<void> _loadWriters() async {
-    setState(() => _loadingWriters = true);
+  Future<void> _loadMembers() async {
+    setState(() => _loadingMembers = true);
     try {
-      final writers = await _classService.getWriters(widget.classModel.classId);
+      final members = await _classService.getMembers(widget.classModel.classId);
+      // Ensure the owner is at the top
+      members.sort((a, b) {
+        if (a['uid'] == widget.classModel.creatorUid) return -1;
+        if (b['uid'] == widget.classModel.creatorUid) return 1;
+        return (a['displayName'] ?? '').compareTo(b['displayName'] ?? '');
+      });
       if (mounted) {
         setState(() {
-          _writers = writers;
-          _loadingWriters = false;
+          _members = members;
+          _loadingMembers = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loadingWriters = false);
+      if (mounted) setState(() => _loadingMembers = false);
     }
   }
 
@@ -47,6 +54,7 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
   }
 
   Future<void> _addWriter() async {
+    if (widget.userRole != 'writer') return;
     final emailController = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
@@ -91,7 +99,7 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
 
       try {
         await _classService.addWriterByEmail(widget.classModel.classId, email);
-        _loadWriters();
+        _loadMembers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Writer added successfully'), backgroundColor: U.green));
         }
@@ -104,6 +112,7 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
   }
 
   Future<void> _removeWriter(String uid, String name) async {
+    if (widget.userRole != 'writer') return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -123,7 +132,7 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
     if (confirm == true) {
       try {
         await _classService.removeWriter(widget.classModel.classId, uid);
-        _loadWriters();
+        _loadMembers();
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: U.red));
@@ -196,11 +205,13 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
         children: [
           _buildHeader(),
           const SizedBox(height: 32),
-          _buildWritersSection(),
+          _buildMembersSection(),
           const SizedBox(height: 32),
           _buildTimetablePlaceholder(),
-          const SizedBox(height: 48),
-          _buildDangerZone(),
+          if (widget.userRole == 'writer') ...[
+            const SizedBox(height: 48),
+            _buildDangerZone(),
+          ]
         ],
       ),
     );
@@ -226,8 +237,8 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'THIS FEATURE IS UNDER DEVELOPMENT.',
-            style: GoogleFonts.outfit(color: U.red.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+            'SHARE THIS CODE WITH STUDENTS',
+            style: GoogleFonts.outfit(color: U.dim, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.5),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -248,15 +259,16 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
     );
   }
 
-  Widget _buildWritersSection() {
+  Widget _buildMembersSection() {
+    final bool canEdit = widget.userRole == 'writer';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('WRITERS', style: GoogleFonts.outfit(color: U.sub, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
-            Text('${_writers.length}/6', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+            Text('MEMBERS', style: GoogleFonts.outfit(color: U.sub, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+            Text('${_members.length}', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 12),
@@ -266,18 +278,20 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: U.border.withValues(alpha: 0.5)),
           ),
-          child: _loadingWriters
+          child: _loadingMembers
               ? const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
               : Column(
                   children: [
-                    ..._writers.map((w) {
+                    ..._members.map((w) {
                       final isCreator = w['uid'] == widget.classModel.creatorUid;
+                      final isWriter = widget.classModel.writerUids.contains(w['uid']);
+                      final isSelf = FirebaseAuth.instance.currentUser?.uid == w['uid'];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: U.primary.withValues(alpha: 0.1),
-                          child: Text(w['displayName'][0].toUpperCase(), style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.bold)),
+                          backgroundColor: isWriter ? U.primary.withValues(alpha: 0.1) : U.dim.withValues(alpha: 0.1),
+                          child: Text(w['displayName'][0].toUpperCase(), style: GoogleFonts.outfit(color: isWriter ? U.primary : U.text, fontWeight: FontWeight.bold)),
                         ),
-                        title: Text(w['displayName'], style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600, fontSize: 15)),
+                        title: Text(w['displayName'] + (isSelf ? ' (You)' : ''), style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600, fontSize: 15)),
                         subtitle: Text(w['email'], style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
                         trailing: isCreator
                             ? Container(
@@ -285,13 +299,21 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
                                 decoration: BoxDecoration(color: U.dim.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                                 child: Text('Owner', style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w600)),
                               )
-                            : IconButton(
-                                icon: Icon(Icons.remove_circle_outline, color: U.red.withValues(alpha: 0.7), size: 20),
-                                onPressed: () => _removeWriter(w['uid'], w['displayName']),
-                              ),
+                            : isWriter
+                              ? canEdit
+                                  ? IconButton(
+                                      icon: Icon(Icons.remove_circle_outline, color: U.red.withValues(alpha: 0.7), size: 20),
+                                      onPressed: () => _removeWriter(w['uid'], w['displayName']),
+                                    )
+                                  : Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(color: U.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                                      child: Text('Writer', style: GoogleFonts.outfit(color: U.primary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                    )
+                              : null,
                       );
                     }),
-                    if (_writers.length < 6)
+                    if (canEdit && widget.classModel.writerUids.length < 6)
                       ListTile(
                         leading: Container(
                           width: 40,

@@ -930,7 +930,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         ),
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: 100,
           child: _TodayPulseButton(
             animation: _glowController,
             onTap: _showTodaySheet,

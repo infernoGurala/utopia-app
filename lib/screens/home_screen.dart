@@ -370,10 +370,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 'Utopia',
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.playfairDisplay(
-                  fontSize: 30,
+                  fontSize: 32,
                   fontWeight: FontWeight.w700,
                   color: U.primary,
                   fontStyle: FontStyle.italic,
+                  letterSpacing: -1,
+                  shadows: [
+                    Shadow(
+                      color: U.primary.withValues(alpha: 0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -765,35 +773,30 @@ class _HeaderAction extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Ink(
+        child: SizedBox(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(
-            color: U.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: U.border),
-          ),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Center(child: Icon(icon, color: iconColor, size: 20)),
+              Center(child: Icon(icon, color: iconColor, size: 22)),
               if (badgeCount > 0)
                 Positioned(
-                  right: 6,
-                  top: 6,
+                  right: 8,
+                  top: 8,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 5,
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: U.primary,
+                      color: U.red,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       badgeCount > 9 ? '9+' : '$badgeCount',
                       style: GoogleFonts.outfit(
-                        color: U.bg,
+                        color: Colors.white,
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                       ),

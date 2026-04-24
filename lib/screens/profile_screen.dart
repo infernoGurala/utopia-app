@@ -203,10 +203,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: Text(
                         'Profile',
-                        style: GoogleFonts.outfit(
-                          fontSize: 28,
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 32,
                           fontWeight: FontWeight.w700,
                           color: U.text,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: -1,
+                          shadows: [
+                            Shadow(
+                              color: U.text.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -445,86 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Morning Notification Toggle
-                      ValueListenableBuilder<bool>(
-                        valueListenable: morningNotifEnabledNotifier,
-                        builder: (context, notifEnabled, _) {
-                          return _groupedToggleTile(
-                            icon: Icons.wb_sunny_outlined,
-                            label: 'Morning Notification',
-                            sub: notifEnabled
-                                ? 'Enabled · Receive daily morning alerts'
-                                : 'Disabled · No morning alerts',
-                            color: notifEnabled ? U.peach : U.dim,
-                            value: notifEnabled,
-                            onChanged: (v) async {
-                              morningNotifEnabledNotifier.value = v;
-                              unawaited(
-                                CacheService().saveAppSetting(
-                                  'morning_notif_enabled',
-                                  v.toString(),
-                                ),
-                              );
-                              final uid = FirebaseAuth.instance.currentUser?.uid;
-                              if (uid != null) {
-                                unawaited(
-                                  FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(uid)
-                                      .set({
-                                        'morningNotificationEnabled': v,
-                                      }, SetOptions(merge: true)),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
-                      // Sci-Wordle Notification Toggle
-                      ValueListenableBuilder<bool>(
-                        valueListenable: sciWordleNotifEnabledNotifier,
-                        builder: (context, notifEnabled, _) {
-                          return _groupedToggleTile(
-                            icon: Icons.games_outlined,
-                            label: 'SCI-Wordle Notification',
-                            sub: notifEnabled
-                                ? 'Enabled · Receive daily game alerts'
-                                : 'Disabled · No game alerts',
-                            color: notifEnabled ? U.primary : U.dim,
-                            value: notifEnabled,
-                            onChanged: (v) async {
-                              sciWordleNotifEnabledNotifier.value = v;
-                              unawaited(
-                                CacheService().saveAppSetting(
-                                  'sci_wordle_notif_enabled',
-                                  v.toString(),
-                                ),
-                              );
-                              final uid = FirebaseAuth.instance.currentUser?.uid;
-                              if (uid != null) {
-                                unawaited(
-                                  FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(uid)
-                                      .set({
-                                        'sciWordleNotificationEnabled': v,
-                                      }, SetOptions(merge: true)),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
                       // Report Bugs & Suggestions
                       _groupedTile(
                         icon: Icons.bug_report_outlined,
@@ -538,13 +468,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Sign out
-                      _groupedTile(
-                        icon: Icons.logout_outlined,
-                        label: 'Sign out',
-                        sub: 'Sign out of your account',
-                        color: U.red,
-                        onTap: _signOut,
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  onPressed: _signOut,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: U.red,
+                    side: BorderSide(color: U.red.withValues(alpha: 0.3), width: 1),
+                    backgroundColor: U.red.withValues(alpha: 0.05),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout_outlined, size: 20, color: U.red),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Sign Out',
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ],
                   ),

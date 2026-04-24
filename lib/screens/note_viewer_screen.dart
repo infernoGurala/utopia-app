@@ -922,23 +922,81 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
                       ),
                       onPressed: () async {
                         if (widget.useGlobalRepo && !widget.filePath.contains('/Community/')) {
-                          // Class notes → raw markdown editor
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => _RawMarkdownEditor(
-                                title: widget.title,
-                                filePath: widget.filePath,
-                                initialContent: _rawContent,
-                              ),
+                          // Class notes → Use modal to select edit mode
+                          final mode = await showModalBottomSheet<String>(
+                            context: context,
+                            backgroundColor: U.surface,
+                            shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                            ),
+                            builder: (ctx) => Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(color: U.border, borderRadius: BorderRadius.circular(2)),
+                                ),
+                                const SizedBox(height: 24),
+                                ListTile(
+                                  leading: Icon(Icons.dashboard_customize_outlined, color: U.text),
+                                  title: Text('Visual Editor', style: GoogleFonts.outfit(color: U.text)),
+                                  subtitle: Text('Edit using blocks', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
+                                  onTap: () => Navigator.pop(ctx, 'blocks'),
+                                ),
+                                if (_isSuperUser)
+                                  ListTile(
+                                    leading: Icon(Icons.code, color: U.primary),
+                                    title: Text('Code Editor', style: GoogleFonts.outfit(color: U.primary)),
+                                    subtitle: Text('Edit raw markdown source', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
+                                    onTap: () => Navigator.pop(ctx, 'code'),
+                                  ),
+                                const SizedBox(height: 24),
+                              ],
                             ),
                           );
-                          if (result is String) {
-                            setState(() {
-                              _rawContent = result;
-                              _segments = _parseSegments(result);
-                              _loading = false;
-                            });
+                          
+                          if (mode == null) return;
+                          
+                          if (mode == 'code') {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => _RawMarkdownEditor(
+                                  title: widget.title,
+                                  filePath: widget.filePath,
+                                  initialContent: _rawContent,
+                                ),
+                              ),
+                            );
+                            if (result is String) {
+                              setState(() {
+                                _rawContent = result;
+                                _segments = _parseSegments(result);
+                                _loading = false;
+                              });
+                            }
+                          } else {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => EditorScreen(
+                                  title: widget.title,
+                                  filePath: widget.filePath,
+                                  initialContent: _rawContent,
+                                ),
+                              ),
+                            );
+                            if (result is String) {
+                              setState(() {
+                                _rawContent = result;
+                                _segments = _parseSegments(result);
+                                _loading = false;
+                              });
+                            } else if (result == true) {
+                              _load();
+                            }
                           }
                         } else {
                           // Community / personal notes → block editor

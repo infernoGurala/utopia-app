@@ -87,6 +87,7 @@ class ClassService {
         universityId: universityId,
         creatorUid: creatorUid,
         writerUids: [creatorUid],
+        memberUids: [creatorUid],
         createdAt: now,
         memberCount: 1,
       );
@@ -154,8 +155,11 @@ class ClassService {
       'role': 'reader',
     });
 
-    // Increment member count in class document
-    batch.update(classDoc.reference, {'memberCount': FieldValue.increment(1)});
+    // Increment member count in class document and add to memberUids
+    batch.update(classDoc.reference, {
+      'memberCount': FieldValue.increment(1),
+      'memberUids': FieldValue.arrayUnion([uid]),
+    });
 
     await batch.commit();
   }
@@ -178,20 +182,51 @@ class ClassService {
     final classDoc = await _firestore.collection('classes').doc(classId).get();
     if (!classDoc.exists) return [];
 
-    final writerUids = List<String>.from(classDoc.data()?['writerUids'] ?? []);
-    final List<Map<String, dynamic>> writers = [];
+    final writers = List<String>.from(classDoc.data()?['writerUids'] ?? []);
+    if (writers.isEmpty) return [];
 
-    for (final uid in writerUids) {
-      final userDoc = await _firestore.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        writers.add({
-          'uid': uid,
-          'displayName': userDoc.data()?['displayName'] ?? 'Unknown User',
-          'email': userDoc.data()?['email'] ?? '',
-        });
-      }
+    final usersQuery = await _firestore
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: writers)
+        .get();
+
+    return usersQuery.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'uid': doc.id,
+        'displayName': data['displayName'] ?? 'Unknown User',
+        'email': data['email'] ?? '',
+      };
+    }).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getMembers(String classId) async {
+    final classDoc = await _firestore.collection('classes').doc(classId).get();
+    if (!classDoc.exists) return [];
+
+    final members = List<String>.from(classDoc.data()?['memberUids'] ?? []);
+    if (members.isEmpty) return [];
+
+    // Firestore whereIn supports max 10 elements. We need to chunk.
+    List<Map<String, dynamic>> results = [];
+    for (int i = 0; i < members.length; i += 10) {
+      final chunk = members.sublist(i, i + 10 > members.length ? members.length : i + 10);
+      final usersQuery = await _firestore
+          .collection('users')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      
+      results.addAll(usersQuery.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'uid': doc.id,
+          'displayName': data['displayName'] ?? 'Unknown User',
+          'email': data['email'] ?? '',
+        };
+      }));
     }
-    return writers;
+
+    return results;
   }
 
   Future<void> addWriterByEmail(String classId, String email) async {

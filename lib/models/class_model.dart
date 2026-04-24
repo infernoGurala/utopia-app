@@ -7,6 +7,7 @@ class ClassModel {
   final String universityId;
   final String creatorUid;
   final List<String> writerUids;
+  final List<String> memberUids;
   final Timestamp createdAt;
   final int memberCount;
 
@@ -17,6 +18,7 @@ class ClassModel {
     required this.universityId,
     required this.creatorUid,
     required this.writerUids,
+    required this.memberUids,
     required this.createdAt,
     required this.memberCount,
   });
@@ -29,6 +31,7 @@ class ClassModel {
       universityId: data['universityId'] ?? '',
       creatorUid: data['creatorUid'] ?? '',
       writerUids: List<String>.from(data['writerUids'] ?? []),
+      memberUids: List<String>.from(data['memberUids'] ?? []),
       createdAt: data['createdAt'] as Timestamp? ?? Timestamp.now(),
       memberCount: data['memberCount'] ?? 0,
     );
@@ -41,6 +44,7 @@ class ClassModel {
       'universityId': universityId,
       'creatorUid': creatorUid,
       'writerUids': writerUids,
+      'memberUids': memberUids,
       'createdAt': createdAt,
       'memberCount': memberCount,
     };

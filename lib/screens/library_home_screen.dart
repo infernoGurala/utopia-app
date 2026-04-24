@@ -218,10 +218,18 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       Text(
                         'Utopia',
                         style: GoogleFonts.playfairDisplay(
-                          fontSize: 30,
+                          fontSize: 32,
                           fontWeight: FontWeight.w700,
                           color: U.primary,
                           fontStyle: FontStyle.italic,
+                          letterSpacing: -1,
+                          shadows: [
+                            Shadow(
+                              color: U.primary.withValues(alpha: 0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -245,7 +253,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        icon: Icon(Icons.calendar_today_rounded, color: U.sub, size: 20),
+                        icon: Icon(Icons.calendar_month_rounded, color: const Color(0xFFF9E2AF), size: 22),
                         tooltip: 'Timetable',
                         onPressed: () {
                           Navigator.push(
@@ -253,12 +261,12 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             MaterialPageRoute(builder: (_) => const TimetableScreen()),
                           );
                         },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(),
                       ),
                       const SizedBox(width: 4),
                       IconButton(
-                        icon: Icon(Icons.notifications_none_rounded, color: U.sub, size: 22),
+                        icon: Icon(Icons.notifications_outlined, color: const Color(0xFFCDD6F4), size: 22),
                         tooltip: 'Notifications',
                         onPressed: () {
                           Navigator.push(
@@ -266,8 +274,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
                           );
                         },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
@@ -332,16 +340,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             (c) => _buildClassTile(context, c),
                           ),
 
-                          // ── Create / Join ──
+                          // ── New Class ──
                           _buildActionTile(
-                            label: 'CREATE',
+                            label: 'NEW CLASS',
                             icon: Icons.add_circle_outline,
-                            onTap: _showCreateClassSheet,
-                          ),
-                          _buildActionTile(
-                            label: 'JOIN',
-                            icon: Icons.group_add_outlined,
-                            onTap: _showJoinClassSheet,
+                            onTap: _showNewClassMenu,
                           ),
                         ],
                       ),
@@ -710,12 +713,12 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 color: U.sub,
                 onTap: () {
                   Navigator.pop(ctx);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ClassSettingsScreen(classModel: c),
-                    ),
-                  );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ClassSettingsScreen(classModel: c, userRole: isOwner ? 'writer' : 'reader'),
+                      ),
+                    );
                 },
               ),
             // ── Exit class (non-owner only) ──
@@ -890,6 +893,47 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showNewClassMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: U.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 24),
+          ListTile(
+            leading: Icon(Icons.group_add_outlined, color: U.text),
+            title: Text('Join a Class', style: GoogleFonts.outfit(color: U.text)),
+            subtitle: Text('Enter a 6-character code', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showJoinClassSheet();
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.add_circle_outline, color: U.primary),
+            title: Text('Create a Class', style: GoogleFonts.outfit(color: U.primary)),
+            subtitle: Text('Start a new shared folder', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showCreateClassSheet();
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }
