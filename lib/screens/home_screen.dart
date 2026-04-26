@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -421,7 +422,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ],
         ),
       ],
-    );
+    )
+        .animate()
+        .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+        .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut);
   }
 
   Widget _buildHeaderActions() {
@@ -464,7 +468,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
         ),
       ],
-    );
+    )
+        .animate()
+        .fadeIn(delay: 200.ms, duration: 500.ms, curve: Curves.easeOut)
+        .slideY(begin: 0.1, end: 0, delay: 200.ms, duration: 500.ms, curve: Curves.easeOut);
   }
 
   @override

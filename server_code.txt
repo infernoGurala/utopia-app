@@ -1,0 +1,666 @@
+// ============================================================
+// UTOPIA Attendance Proxy Server
+// Google Apps Script — deploy as Web App (Execute as: Me,
+// Who has access: Anyone)
+// ============================================================
+
+// ── Native AES-128-CBC + PKCS7 (no external libraries) ──────
+
+var _AES_SBOX = null;
+var _AES_KEY_SCHED = null;
+
+function _aesInit() {
+  if (_AES_SBOX) return;
+  var sbox = new Array(256);
+  var rsbox = new Array(256);
+  var p = 1, q = 1;
+  do {
+    p = p ^ (p << 1) ^ (p & 0x80 ? 0x1B : 0);
+    p &= 0xFF;
+    q ^= q << 1; q ^= q << 2; q ^= q << 4; q ^= q & 0x80 ? 0x09 : 0;
+    q &= 0xFF;
+    var xformed = q ^ ((q << 1) | (q >> 7)) ^ ((q << 2) | (q >> 6)) ^ ((q << 3) | (q >> 5)) ^ ((q << 4) | (q >> 4));
+    xformed &= 0xFF;
+    xformed ^= 0x63;
+    sbox[p] = xformed;
+    rsbox[xformed] = p;
+  } while (p !== 1);
+  sbox[0] = 0x63;
+  rsbox[0x63] = 0;
+  _AES_SBOX = sbox;
+}
+
+function _aesExpandKey(keyBytes) {
+  _aesInit();
+  var sbox = _AES_SBOX;
+  var rcon = [0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80,0x1b,0x36];
+  var w = [];
+  for (var i = 0; i < 4; i++) {
+    w[i] = (keyBytes[i*4]<<24)|(keyBytes[i*4+1]<<16)|(keyBytes[i*4+2]<<8)|keyBytes[i*4+3];
+  }
+  for (var i = 4; i < 44; i++) {
+    var temp = w[i-1];
+    if (i % 4 === 0) {
+      temp = ((temp<<8)|(temp>>>24))&0xFFFFFFFF;
+      temp = (sbox[(temp>>24)&0xFF]<<24)|(sbox[(temp>>16)&0xFF]<<16)|(sbox[(temp>>8)&0xFF]<<8)|sbox[temp&0xFF];
+      temp ^= (rcon[(i/4)-1] << 24);
+    }
+    w[i] = w[i-4] ^ temp;
+  }
+  return w;
+}
+
+function _aesEncryptBlock(block, w) {
+  _aesInit();
+  var sbox = _AES_SBOX;
+  var s = block.slice();
+
+  for (var i = 0; i < 16; i++) {
+    var wi = (i >> 2);
+    var shift = 24 - (i % 4) * 8;
+    s[i] ^= (w[wi] >> shift) & 0xFF;
+  }
+
+  for (var round = 1; round <= 10; round++) {
+    for (var i = 0; i < 16; i++) s[i] = sbox[s[i]];
+
+    var t;
+    t = s[1]; s[1]=s[5]; s[5]=s[9]; s[9]=s[13]; s[13]=t;
+    t = s[2]; s[2]=s[10]; s[10]=t; t=s[6]; s[6]=s[14]; s[14]=t;
+    t = s[15]; s[15]=s[11]; s[11]=s[7]; s[7]=s[3]; s[3]=t;
+
+    if (round < 10) {
+      for (var c = 0; c < 4; c++) {
+        var i0=c*4, i1=i0+1, i2=i0+2, i3=i0+3;
+        var a=s[i0],b=s[i1],cc=s[i2],d=s[i3];
+        function xtime(x) { return ((x<<1)^(x&0x80?0x1b:0))&0xFF; }
+        s[i0] = xtime(a)^xtime(b)^b^cc^d;
+        s[i1] = a^xtime(b)^xtime(cc)^cc^d;
+        s[i2] = a^b^xtime(cc)^xtime(d)^d;
+        s[i3] = xtime(a)^a^b^cc^xtime(d);
+      }
+    }
+
+    var base = round * 4;
+    for (var i = 0; i < 16; i++) {
+      var wi = base + (i >> 2);
+      var shift = 24 - (i % 4) * 8;
+      s[i] ^= (w[wi] >> shift) & 0xFF;
+    }
+  }
+  return s;
+}
+
+function _pkcs7Pad(bytes, blockSize) {
+  var padLen = blockSize - (bytes.length % blockSize);
+  var padded = bytes.slice();
+  for (var i = 0; i < padLen; i++) padded.push(padLen);
+  return padded;
+}
+
+function _strToBytes(str) {
+  var bytes = [];
+  for (var i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i) & 0xFF);
+  return bytes;
+}
+
+function _bytesToBase64(bytes) {
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  var result = '';
+  for (var i = 0; i < bytes.length; i += 3) {
+    var b0=bytes[i], b1=bytes[i+1]||0, b2=bytes[i+2]||0;
+    result += chars[b0>>2];
+    result += chars[((b0&3)<<4)|(b1>>4)];
+    result += i+1 < bytes.length ? chars[((b1&0xF)<<2)|(b2>>6)] : '=';
+    result += i+2 < bytes.length ? chars[b2&0x3F] : '=';
+  }
+  return result;
+}
+
+function encryptPassword(password) {
+  var SECRET = '8701661282118308';
+  var keyBytes = _strToBytes(SECRET);
+  var ivBytes  = _strToBytes(SECRET);
+  var msgBytes = _pkcs7Pad(_strToBytes(password), 16);
+  var w = _aesExpandKey(keyBytes);
+
+  var prev = ivBytes.slice();
+  var cipher = [];
+  for (var i = 0; i < msgBytes.length; i += 16) {
+    var block = [];
+    for (var j = 0; j < 16; j++) block.push(msgBytes[i+j] ^ prev[j]);
+    var enc = _aesEncryptBlock(block, w);
+    for (var j = 0; j < 16; j++) cipher.push(enc[j]);
+    prev = enc;
+  }
+  return _bytesToBase64(cipher);
+}
+
+// ── HTTP helpers ─────────────────────────────────────────────
+
+function buildCookieHeader(cookies) {
+  return Object.keys(cookies).map(function(k){ return k+'='+cookies[k]; }).join('; ');
+}
+
+function captureCookies(response, cookies) {
+  var headers = response.getAllHeaders();
+  var setCookie = headers['Set-Cookie'];
+  if (!setCookie) return;
+  if (typeof setCookie === 'string') setCookie = [setCookie];
+  setCookie.forEach(function(header) {
+    var pair = header.split(';')[0].trim();
+    var eqIdx = pair.indexOf('=');
+    if (eqIdx < 0) return;
+    var name  = pair.substring(0, eqIdx).trim();
+    var value = pair.substring(eqIdx + 1).trim();
+    if (name) cookies[name] = value;
+  });
+}
+
+function sendRequest(options) {
+  var method      = options.method || 'GET';
+  var url         = options.url;
+  var cookies     = options.cookies;
+  var body        = options.body || null;
+  var contentType = options.contentType || null;
+  var extraHeaders = options.extraHeaders || {};
+  var followRedirects = (options.followRedirects !== false);
+  var maxRedirects = 8, redirectCount = 0;
+
+  while (true) {
+    var reqHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 14; vivo I2305) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-IN,en;q=0.9'
+    };
+    if (Object.keys(cookies).length > 0) reqHeaders['Cookie'] = buildCookieHeader(cookies);
+    if (contentType) reqHeaders['Content-Type'] = contentType;
+    Object.keys(extraHeaders).forEach(function(k){ reqHeaders[k] = extraHeaders[k]; });
+
+    var fetchOptions = { method: method.toLowerCase(), headers: reqHeaders, followRedirects: false, muteHttpExceptions: true };
+    if (body) fetchOptions.payload = body;
+
+    var response = UrlFetchApp.fetch(url, fetchOptions);
+    captureCookies(response, cookies);
+
+    var statusCode = response.getResponseCode();
+    var responseBody = response.getContentText('UTF-8');
+    var allHeaders = response.getAllHeaders();
+    var location = allHeaders['Location'] || allHeaders['location'] || null;
+    var isRedirect = statusCode >= 300 && statusCode < 400;
+
+    if (!followRedirects || !isRedirect || !location) {
+      return { statusCode: statusCode, body: responseBody, location: location };
+    }
+    if (redirectCount >= maxRedirects) throw new Error('Portal redirected too many times');
+
+    if (location.indexOf('http') !== 0) {
+      var parsed = url.match(/^(https?:\/\/[^\/]+)/);
+      location = (parsed ? parsed[1] : '') + location;
+    }
+    url = location; method = 'GET'; body = null; contentType = null; redirectCount++;
+  }
+}
+
+// ── HTML parsing helpers ─────────────────────────────────────
+
+function cleanHtmlText(input) {
+  return input.replace(/<[^>]+>/g,' ')
+    .replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"')
+    .replace(/&#39;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+    .replace(/\s+/g,' ').trim();
+}
+
+function extractHiddenInput(html, fieldName) {
+  var patterns = [
+    new RegExp('id="'+fieldName+'"[^>]*value="([^"]*)"','i'),
+    new RegExp('name="'+fieldName+'"[^>]*value="([^"]*)"','i'),
+    new RegExp("id='"+fieldName+"'[^>]*value='([^']*)'","i"),
+    new RegExp("name='"+fieldName+"'[^>]*value='([^']*)'","i"),
+    new RegExp('value="([^"]*)"[^>]*id="'+fieldName+'"','i'),
+    new RegExp('value="([^"]*)"[^>]*name="'+fieldName+'"','i'),
+  ];
+  for (var i=0;i<patterns.length;i++){var m=html.match(patterns[i]);if(m)return m[1];}
+  throw new Error('Portal login tokens were not found ('+fieldName+')');
+}
+
+function extractWebMethodToken(html) {
+  var patterns = [/var\s+_tkn\s*=\s*'([^']+)'/,/var\s+_tkn\s*=\s*"([^"]+)"/,/'_tkn'\s*:\s*'([^']+)'/,/"_tkn"\s*:\s*"([^"]+)"/];
+  for (var i=0;i<patterns.length;i++){var m=html.match(patterns[i]);if(m&&m[1].trim())return m[1].trim();}
+  return null;
+}
+
+// ── Profile page attendance parser (AUS) ─────────────────────
+// Parses the ATTENDANCE table inside StudentProfile.aspx?scrid=17
+// The table has columns: Sl.No | Subject | Held | Attend | %
+
+function parseProfileAttendanceHtml(html) {
+  var subjects = [];
+  var totalHeld = 0, totalAttended = 0;
+  var totalHeldFromReport = null, totalAttendedFromReport = null, totalPercentageFromReport = null;
+  var studentName = null;
+
+  // Extract student name from "Hi...NAME" in the page
+  var nameMatch = html.match(/Hi\.\.\.([^<"]+)/i);
+  if (nameMatch && nameMatch[1].trim()) studentName = nameMatch[1].trim();
+
+  // Find the ATTENDANCE table — it contains "Held" and "Attend" headers
+  var tableMatch = html.match(/<table[^>]*>([\s\S]*?)<\/table>/gi);
+  var attendanceTableHtml = null;
+  if (tableMatch) {
+    for (var t = 0; t < tableMatch.length; t++) {
+      var tbl = tableMatch[t];
+      if (tbl.toLowerCase().indexOf('held') >= 0 && tbl.toLowerCase().indexOf('attend') >= 0) {
+        attendanceTableHtml = tbl;
+        break;
+      }
+    }
+  }
+
+  if (!attendanceTableHtml) {
+    return { overallPercentage: 0, totalClasses: 0, totalAttended: 0, subjects: [], studentName: studentName, hasReport: false };
+  }
+
+  // Parse rows
+  var rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  var rowMatch;
+  var rows = [];
+  while ((rowMatch = rowPattern.exec(attendanceTableHtml)) !== null) rows.push(rowMatch[1]);
+
+  var subjectIdx = null, heldIdx = null, attendIdx = null, percentIdx = null;
+
+  rows.forEach(function(rowHtml) {
+    var isHeader = /<th\b/i.test(rowHtml);
+    var cellPattern = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    var cellMatch;
+    var cells = [];
+    while ((cellMatch = cellPattern.exec(rowHtml)) !== null) cells.push(cleanHtmlText(cellMatch[1]));
+
+    if (isHeader) {
+      cells.forEach(function(cell, i) {
+        var lower = cell.toLowerCase().trim();
+        if (lower === 'subject' || lower.indexOf('subject') >= 0) subjectIdx = i;
+        else if (lower === 'held') heldIdx = i;
+        else if (lower === 'attend') attendIdx = i;
+        else if (lower === '%' || lower === 'percentage') percentIdx = i;
+      });
+      return;
+    }
+
+    if (cells.filter(function(c){return c.trim()!=='';}).length < 3) return;
+
+    // Skip header-like rows
+    var firstCell = (cells[0] || '').toLowerCase().trim();
+    if (firstCell === 'sl.no' || firstCell === 'sl' || firstCell === 'sno') return;
+
+    var subjectName = null, totalClasses = null, attendedClasses = null, percentage = null;
+
+    if (subjectIdx !== null && heldIdx !== null && attendIdx !== null) {
+      if (subjectIdx < cells.length) subjectName = cells[subjectIdx].trim() || null;
+      if (heldIdx < cells.length) totalClasses = parseInt(cells[heldIdx].trim(), 10) || null;
+      if (attendIdx < cells.length) attendedClasses = parseInt(cells[attendIdx].trim(), 10) || null;
+      if (percentIdx !== null && percentIdx < cells.length) {
+        var raw = cells[percentIdx].trim();
+        if (raw.charAt(0) === '.') raw = '0' + raw;
+        percentage = parseFloat(raw) || null;
+      }
+    }
+
+    if (!subjectName || totalClasses === null || attendedClasses === null) return;
+
+    var lowerSub = subjectName.toLowerCase().trim();
+
+    if (lowerSub === 'total') {
+      totalHeldFromReport = totalClasses;
+      totalAttendedFromReport = attendedClasses;
+      totalPercentageFromReport = percentage;
+      return;
+    }
+
+    if (percentage === null && totalClasses > 0) {
+      percentage = (attendedClasses / totalClasses) * 100;
+    }
+    percentage = percentage || 0;
+
+    subjects.push({
+      subject: subjectName,
+      totalClasses: totalClasses,
+      attendedClasses: attendedClasses,
+      percentage: parseFloat(percentage.toFixed(2))
+    });
+  });
+
+  var overallPercentage = totalPercentageFromReport !== null
+    ? totalPercentageFromReport
+    : (totalHeldFromReport > 0 ? (totalAttendedFromReport / totalHeldFromReport) * 100 : 0);
+
+  return {
+    overallPercentage: parseFloat(overallPercentage.toFixed(1)),
+    totalClasses: totalHeldFromReport !== null ? totalHeldFromReport : subjects.reduce(function(s,x){return s+x.totalClasses;},0),
+    totalAttended: totalAttendedFromReport !== null ? totalAttendedFromReport : subjects.reduce(function(s,x){return s+x.attendedClasses;},0),
+    subjects: subjects,
+    studentName: studentName,
+    hasReport: totalHeldFromReport !== null
+  };
+}
+
+// ── ACET HTML parser (unchanged) ─────────────────────────────
+
+function parseAttendanceHtml(html) {
+  var subjects=[], totalHeldFromReport=null, totalAttendedFromReport=null, totalPercentageFromReport=null, hasReport=false;
+  var tableHtml=html;
+  var tblMatch=html.match(/<table[^>]*id=["']tblReport["'][^>]*>([\s\S]*?)<\/table>/i);
+  if(tblMatch) tableHtml=tblMatch[1];
+
+  var studentName=null;
+  var plainText=cleanHtmlText(tableHtml);
+  var snMatch=plainText.match(/Student Name\s*:\s*(.*?)\s*(?=RollNo\s*:|Student Name\s*:|Course\s*:|Branch\s*:|Semester\s*:|$)/i);
+  if(snMatch&&snMatch[1].trim()) studentName=snMatch[1].trim();
+
+  var subjectIdx=null,heldIdx=null,attendIdx=null,percentIdx=null;
+  var rowPattern=/<tr[^>]*>([\s\S]*?)<\/tr>/gi, rowMatch, rows=[];
+  while((rowMatch=rowPattern.exec(tableHtml))!==null) rows.push(rowMatch[1]);
+
+  rows.forEach(function(rowHtml){
+    var isHeader=/<th\b/i.test(rowHtml);
+    var cellPattern=/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi, cellMatch, cells=[];
+    while((cellMatch=cellPattern.exec(rowHtml))!==null) cells.push(cleanHtmlText(cellMatch[1]));
+
+    if(isHeader){
+      cells.forEach(function(cell,i){
+        var lower=cell.toLowerCase().trim();
+        if(lower.indexOf('subject')>=0||lower.indexOf('course')>=0||lower.indexOf('paper')>=0) subjectIdx=i;
+        else if(lower.indexOf('held')>=0) heldIdx=i;
+        else if(lower.indexOf('attend')>=0&&lower.indexOf('attendance')<0) attendIdx=i;
+        else if(lower==='%'||lower.indexOf('percent')>=0) percentIdx=i;
+      });
+      return;
+    }
+
+    if(cells.filter(function(c){return c.trim()!=='';}).length<3) return;
+
+    var subjectName=null,totalClasses=null,attendedClasses=null,percentage=null;
+    if(subjectIdx!==null&&heldIdx!==null&&attendIdx!==null){
+      if(subjectIdx<cells.length&&cells[subjectIdx].trim()) subjectName=cells[subjectIdx].trim();
+      if(heldIdx<cells.length) totalClasses=parseInt(cells[heldIdx].trim(),10)||null;
+      if(attendIdx<cells.length) attendedClasses=parseInt(cells[attendIdx].trim(),10)||null;
+      if(percentIdx!==null&&percentIdx<cells.length){var raw=cells[percentIdx].trim();if(raw.charAt(0)==='.') raw='0'+raw;percentage=parseFloat(raw)||null;}
+    } else {
+      for(var i=0;i<cells.length;i++){
+        var cell=cells[i].trim();if(!cell) continue;
+        var lower=cell.toLowerCase();
+        if(lower==='total'||(!/\d/.test(cell)&&/[a-z]/i.test(cell)&&lower.indexOf('percentage')<0&&lower.indexOf('attended')<0&&lower.indexOf('held')<0&&lower.indexOf('total')<0)){
+          subjectName=cell;
+          var intCells=[];
+          for(var j=i+1;j<cells.length;j++){var v=parseInt(cells[j].trim(),10);if(!isNaN(v)) intCells.push(v);}
+          if(intCells.length>=2){totalClasses=intCells[0];attendedClasses=intCells[1];}
+          break;
+        }
+      }
+    }
+
+    if(percentage===null){for(var ci=cells.length-1;ci>=0;ci--){var trimmed=cells[ci].trim();if(trimmed.charAt(0)==='.') trimmed='0'+trimmed;if(trimmed.indexOf('.')>=0){var p=parseFloat(trimmed);if(!isNaN(p)&&p>=0&&p<=100){percentage=p;break;}}}}
+    if(percentage===null&&totalClasses&&totalClasses>0&&attendedClasses!==null) percentage=(attendedClasses/totalClasses)*100;
+    if(percentage===null) percentage=0;
+    if(!subjectName||totalClasses===null||attendedClasses===null) return;
+
+    var lowerSub=subjectName.toLowerCase().trim();
+    if(lowerSub==='total'){hasReport=true;totalHeldFromReport=totalClasses;totalAttendedFromReport=attendedClasses;totalPercentageFromReport=percentage;return;}
+    if(lowerSub.indexOf('subject')>=0||lowerSub==='sr'||lowerSub==='sl') return;
+
+    subjects.push({subject:subjectName,totalClasses:totalClasses,attendedClasses:attendedClasses,percentage:percentage});
+  });
+
+  var totalHeld=subjects.reduce(function(s,x){return s+(x.totalClasses||0);},0);
+  var totalAttended=subjects.reduce(function(s,x){return s+(x.attendedClasses||0);},0);
+  var overallPercentage=totalHeld===0?0:(totalAttended/totalHeld)*100;
+
+  return {
+    overallPercentage:parseFloat((totalPercentageFromReport!==null?totalPercentageFromReport:overallPercentage).toFixed(1)),
+    totalClasses:totalHeldFromReport!==null?totalHeldFromReport:totalHeld,
+    totalAttended:totalAttendedFromReport!==null?totalAttendedFromReport:totalAttended,
+    subjects:subjects, studentName:studentName, hasReport:hasReport
+  };
+}
+
+// ── Date helpers ─────────────────────────────────────────────
+
+function parsePortalDate(str) {
+  if(!str) return new Date();
+  var parts=str.split('-');
+  if(parts.length===3) return new Date(parseInt(parts[2]),parseInt(parts[1])-1,parseInt(parts[0]));
+  return new Date();
+}
+
+function formatPortalDate(dt) {
+  var dd=String(dt.getDate()).padStart(2,'0'), mm=String(dt.getMonth()+1).padStart(2,'0');
+  return dd+'-'+mm+'-'+dt.getFullYear();
+}
+
+// ── AUS fetch ────────────────────────────────────────────────
+
+function fetchAus(rollNumber, password, fromDate, toDate) {
+  var BASE='https://info.aec.edu.in', PREFIX='/aus';
+  var cookies={};
+  var encPassword=encryptPassword(password);
+
+  var loginGet=sendRequest({url:BASE+PREFIX+'/default.aspx',cookies:cookies,followRedirects:true});
+  var viewState=extractHiddenInput(loginGet.body,'__VIEWSTATE');
+  var viewStateGenerator=extractHiddenInput(loginGet.body,'__VIEWSTATEGENERATOR');
+  var eventValidation=extractHiddenInput(loginGet.body,'__EVENTVALIDATION');
+
+  var loginBody='__VIEWSTATE='+encodeURIComponent(viewState)
+    +'&__VIEWSTATEGENERATOR='+encodeURIComponent(viewStateGenerator)
+    +'&__EVENTVALIDATION='+encodeURIComponent(eventValidation)
+    +'&userType=rbtStudent'
+    +'&txtUserId='+encodeURIComponent(rollNumber.trim())
+    +'&txtPassword='+encodeURIComponent(encPassword)
+    +'&hdnpwd='+encodeURIComponent(encPassword)
+    +'&btnLogin=LOGIN';
+
+  var loginPost=sendRequest({url:BASE+PREFIX+'/default.aspx',method:'POST',cookies:cookies,body:loginBody,contentType:'application/x-www-form-urlencoded',followRedirects:false,extraHeaders:{'Origin':BASE,'Referer':BASE+PREFIX+'/default.aspx'}});
+
+  var location=loginPost.location||'';
+  var redirectedToSM=(loginPost.statusCode>=300&&loginPost.statusCode<400)&&location.toLowerCase().indexOf('studentmaster.aspx')>=0;
+  if(!redirectedToSM||!cookies['ASP.NET_SessionId']||!cookies['frmAuth']) throw new Error('Invalid credentials');
+
+  var smResponse=sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/default.aspx'}});
+  if(looksLikeLoginPage(smResponse.body)) throw new Error('Invalid credentials');
+
+  Logger.log('fetchAus: cookies after StudentMaster.aspx: ' + JSON.stringify(Object.keys(cookies)));
+
+  if(!cookies['AuthToken']){
+    Logger.log('fetchAus: AuthToken missing, retrying StudentMaster.aspx');
+    var smRetry=sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/default.aspx'}});
+    Logger.log('fetchAus: cookies after retry: ' + JSON.stringify(Object.keys(cookies)));
+  }
+
+  var profileResponse=sendRequest({url:BASE+PREFIX+'/Academics/StudentProfile.aspx?scrid=17',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/StudentMaster.aspx'}});
+
+  if(profileResponse.statusCode!==200) throw new Error('Could not load the student profile page');
+
+  var parsed=parseProfileAttendanceHtml(profileResponse.body);
+  if(parsed.subjects.length===0&&!parsed.hasReport) throw new Error('Attendance data was not found in the portal response');
+  return parsed;
+}
+
+// ── ACET fetch ───────────────────────────────────────────────
+
+function looksLikeLoginPage(body){var lower=body.toLowerCase();return(lower.indexOf('txtid2')>=0||lower.indexOf('txtuserid')>=0)&&(lower.indexOf('txtpwd2')>=0||lower.indexOf('txtpassword')>=0)&&(lower.indexOf('btnlogin')>=0||lower.indexOf('>login<')>=0);}
+
+function fetchAcet(rollNumber, password, fromDate, toDate, mode) {
+  var BASE='https://info.aec.edu.in', PREFIX='/acet';
+  var cookies={};
+  var encPassword=encryptPassword(password);
+
+  var initial=sendRequest({url:BASE+PREFIX+'/default.aspx',cookies:cookies,followRedirects:true});
+  var loginPageHtml;
+  if(initial.body.indexOf('__VIEWSTATE')>=0){loginPageHtml=initial.body;}
+  else{sendRequest({url:BASE+PREFIX+'/authcheck.aspx',cookies:cookies,followRedirects:true});loginPageHtml=sendRequest({url:BASE+PREFIX+'/default.aspx',cookies:cookies,followRedirects:true}).body;}
+
+  var hiddenFields={};
+  var hiddenPattern=/<input\s+([^>]*?)>/gi, hMatch;
+  while((hMatch=hiddenPattern.exec(loginPageHtml))!==null){
+    var inputTag=hMatch[1];
+    var typeM=inputTag.match(/type\s*=\s*["']([^"']*)["']/i);
+    if(!typeM||typeM[1].toLowerCase()!=='hidden') continue;
+    var nameM=inputTag.match(/name\s*=\s*["']([^"']*)["']/i);
+    var idM=inputTag.match(/id\s*=\s*["']([^"']*)["']/i);
+    var key=(nameM&&nameM[1])||(idM&&idM[1])||'';
+    if(!key) continue;
+    var valM=inputTag.match(/value\s*=\s*["']([^"']*)["']/i);
+    hiddenFields[key]=valM?valM[1]:'';
+  }
+
+  var formBody=JSON.parse(JSON.stringify(hiddenFields));
+  ['txtId1','txtId2','txtId3'].forEach(function(k){formBody[k]=rollNumber.trim();});
+  ['txtPwd1','txtPwd2','txtPwd3'].forEach(function(k){formBody[k]=encPassword;});
+  ['hdnpwd1','hdnpwd2','hdnpwd3'].forEach(function(k){if(k in hiddenFields) formBody[k]=encPassword;});
+  formBody['imgBtn2.x']='42'; formBody['imgBtn2.y']='6';
+
+  var loginBodyStr=Object.keys(formBody).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(formBody[k]);}).join('&');
+  var loginPost=sendRequest({url:BASE+PREFIX+'/default.aspx',method:'POST',cookies:cookies,body:loginBodyStr,contentType:'application/x-www-form-urlencoded',followRedirects:true,extraHeaders:{'Origin':BASE,'Referer':BASE+PREFIX+'/default.aspx','Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'}});
+
+  var smResponse=sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/default.aspx'}});
+  var loginSuccess=(loginPost.statusCode>=300&&loginPost.statusCode<400)||!!cookies['frmAuth']||!looksLikeLoginPage(smResponse.body);
+  if(!loginSuccess) throw new Error('Invalid credentials');
+
+  sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true});
+
+  var attPage=sendRequest({url:BASE+PREFIX+'/Academics/StudentAttendance.aspx?scrid=3&showtype=SA',cookies:cookies,followRedirects:true});
+  var webMethodToken=extractWebMethodToken(attPage.body);
+
+  if(!webMethodToken){
+    var tkHiddenPattern=/<input\s+[^>]*type\s*=\s*["']hidden["'][^>]*>/gi, tkMatch;
+    while((tkMatch=tkHiddenPattern.exec(attPage.body))!==null){
+      var inputStr=tkMatch[0];
+      var nM=inputStr.match(/(?:name|id)\s*=\s*["']([^"']*)["']/i);
+      var fKey=nM?nM[1].toLowerCase():'';
+      if(fKey.indexOf('tkn')>=0||fKey.indexOf('token')>=0){var vM=inputStr.match(/value\s*=\s*["']([^"']*)["']/i);if(vM&&vM[1].trim()){webMethodToken=vM[1].trim();break;}}
+    }
+  }
+
+  sendRequest({url:BASE+PREFIX+'/JSFiles/AjaxMethods.js',cookies:cookies,followRedirects:true});
+
+  var formattedFromDate, formattedToDate;
+  if(mode==='tillNow'){formattedFromDate='';formattedToDate='';}
+  else{
+    var fromDt=parsePortalDate(fromDate), toDt=parsePortalDate(toDate);
+    if(fromDt>toDt){var tmp=fromDt;fromDt=toDt;toDt=tmp;}
+    var todayDt=new Date(); if(toDt>todayDt) toDt=todayDt;
+    formattedFromDate=formatPortalDate(fromDt); formattedToDate=formatPortalDate(toDt);
+  }
+
+  var attBodyJson=JSON.stringify({fromDate:formattedFromDate,toDate:formattedToDate,excludeothersubjects:false});
+  var attHeaders={'Origin':BASE,'Referer':BASE+PREFIX+'/Academics/StudentAttendance.aspx?scrid=3&showtype=SA','X-Requested-With':'XMLHttpRequest','Accept':'application/json, text/javascript, */*','Cache-Control':'no-cache','Pragma':'no-cache'};
+  if(webMethodToken) attHeaders['X-Auth-Token']=webMethodToken;
+
+  var attResponse=sendRequest({url:BASE+PREFIX+'/Academics/studentattendance.aspx/ShowAttendance',method:'POST',cookies:cookies,body:attBodyJson,contentType:'application/json; charset=UTF-8',followRedirects:false,extraHeaders:attHeaders});
+  if(attResponse.statusCode!==200) throw new Error('Could not fetch attendance right now');
+
+  var attendanceHtml;
+  try{var decoded=JSON.parse(attResponse.body);attendanceHtml=decoded.d||'';}catch(e){attendanceHtml=attResponse.body;}
+
+  var parsed=parseAttendanceHtml(attendanceHtml);
+  if(parsed.subjects.length===0&&!parsed.hasReport) throw new Error('Attendance data was not found in the portal response');
+  return parsed;
+}
+
+// ── Web App entry point ──────────────────────────────────────
+
+function doPost(e) {
+  var output=ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+  try {
+    var body=JSON.parse(e.postData.contents);
+    var rollNumber=(body.rollNumber||'').trim();
+    var password=(body.password||'').trim();
+    var college=(body.college||'aus').toLowerCase().trim();
+    var mode=body.mode||'full';
+    var fromDate=body.fromDate||null;
+    var toDate=body.toDate||null;
+
+    if(mode==='debug'){
+      return debugProfilePage(rollNumber, password, college);
+    }
+
+    if(!rollNumber||!password){return output.setContent(JSON.stringify({error:'Roll number and password are required'}));}
+
+    var result;
+    if(college==='acet'){
+      result=fetchAcet(rollNumber,password,fromDate,toDate,mode);
+    } else {
+      result=fetchAus(rollNumber,password,fromDate,toDate);
+    }
+    return output.setContent(JSON.stringify({success:true,data:result,college:college}));
+  } catch(err) {
+    return output.setContent(JSON.stringify({error:err.message}));
+  }
+}
+
+function debugProfilePage(rollNumber, password, college) {
+  var output=ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+  try {
+    if(!rollNumber||!password){
+      return output.setContent(JSON.stringify({error:'Roll number and password are required'}));
+    }
+
+    var BASE='https://info.aec.edu.in';
+    var PREFIX='/';
+    if(college==='acet'){
+      PREFIX='/acet';
+    } else {
+      PREFIX='/aus';
+    }
+    var cookies={};
+    var encPassword=encryptPassword(password);
+
+    var loginGet=sendRequest({url:BASE+PREFIX+'/default.aspx',cookies:cookies,followRedirects:true});
+    var viewState=extractHiddenInput(loginGet.body,'__VIEWSTATE');
+    var viewStateGenerator=extractHiddenInput(loginGet.body,'__VIEWSTATEGENERATOR');
+    var eventValidation=extractHiddenInput(loginGet.body,'__EVENTVALIDATION');
+
+    var loginBody='__VIEWSTATE='+encodeURIComponent(viewState)
+      +'&__VIEWSTATEGENERATOR='+encodeURIComponent(viewStateGenerator)
+      +'&__EVENTVALIDATION='+encodeURIComponent(eventValidation)
+      +'&userType=rbtStudent'
+      +'&txtUserId='+encodeURIComponent(rollNumber.trim())
+      +'&txtPassword='+encodeURIComponent(encPassword)
+      +'&hdnpwd='+encodeURIComponent(encPassword)
+      +'&btnLogin=LOGIN';
+
+    var loginPost=sendRequest({url:BASE+PREFIX+'/default.aspx',method:'POST',cookies:cookies,body:loginBody,contentType:'application/x-www-form-urlencoded',followRedirects:false,extraHeaders:{'Origin':BASE,'Referer':BASE+PREFIX+'/default.aspx'}});
+
+    var location=loginPost.location||'';
+    var redirectedToSM=(loginPost.statusCode>=300&&loginPost.statusCode<400)&&location.toLowerCase().indexOf('studentmaster.aspx')>=0;
+    if(!redirectedToSM||!cookies['ASP.NET_SessionId']||!cookies['frmAuth']) throw new Error('Invalid credentials');
+
+    var smResponse=sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/default.aspx'}});
+    Logger.log('debugProfilePage: cookies after StudentMaster.aspx: ' + JSON.stringify(Object.keys(cookies)));
+
+    if(!cookies['AuthToken']){
+      Logger.log('debugProfilePage: AuthToken missing, retrying StudentMaster.aspx');
+      var smRetry=sendRequest({url:BASE+PREFIX+'/StudentMaster.aspx',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/default.aspx'}});
+      Logger.log('debugProfilePage: cookies after retry: ' + JSON.stringify(Object.keys(cookies)));
+    }
+
+    var profileResponse=sendRequest({url:BASE+PREFIX+'/Academics/StudentProfile.aspx?scrid=17',cookies:cookies,followRedirects:true,extraHeaders:{'Referer':BASE+PREFIX+'/StudentMaster.aspx'}});
+
+    return output.setContent(JSON.stringify({
+      debug:true,
+      college:college,
+      login_status:'success',
+      cookies_after_sm:Object.keys(cookies),
+      profile_status:profileResponse.statusCode,
+      html_length:profileResponse.body.length,
+      html_preview:profileResponse.body.substring(0,5000)
+    }));
+  } catch(err) {
+    return output.setContent(JSON.stringify({error:err.message}));
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({status:'UTOPIA Attendance Proxy is running'})).setMimeType(ContentService.MimeType.JSON);
+}

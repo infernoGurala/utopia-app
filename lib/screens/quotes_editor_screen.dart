@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../main.dart';
 import '../services/writer_github_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
@@ -62,40 +64,40 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF313244),
-          title: const Text(
+          backgroundColor: U.surface,
+          title: Text(
             'Add Quote',
-            style: TextStyle(color: Color(0xFFCDD6F4)),
+            style: GoogleFonts.outfit(color: U.text),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
             maxLines: 3,
-            style: const TextStyle(color: Color(0xFFCDD6F4)),
+            style: GoogleFonts.outfit(color: U.text),
             decoration: InputDecoration(
               hintText: 'Type a new quote',
-              hintStyle: const TextStyle(color: Color(0xFF6C7086)),
+              hintStyle: GoogleFonts.outfit(color: U.dim),
               filled: true,
-              fillColor: const Color(0xFF1E1E2E),
+              fillColor: U.bg,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFF45475A)),
+                borderSide: BorderSide(color: U.border),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFCBA6F7)),
+                borderSide: BorderSide(color: U.primary),
               ),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              child: Text(
                 'Cancel',
-                style: TextStyle(color: Color(0xFFA6ADC8)),
+                style: GoogleFonts.outfit(color: U.sub),
               ),
             ),
             FilledButton(
@@ -109,8 +111,8 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
                 Navigator.pop(context);
               },
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFCBA6F7),
-                foregroundColor: const Color(0xFF11111B),
+                backgroundColor: U.primary,
+                foregroundColor: U.bg,
               ),
               child: const Text('Add'),
             ),
@@ -163,21 +165,19 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2E),
+      backgroundColor: U.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF181825),
-        foregroundColor: const Color(0xFFCDD6F4),
+        backgroundColor: U.bg,
+        foregroundColor: U.text,
         title: const Text('Quotes Pool'),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFCBA6F7)),
-            )
+          ? Center(child: CircularProgressIndicator(color: U.primary))
           : _quotes.isEmpty
-          ? const Center(
+          ? Center(
               child: Text(
                 'No quotes yet.',
-                style: TextStyle(color: Color(0xFFA6ADC8)),
+                style: GoogleFonts.outfit(color: U.sub),
               ),
             )
           : ListView.separated(
@@ -186,7 +186,7 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 return Card(
-                  color: const Color(0xFF313244),
+                  color: U.card,
                   margin: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -194,8 +194,8 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
                   child: ListTile(
                     title: Text(
                       _quotes[index],
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFFCDD6F4),
+                      style: GoogleFonts.outfit(
+                        color: U.text,
                         height: 1.5,
                       ),
                     ),
@@ -205,9 +205,9 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
                           _quotes.removeAt(index);
                         });
                       },
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.delete,
-                        color: Color(0xFFF38BA8),
+                        color: U.red,
                       ),
                     ),
                   ),
@@ -216,8 +216,8 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddQuoteDialog,
-        backgroundColor: const Color(0xFFCBA6F7),
-        foregroundColor: const Color(0xFF11111B),
+        backgroundColor: U.primary,
+        foregroundColor: U.bg,
         child: const Icon(Icons.add),
       ),
       bottomNavigationBar: SafeArea(
@@ -228,19 +228,19 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
             child: FilledButton(
               onPressed: _saving ? null : _saveQuotes,
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFCBA6F7),
-                foregroundColor: const Color(0xFF11111B),
+                backgroundColor: U.primary,
+                foregroundColor: U.bg,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.2,
-                        color: Color(0xFF11111B),
+                        color: U.bg,
                       ),
                     )
                   : const Text('Save'),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
@@ -568,7 +569,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     color: U.primary,
                     size: 28,
                   ),
-                ),
+                )
+                    .animate()
+                    .fadeIn(duration: 500.ms)
+                    .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), duration: 500.ms, curve: Curves.easeOutBack),
                 const SizedBox(height: 12),
                 Text(
                   'Connect Attendance',
@@ -577,12 +581,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     fontSize: 22,
                     fontWeight: FontWeight.w700,
                   ),
-                ),
+                )
+                    .animate()
+                    .fadeIn(delay: 100.ms, duration: 500.ms)
+                    .slideY(begin: 0.1, end: 0, delay: 100.ms, duration: 500.ms),
                 const SizedBox(height: 6),
                 Text(
                   'Your data stays on this device only',
                   style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                ),
+                )
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: 500.ms),
               ],
             ),
           ),

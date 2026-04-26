@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../main.dart';
 import '../services/broadcast_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
@@ -105,10 +107,10 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
         : _messageController.text.trim();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1E1E2E),
+      backgroundColor: U.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF181825),
-        foregroundColor: const Color(0xFFCDD6F4),
+        backgroundColor: U.bg,
+        foregroundColor: U.text,
         title: const Text('Broadcast Message'),
       ),
       body: SafeArea(
@@ -119,35 +121,30 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
             children: [
               Text(
                 'Send an urgent message to all students',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFFA6ADC8),
-                ),
+                style: GoogleFonts.outfit(color: U.sub),
               ),
               const SizedBox(height: 24),
               TextField(
                 controller: _titleController,
                 maxLength: 60,
-                style: const TextStyle(color: Color(0xFFCDD6F4)),
+                style: GoogleFonts.outfit(color: U.text),
                 decoration: InputDecoration(
                   labelText: 'Title',
                   hintText: 'e.g. Lab cancelled today',
-                  labelStyle: const TextStyle(color: Color(0xFFCDD6F4)),
-                  hintStyle: const TextStyle(color: Color(0xFF6C7086)),
+                  labelStyle: GoogleFonts.outfit(color: U.text),
+                  hintStyle: GoogleFonts.outfit(color: U.dim),
                   filled: true,
-                  fillColor: const Color(0xFF313244),
+                  fillColor: U.card,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF45475A)),
+                    borderSide: BorderSide(color: U.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFCBA6F7),
-                      width: 1.4,
-                    ),
+                    borderSide: BorderSide(color: U.primary, width: 1.4),
                   ),
                 ),
               ),
@@ -156,34 +153,31 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 controller: _messageController,
                 maxLength: 200,
                 maxLines: 4,
-                style: const TextStyle(color: Color(0xFFCDD6F4)),
+                style: GoogleFonts.outfit(color: U.text),
                 decoration: InputDecoration(
                   labelText: 'Message',
                   hintText:
                       'e.g. BEEE lab is cancelled. Report to classroom.',
-                  labelStyle: const TextStyle(color: Color(0xFFCDD6F4)),
-                  hintStyle: const TextStyle(color: Color(0xFF6C7086)),
+                  labelStyle: GoogleFonts.outfit(color: U.text),
+                  hintStyle: GoogleFonts.outfit(color: U.dim),
                   filled: true,
-                  fillColor: const Color(0xFF313244),
+                  fillColor: U.card,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFF45475A)),
+                    borderSide: BorderSide(color: U.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(
-                      color: Color(0xFFCBA6F7),
-                      width: 1.4,
-                    ),
+                    borderSide: BorderSide(color: U.primary, width: 1.4),
                   ),
                 ),
               ),
               const SizedBox(height: 24),
               Card(
-                color: const Color(0xFF313244),
+                color: U.card,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
@@ -194,24 +188,25 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                     children: [
                       Text(
                         '📢 Preview',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: const Color(0xFFCBA6F7),
+                        style: GoogleFonts.outfit(
+                          color: U.primary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         '📢 $previewTitle',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: const Color(0xFFCDD6F4),
+                        style: GoogleFonts.outfit(
+                          color: U.text,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
                         '$previewMessage\n— $_senderName',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: const Color(0xFFA6ADC8),
+                        style: GoogleFonts.outfit(
+                          color: U.sub,
                           height: 1.5,
                         ),
                       ),
@@ -226,19 +221,19 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 child: FilledButton(
                   onPressed: _canSend ? _sendBroadcast : null,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFCBA6F7),
-                    foregroundColor: const Color(0xFF11111B),
+                    backgroundColor: U.primary,
+                    foregroundColor: U.bg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: _sending
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.2,
-                            color: Color(0xFF11111B),
+                            color: U.bg,
                           ),
                         )
                       : const Text('Send to All Students'),

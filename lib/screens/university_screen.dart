@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import 'friends_screen.dart';
@@ -32,7 +33,10 @@ class _UniversityScreenState extends State<UniversityScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.hourglass_empty, color: U.dim, size: 64),
+          Icon(Icons.hourglass_empty, color: U.dim, size: 64)
+              .animate()
+              .fadeIn(duration: 500.ms)
+              .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), duration: 500.ms, curve: Curves.easeOutBack),
           const SizedBox(height: 16),
           Text(
             'Coming Soon',
@@ -41,12 +45,17 @@ class _UniversityScreenState extends State<UniversityScreen>
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
-          ),
+          )
+              .animate()
+              .fadeIn(delay: 150.ms, duration: 500.ms)
+              .slideY(begin: 0.1, end: 0, delay: 150.ms, duration: 500.ms),
           const SizedBox(height: 8),
           Text(
             'This feature is under development',
             style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
-          ),
+          )
+              .animate()
+              .fadeIn(delay: 300.ms, duration: 500.ms),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -735,14 +736,14 @@ class UtopiaApp extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: U.primary,
-                foregroundColor: U.bg,
+                foregroundColor: isDark ? U.bg : Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 textStyle: GoogleFonts.outfit(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: -0.3,
                 ),
                 minimumSize: const Size(double.infinity, 54),
               ),
@@ -750,22 +751,15 @@ class UtopiaApp extends StatelessWidget {
             outlinedButtonTheme: OutlinedButtonThemeData(
               style: OutlinedButton.styleFrom(
                 elevation: 0,
-                foregroundColor: U.text,
-                backgroundColor: isDark
-                    ? Colors.white.withValues(alpha: 0.04)
-                    : Colors.black.withValues(alpha: 0.02),
-                side: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.06),
-                ),
+                foregroundColor: U.primary,
+                side: BorderSide(color: U.primary.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 textStyle: GoogleFonts.outfit(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: -0.3,
                 ),
                 minimumSize: const Size(double.infinity, 54),
               ),
@@ -775,29 +769,23 @@ class UtopiaApp extends StatelessWidget {
               fillColor: isDark
                   ? Colors.white.withValues(alpha: 0.04)
                   : Colors.black.withValues(alpha: 0.02),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.06),
-                ),
+                borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.06),
+                  color: U.primary.withValues(alpha: 0.15),
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: U.primary.withValues(alpha: 0.5)),
+                borderSide: BorderSide(color: U.primary, width: 1.5),
               ),
               hintStyle: GoogleFonts.outfit(
-                color: U.sub.withValues(alpha: 0.6),
+                color: U.sub.withValues(alpha: 0.5),
                 fontSize: 14,
               ),
             ),
@@ -823,8 +811,15 @@ class UtopiaApp extends StatelessWidget {
               color: isDark
                   ? Colors.white.withValues(alpha: 0.08)
                   : Colors.black.withValues(alpha: 0.06),
-              thickness: 1,
-              space: 1,
+              thickness: 0.5,
+              space: 0.5,
+            ),
+            iconTheme: IconThemeData(color: U.sub),
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+              backgroundColor: Colors.transparent,
+              selectedItemColor: U.primary,
+              unselectedItemColor: U.sub.withValues(alpha: 0.4),
+              elevation: 0,
             ),
             navigationBarTheme: NavigationBarThemeData(
               backgroundColor: U.surface,
@@ -853,7 +848,7 @@ class UtopiaApp extends StatelessWidget {
               height: 64,
             ),
             appBarTheme: AppBarTheme(
-              backgroundColor: U.bg,
+              backgroundColor: Colors.transparent,
               elevation: 0,
               scrolledUnderElevation: 0,
               systemOverlayStyle: SystemUiOverlayStyle(
@@ -865,10 +860,10 @@ class UtopiaApp extends StatelessWidget {
               ),
               titleTextStyle: GoogleFonts.outfit(
                 color: U.text,
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
-              iconTheme: IconThemeData(color: U.sub),
+              iconTheme: IconThemeData(color: U.text),
             ),
             dividerColor: U.border,
           ),
@@ -1104,75 +1099,108 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: U.bg,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedBuilder(
-              animation: _ac,
-              builder: (context, _) => Opacity(
-                opacity: _fade.value,
-                child: Transform.translate(
-                  offset: Offset(0, _slide.value),
-                  child: Text(
-                    SplashScreen.greetings[_idx],
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 42,
-                      fontWeight: FontWeight.w700,
-                      fontStyle: FontStyle.italic,
-                      color: U.primary,
-                      shadows: [
-                        Shadow(
-                          color: U.primary.withValues(alpha: 0.3),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
+      body: Stack(
+        children: [
+          // ── Glowing Aura (Interceptor-style) ──
+          Positioned.fill(
+            child: Center(
+              child: AnimatedBuilder(
+                animation: _ac,
+                builder: (context, _) {
+                  final scale = 0.8 + (0.4 * _fade.value);
+                  return Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      width: 250,
+                      height: 250,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            U.primary.withValues(alpha: 0.15),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.2, 1.0],
                         ),
-                      ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          // ── Content ──
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: _ac,
+                  builder: (context, _) => Opacity(
+                    opacity: _fade.value,
+                    child: Transform.translate(
+                      offset: Offset(0, _slide.value),
+                      child: Text(
+                        SplashScreen.greetings[_idx],
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 42,
+                          fontWeight: FontWeight.w700,
+                          fontStyle: FontStyle.italic,
+                          color: U.primary,
+                          shadows: [
+                            Shadow(
+                              color: U.primary.withValues(alpha: 0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'UTOPIA',
-              style: GoogleFonts.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: U.sub,
-                letterSpacing: 4,
-                shadows: [
-                  Shadow(
-                    color: U.sub.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 48),
-            AnimatedBuilder(
-              animation: _ac,
-              builder: (context, _) {
-                return Container(
-                  width: 4 + (20 * _fade.value),
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
-                    borderRadius: BorderRadius.circular(2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: U.primary.withValues(alpha: 0.3 * _fade.value),
+                const SizedBox(height: 8),
+                Text(
+                  'UTOPIA',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: U.sub,
+                    letterSpacing: 8,
+                    shadows: [
+                      Shadow(
+                        color: U.sub.withValues(alpha: 0.2),
                         blurRadius: 8,
-                        spreadRadius: 2,
+                        offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+                const SizedBox(height: 48),
+                AnimatedBuilder(
+                  animation: _ac,
+                  builder: (context, _) {
+                    return Container(
+                      width: 4 + (20 * _fade.value),
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
+                        borderRadius: BorderRadius.circular(2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: U.primary.withValues(alpha: 0.3 * _fade.value),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1184,34 +1212,9 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _error;
-  late AnimationController _ac;
-  late Animation<double> _fade;
-  late Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ac = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
-    _ac.forward();
-  }
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
 
   Future<void> _signIn() async {
     if (!PlatformSupport.supportsGoogleSignIn) {
@@ -1257,125 +1260,130 @@ class _LoginScreenState extends State<LoginScreen>
     return Scaffold(
       backgroundColor: U.bg,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fade,
-          child: SlideTransition(
-            position: _slide,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 36),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Spacer(flex: 4),
-                  Text(
-                    'UTOPIA',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 52,
-                      fontWeight: FontWeight.w700,
-                      color: U.primary,
-                      fontStyle: FontStyle.italic,
-                      height: 1,
-                      letterSpacing: -1,
-                      shadows: [
-                        Shadow(
-                          color: U.primary.withValues(alpha: 0.2),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Spacer(flex: 4),
+              Text(
+                'UTOPIA',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w700,
+                  color: U.primary,
+                  fontStyle: FontStyle.italic,
+                  height: 1,
+                  letterSpacing: -1,
+                  shadows: [
+                    Shadow(
+                      color: U.primary.withValues(alpha: 0.2),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'The Productivity Platform',
-                    style: GoogleFonts.outfit(
-                      fontSize: 15,
-                      color: U.sub,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const Spacer(flex: 3),
-                  if (_error != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: U.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: U.red.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: GoogleFonts.outfit(
-                          color: U.red,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                   ],
-                  // Animated container for the button state
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOutCubic,
-                    width: double.infinity,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: U.primary.withValues(alpha: 0.2),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: 600.ms, curve: Curves.easeOut)
+                  .slideY(begin: 0.15, end: 0, duration: 600.ms, curve: Curves.easeOut),
+              const SizedBox(height: 10),
+              Text(
+                'The Productivity Platform',
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  color: U.sub,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0.2,
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 200.ms, duration: 600.ms, curve: Curves.easeOut)
+                  .slideY(begin: 0.15, end: 0, delay: 200.ms, duration: 600.ms, curve: Curves.easeOut),
+              const Spacer(flex: 3),
+              if (_error != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: U.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: U.red.withValues(alpha: 0.3),
+                      width: 1,
                     ),
-                    child: ElevatedButton(
-                      onPressed: _loading || !PlatformSupport.supportsGoogleSignIn
-                          ? null
-                          : _signIn,
-                      child: _loading
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: U.bg,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const _GoogleIcon(),
-                                const SizedBox(width: 12),
-                                Text(
-                                  PlatformSupport.supportsGoogleSignIn
-                                      ? 'Continue with Google'
-                                      : 'Google sign-in unavailable',
-                                ),
-                              ],
+                  ),
+                  child: Text(
+                    _error!,
+                    style: GoogleFonts.outfit(
+                      color: U.red,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              // Animated container for the button state
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                width: double.infinity,
+                height: 54,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: U.primary.withValues(alpha: 0.2),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton(
+                  onPressed: _loading || !PlatformSupport.supportsGoogleSignIn
+                      ? null
+                      : _signIn,
+                  child: _loading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: U.bg,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const _GoogleIcon(),
+                            const SizedBox(width: 12),
+                            Text(
+                              PlatformSupport.supportsGoogleSignIn
+                                  ? 'Continue with Google'
+                                  : 'Google sign-in unavailable',
                             ),
-                    ),
+                          ],
+                        ),
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 600.ms, curve: Curves.easeOut)
+                  .slideY(begin: 0.15, end: 0, delay: 400.ms, duration: 600.ms, curve: Curves.easeOut),
+              const SizedBox(height: 24),
+              Center(
+                child: Text(
+                  'UTOPIA · designed by Inferno',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11,
+                    color: U.dim,
+                    letterSpacing: 0.5,
                   ),
-                  const SizedBox(height: 24),
-                  Center(
-                    child: Text(
-                      'UTOPIA · designed by Inferno',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        color: U.dim,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const Spacer(flex: 1),
-                ],
-              ),
-            ),
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 600.ms, duration: 600.ms),
+              const Spacer(flex: 1),
+            ],
           ),
         ),
       ),

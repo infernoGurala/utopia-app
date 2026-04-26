@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
@@ -178,19 +179,16 @@ class _TimetableScreenState extends State<TimetableScreen>
     required List<_ClassEntry> entries,
     required String emptyText,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF211F31), Color(0xFF1B1B29)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDark ? U.card : U.surface,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: U.border.withValues(alpha: 0.9)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
@@ -277,19 +275,16 @@ class _TimetableScreenState extends State<TimetableScreen>
   }
 
   Widget _buildCarrySection(List<String> items) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1B2637), Color(0xFF17202E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: isDark ? U.card : U.surface,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0xFF2E405C)),
+        border: Border.all(color: U.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 22,
             offset: const Offset(0, 12),
           ),
@@ -346,6 +341,7 @@ class _TimetableScreenState extends State<TimetableScreen>
     final dayLabel = _dayLabels[_dayKeys.indexOf(dayKey)];
     final isToday = _dayKeys[_initialDayIndex()] == dayKey;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
       children: [
@@ -355,8 +351,8 @@ class _TimetableScreenState extends State<TimetableScreen>
             gradient: LinearGradient(
               colors: [
                 U.primary.withValues(alpha: 0.22),
-                const Color(0xFF1B2232),
-                const Color(0xFF171923),
+                isDark ? U.card : U.surface,
+                U.bg,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -365,7 +361,7 @@ class _TimetableScreenState extends State<TimetableScreen>
             border: Border.all(color: U.border.withValues(alpha: 0.95)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
+                color: Colors.black.withValues(alpha: 0.10),
                 blurRadius: 26,
                 offset: const Offset(0, 14),
               ),
@@ -411,23 +407,35 @@ class _TimetableScreenState extends State<TimetableScreen>
               ),
             ],
           ),
-        ),
+        )
+            .animate()
+            .fadeIn(duration: 500.ms)
+            .slideY(begin: 0.05, end: 0, duration: 500.ms, curve: Curves.easeOut),
         const SizedBox(height: 16),
         _buildClassSection(
           title: 'Morning',
           icon: Icons.wb_sunny_outlined,
           entries: schedule.morning,
           emptyText: 'No morning classes listed.',
-        ),
+        )
+        .animate()
+        .fadeIn(delay: 100.ms, duration: 500.ms)
+        .slideY(begin: 0.05, end: 0, delay: 100.ms, duration: 500.ms, curve: Curves.easeOut),
         const SizedBox(height: 16),
         _buildClassSection(
           title: 'Afternoon',
           icon: Icons.wb_twilight_outlined,
           entries: schedule.afternoon,
           emptyText: 'No afternoon classes listed.',
-        ),
+        )
+        .animate()
+        .fadeIn(delay: 200.ms, duration: 500.ms)
+        .slideY(begin: 0.05, end: 0, delay: 200.ms, duration: 500.ms, curve: Curves.easeOut),
         const SizedBox(height: 16),
-        _buildCarrySection(schedule.mustCarry),
+        _buildCarrySection(schedule.mustCarry)
+        .animate()
+        .fadeIn(delay: 300.ms, duration: 500.ms)
+        .slideY(begin: 0.05, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
       ],
     );
   }

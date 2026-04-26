@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -41,7 +42,10 @@ class AboutUtopiaScreen extends StatelessWidget {
                 ),
               );
             },
-          ),
+          )
+              .animate()
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: -0.05, end: 0, duration: 500.ms, curve: Curves.easeOut),
           const SizedBox(height: 12),
           _buildActionTile(
             context,
@@ -55,7 +59,10 @@ class AboutUtopiaScreen extends StatelessWidget {
                 ),
               );
             },
-          ),
+          )
+              .animate()
+              .fadeIn(delay: 100.ms, duration: 500.ms)
+              .slideX(begin: -0.05, end: 0, delay: 100.ms, duration: 500.ms, curve: Curves.easeOut),
         ],
       ),
     );

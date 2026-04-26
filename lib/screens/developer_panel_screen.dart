@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -123,28 +124,28 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF313244),
-            title: const Text(
+            backgroundColor: U.surface,
+            title: Text(
               'Send now?',
-              style: TextStyle(color: Color(0xFFCDD6F4)),
+              style: GoogleFonts.outfit(color: U.text),
             ),
-            content: const Text(
+            content: Text(
               'This will send today\'s morning notification to all students immediately.',
-              style: TextStyle(color: Color(0xFFA6ADC8)),
+              style: GoogleFonts.outfit(color: U.sub),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text(
+                child: Text(
                   'Cancel',
-                  style: TextStyle(color: Color(0xFFA6ADC8)),
+                  style: GoogleFonts.outfit(color: U.sub),
                 ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFCBA6F7),
-                  foregroundColor: const Color(0xFF11111B),
+                  backgroundColor: U.primary,
+                  foregroundColor: U.bg,
                 ),
                 child: const Text('Send'),
               ),
@@ -219,10 +220,10 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF313244),
-            title: const Text(
+            backgroundColor: U.surface,
+            title: Text(
               'Send Personal Test',
-              style: TextStyle(color: Color(0xFFCDD6F4)),
+              style: GoogleFonts.outfit(color: U.text),
             ),
             content: TextField(
               controller: controller,
@@ -230,25 +231,25 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
               maxLength: 200,
               maxLines: 4,
               minLines: 3,
-              style: const TextStyle(color: Color(0xFFCDD6F4)),
-              decoration: const InputDecoration(
+              style: GoogleFonts.outfit(color: U.text),
+              decoration: InputDecoration(
                 hintText: 'Message to send only to your device',
-                hintStyle: TextStyle(color: Color(0xFF6C7086)),
+                hintStyle: GoogleFonts.outfit(color: U.dim),
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
+                child: Text(
                   'Cancel',
-                  style: TextStyle(color: Color(0xFFA6ADC8)),
+                  style: GoogleFonts.outfit(color: U.sub),
                 ),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, controller.text.trim()),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFCBA6F7),
-                  foregroundColor: const Color(0xFF11111B),
+                  backgroundColor: U.primary,
+                  foregroundColor: U.bg,
                 ),
                 child: const Text('Send'),
               ),

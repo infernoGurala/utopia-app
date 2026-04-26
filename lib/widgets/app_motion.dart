@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 
 Route<T> buildForwardRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
@@ -98,6 +99,8 @@ class _SkeletonBoxState extends State<SkeletonBox>
 
   @override
   Widget build(BuildContext context) {
+    final base = U.surface;
+    final highlight = U.border;
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -110,9 +113,9 @@ class _SkeletonBoxState extends State<SkeletonBox>
             borderRadius: BorderRadius.circular(widget.radius),
             gradient: LinearGradient(
               colors: [
-                Color.lerp(const Color(0xFF252738), const Color(0xFF34364A), t)!,
-                Color.lerp(const Color(0xFF313244), const Color(0xFF40435A), t)!,
-                Color.lerp(const Color(0xFF252738), const Color(0xFF34364A), t)!,
+                Color.lerp(base, highlight, t * 0.5)!,
+                Color.lerp(highlight, base, t * 0.5)!,
+                Color.lerp(base, highlight, t * 0.5)!,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -123,3 +126,4 @@ class _SkeletonBoxState extends State<SkeletonBox>
     );
   }
 }
+

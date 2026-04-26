@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -220,7 +221,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ],
-                ),
+                )
+                    .animate()
+                    .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+                    .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                 const SizedBox(height: 32),
                 StreamBuilder<Map<String, int>>(
                   stream: GameChampionService.topScoreRanksStream(),
