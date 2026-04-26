@@ -1112,9 +1112,12 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                           )
                         : FilledButton(
                             onPressed: () async {
-                              final code = codeController.text
-                                  .trim()
-                                  .toUpperCase();
+                              String rawCode = codeController.text.trim();
+                              if (rawCode.contains('/join/')) {
+                                rawCode = rawCode.split('/join/').last;
+                              }
+                              
+                              final code = rawCode.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
                               if (code.length != 6) return;
 
                               final user = FirebaseAuth.instance.currentUser;
@@ -1145,7 +1148,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Class not found. Check the code.',
+                                        e.toString().replaceAll('Exception: ', ''),
                                       ),
                                       backgroundColor: U.red,
                                     ),

@@ -288,29 +288,81 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
                       final isSelf = FirebaseAuth.instance.currentUser?.uid == w['uid'];
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: isWriter ? U.primary.withValues(alpha: 0.1) : U.dim.withValues(alpha: 0.1),
-                          child: Text(w['displayName'][0].toUpperCase(), style: GoogleFonts.outfit(color: isWriter ? U.primary : U.text, fontWeight: FontWeight.bold)),
+                          backgroundColor: isWriter
+                              ? U.primary.withValues(alpha: 0.12)
+                              : U.dim.withValues(alpha: 0.1),
+                          child: Text(
+                            (w['displayName'] as String).isNotEmpty
+                                ? w['displayName'][0].toUpperCase()
+                                : '?',
+                            style: GoogleFonts.outfit(
+                              color: isWriter ? U.primary : U.text,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                        title: Text(w['displayName'] + (isSelf ? ' (You)' : ''), style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600, fontSize: 15)),
-                        subtitle: Text(w['email'], style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
-                        trailing: isCreator
-                            ? Container(
+                        title: Text(
+                          w['displayName'] + (isSelf ? ' (You)' : ''),
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          w['email'],
+                          style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Writer badge (always show if writer, regardless of owner)
+                            if (isWriter)
+                              Container(
+                                margin: const EdgeInsets.only(right: 6),
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: U.dim.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                                child: Text('Owner', style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w600)),
-                              )
-                            : isWriter
-                              ? canEdit
-                                  ? IconButton(
-                                      icon: Icon(Icons.remove_circle_outline, color: U.red.withValues(alpha: 0.7), size: 20),
-                                      onPressed: () => _removeWriter(w['uid'], w['displayName']),
-                                    )
-                                  : Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: U.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                                      child: Text('Writer', style: GoogleFonts.outfit(color: U.primary, fontSize: 11, fontWeight: FontWeight.w600)),
-                                    )
-                              : null,
+                                decoration: BoxDecoration(
+                                  color: U.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Writer',
+                                  style: GoogleFonts.outfit(
+                                    color: U.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            // Owner badge
+                            if (isCreator)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: U.teal.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Owner',
+                                  style: GoogleFonts.outfit(
+                                    color: U.teal,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            // Remove writer button — only for non-owner writers when canEdit
+                            if (!isCreator && isWriter && canEdit)
+                              IconButton(
+                                icon: Icon(
+                                  Icons.remove_circle_outline,
+                                  color: U.red.withValues(alpha: 0.7),
+                                  size: 20,
+                                ),
+                                onPressed: () => _removeWriter(w['uid'], w['displayName']),
+                              ),
+                          ],
+                        ),
                       );
                     }),
                     if (canEdit && widget.classModel.writerUids.length < 6)

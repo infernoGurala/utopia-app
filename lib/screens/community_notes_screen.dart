@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'note_viewer_screen.dart';
+import '../widgets/genz_loading_overlay.dart';
 
 /// Dynamic approvals: Root items need 10, sub items need 3.
 int _getRequiredApprovals(String path) {
@@ -211,6 +212,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   bool _syncing = false;
+  bool _isPushing = false;
   String _currentPath = '';
   List<String> _pathHistory = [''];
   bool _warningShown = false;
@@ -434,14 +436,20 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   /// Persist icon choice for a folder to GitHub .icons.json (shared for all users).
   Future<void> _setFolderIcon(String folderPath, String iconKey) async {
-    setState(() => _folderIcons[folderPath] = iconKey);
+    setState(() => _isPushing = true);
+    _folderIcons[folderPath] = iconKey;
     await _saveIconsToGitHub();
+    await _load(forceRefresh: true);
+    if (mounted) setState(() => _isPushing = false);
   }
 
   /// Remove icon override and persist to GitHub.
   Future<void> _removeFolderIcon(String folderPath) async {
-    setState(() => _folderIcons.remove(folderPath));
+    setState(() => _isPushing = true);
+    _folderIcons.remove(folderPath);
     await _saveIconsToGitHub();
+    await _load(forceRefresh: true);
+    if (mounted) setState(() => _isPushing = false);
   }
 
   /// Write the current _folderIcons map to GitHub as .icons.json.
@@ -879,24 +887,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
                       Navigator.pop(ctx);
 
-                      // Optimistic Update
-                      final originalItems = List<Map<String, dynamic>>.from(
-                        _items,
-                      );
-                      setState(() {
-                        _items.insert(0, {
-                          'name': ghName,
-                          'type': 'dir',
-                          'path':
-                              '${widget.universityFolderName}/Community/$ghName',
-                        });
-                        _sortItems();
-                      });
-
+                      setState(() => _isPushing = true);
                       final success = await _github.createBranchStructure(
                         widget.universityFolderName,
                         ghName,
                       );
+                      if (success && mounted) {
+                        await _load(forceRefresh: true);
+                      }
+                      if (mounted) setState(() => _isPushing = false);
 
                       if (!mounted) return;
 
@@ -1026,34 +1025,19 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           ? '$_fullPath$ghName'
                           : '$_fullPath$ghName/.keep';
 
-                      // Optimistic Update
-                      final originalItems = List<Map<String, dynamic>>.from(
-                        _items,
-                      );
-                      setState(() {
-                        _items.insert(0, {
-                          'name': ghName,
-                          'type': isFile ? 'file' : 'dir',
-                          'path': targetPath,
-                          'size': isFile ? 0 : null,
-                        });
-                        _sortItems();
-                      });
-
+                      setState(() => _isPushing = true);
                       final success = await _github.createFolder(
                         targetPath,
                         content: isFile
                             ? '# ${name.replaceAll('.md', '')}\n\n'
                             : '# init\n',
                       );
+                      if (success && mounted) {
+                        await _load(forceRefresh: true);
+                      }
+                      if (mounted) setState(() => _isPushing = false);
 
                       if (mounted) {
-                        if (!success) {
-                          // Revert on failure
-                          setState(() {
-                            _items = originalItems;
-                          });
-                        }
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -1324,11 +1308,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             ),
           ],
         ),
-        body: Column(
+        body: Stack(
           children: [
-            // ── Breadcrumb bar (visible from semester level onwards) ──
-            if (showBreadcrumbs) _buildBreadcrumbBar(),
-            // ── Main content ──
+            Column(
+              children: [
+                // ── Breadcrumb bar (visible from semester level onwards) ──
+                if (showBreadcrumbs) _buildBreadcrumbBar(),
+                // ── Main content ──
             Expanded(
               child: _loading
             ? Center(
@@ -1612,7 +1598,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                         splashRadius: 18,
                                         onSelected: (value) {
                                           if (value == 'edit') _showEditOptions(item, isFolder);
-                                          if (value == 'icon' && isFolder) _showIconPicker(path);
+                                          if (value == 'icon') _showIconPicker(path);
                                         },
                                         itemBuilder: (ctx) => [
                                           PopupMenuItem(
@@ -1627,8 +1613,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                               ],
                                             ),
                                           ),
-                                          if (isFolder)
-                                            PopupMenuItem(
+                                          PopupMenuItem(
                                               value: 'icon',
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               child: Row(
@@ -1657,6 +1642,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       ),
               ),
             ),
+              ],
+            ),
+            if (_isPushing) const GenZLoadingOverlay(),
           ],
         ),
       ),
@@ -1716,11 +1704,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         setDialogState(() => isDeleting = true);
                         Navigator.pop(ctx);
                         
-                        setState(() {
-                          _items.removeWhere((i) => i['path'] == path);
-                        });
+                        setState(() => _isPushing = true);
 
                         final success = await _github.deleteItem(path);
+                        if (success && mounted) {
+                          await _load(forceRefresh: true);
+                        }
+                        if (mounted) setState(() => _isPushing = false);
 
                         if (mounted) {
                           if (success) {
@@ -1728,7 +1718,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               SnackBar(content: Text('Deleted "$displayName"'), backgroundColor: U.green),
                             );
                           } else {
-                            _load(forceRefresh: true);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Failed to delete "$displayName"'), backgroundColor: U.red),
                             );
@@ -1838,28 +1827,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       final originalItems = List<Map<String, dynamic>>.from(
                         _items,
                       );
-                      setState(() {
-                        final index = _items.indexWhere(
-                          (i) => i['path'] == path,
-                        );
-                        if (index != -1) {
-                          _items[index] = {
-                            ..._items[index],
-                            'name': ghNewName,
-                            'path': newPath,
-                          };
-                        }
-                      });
-
+                      setState(() => _isPushing = true);
                       final success = await _github.renameItem(path, newPath);
+                      if (success && mounted) {
+                        await _load(forceRefresh: true);
+                      }
+                      if (mounted) setState(() => _isPushing = false);
 
                       if (mounted) {
-                        if (!success) {
-                          // Revert on failure
-                          setState(() {
-                            _items = originalItems;
-                          });
-                        }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(

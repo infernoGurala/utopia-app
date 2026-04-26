@@ -397,10 +397,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Color Style
+                      // Switch Theme
                       _groupedTile(
                         icon: Icons.palette_outlined,
-                        label: 'Color Style',
+                        label: 'Switch Theme',
                         sub: _updatingTheme ? 'Updating theme...' : '${U.themeForKey(U.currentThemeKey).label} theme',
                         color: U.primary,
                         onTap: _selectThemeStyle,

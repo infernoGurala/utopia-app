@@ -9,6 +9,7 @@ import '../services/attendance_cache_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
+import '../services/attendance_server_preference.dart';
 import 'total_attendance_screen.dart';
 
 enum _AttendanceViewState { initial, loading, loaded, error }
@@ -27,6 +28,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   final TextEditingController _rollController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String _selectedCollege = 'aus';
+  String _selectedServer = AttendanceServerPreference.kServer1;
 
   late final AnimationController _glowController;
   _AttendanceViewState _state = _AttendanceViewState.loading;
@@ -45,6 +47,16 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
     unawaited(_loadSavedCredentials());
+    unawaited(_loadServerPreference());
+  }
+
+  Future<void> _loadServerPreference() async {
+    final server = await AttendanceServerPreference.getServer();
+    if (mounted) {
+      setState(() {
+        _selectedServer = server;
+      });
+    }
   }
 
   @override
@@ -670,6 +682,101 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text(
+                        'Server',
+                        style: GoogleFonts.outfit(
+                          color: U.sub,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    await AttendanceServerPreference.setServer(
+                                      AttendanceServerPreference.kServer1,
+                                    );
+                                    setState(() => _selectedServer =
+                                        AttendanceServerPreference.kServer1);
+                                  },
+                                  child: Container(
+                                    height: 32,
+                                    color: _selectedServer ==
+                                            AttendanceServerPreference.kServer1
+                                        ? U.primary
+                                        : U.surface,
+                                    child: Center(
+                                      child: Text(
+                                        'In-App',
+                                        style: GoogleFonts.outfit(
+                                          color: _selectedServer ==
+                                                  AttendanceServerPreference
+                                                      .kServer1
+                                              ? U.bg
+                                              : U.sub,
+                                          fontSize: 12,
+                                          fontWeight: _selectedServer ==
+                                                  AttendanceServerPreference
+                                                      .kServer1
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () async {
+                                    await AttendanceServerPreference.setServer(
+                                      AttendanceServerPreference.kServer2,
+                                    );
+                                    setState(() => _selectedServer =
+                                        AttendanceServerPreference.kServer2);
+                                  },
+                                  child: Container(
+                                    height: 32,
+                                    color: _selectedServer ==
+                                            AttendanceServerPreference.kServer2
+                                        ? U.primary
+                                        : U.surface,
+                                    child: Center(
+                                      child: Text(
+                                        'Cloud',
+                                        style: GoogleFonts.outfit(
+                                          color: _selectedServer ==
+                                                  AttendanceServerPreference
+                                                      .kServer2
+                                              ? U.bg
+                                              : U.sub,
+                                          fontSize: 12,
+                                          fontWeight: _selectedServer ==
+                                                  AttendanceServerPreference
+                                                      .kServer2
+                                              ? FontWeight.w700
+                                              : FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   _buildField(
                     controller: _rollController,
                     hintText: _selectedCollege == 'aus'
@@ -863,7 +970,54 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               ),
                             ),
                           ),
-                          // Yesterday & Calendar hidden for now
+                          // Yesterday button
+                          GestureDetector(
+                            onTap: _showYesterdaySheet,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: U.surface,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: U.border, width: 0.5),
+                              ),
+                              child: Text(
+                                'Yesterday',
+                                style: GoogleFonts.outfit(
+                                  color: U.sub,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Calendar date picker
+                          GestureDetector(
+                            onTap: _showDatePickerSheet,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: U.surface,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: U.border, width: 0.5),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.calendar_month_outlined, size: 14, color: U.sub),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Date',
+                                    style: GoogleFonts.outfit(
+                                      color: U.sub,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -892,7 +1046,35 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ],
           ),
         ),
-        // Today button hidden for now
+        // Today floating button
+        Positioned(
+          left: 24,
+          right: 24,
+          bottom: 44,
+          child: _TodayPulseButton(
+            animation: _glowController,
+            onTap: _showTodaySheet,
+          ),
+        ),
+
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 16,
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: U.sub),
+                const SizedBox(width: 6),
+                Text(
+                  'Fetched via ${data['serverUsed'] == 'server2' ? 'Cloud' : data['serverUsed'] == 'server1' ? 'In-App' : 'Cache'}',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

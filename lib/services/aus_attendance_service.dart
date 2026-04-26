@@ -34,14 +34,33 @@ class AusAttendanceService {
     HttpClient client,
     Map<String, String> cookies,
   ) async {
-    final response = await _sendRequest(
+    var response = await _sendRequest(
       client,
       method: 'GET',
       path: _loginPath,
       cookies: cookies,
       followRedirects: true,
     );
-    _debugResponse('GET login page', response.statusCode, response.body);
+    _debugResponse('GET login page (initial)', response.statusCode, response.body);
+
+    if (!response.body.contains('__VIEWSTATE')) {
+      _debugResponse('GET login page', response.statusCode, 'Gate detected, following authcheck');
+      await _sendRequest(
+        client,
+        method: 'GET',
+        path: '$_prefix/authcheck.aspx',
+        cookies: cookies,
+        followRedirects: true,
+      );
+      response = await _sendRequest(
+        client,
+        method: 'GET',
+        path: _loginPath,
+        cookies: cookies,
+        followRedirects: true,
+      );
+      _debugResponse('GET login page (retry)', response.statusCode, response.body);
+    }
 
     final viewState = _extractHiddenInput(response.body, '__VIEWSTATE');
     final viewStateGenerator = _extractHiddenInput(
@@ -139,79 +158,104 @@ class AusAttendanceService {
         followRedirects: true,
       );
 
-      final attendancePageResponse = await _sendRequest(
+      final profilePath = '$_prefix/Academics/StudentProfile.aspx?scrid=17';
+      final profilePageResponse = await _sendRequest(
         client,
         method: 'GET',
-        path: _attendancePagePath,
+        path: profilePath,
         cookies: cookies,
         followRedirects: true,
       );
 
-      final webMethodToken = _extractWebMethodToken(
-        attendancePageResponse.body,
-      );
+      final rollNoMatch = RegExp(
+              r'id="ctl00_CapPlaceHolder_txtRollNo"[^>]*value="([^"]+)"')
+          .firstMatch(profilePageResponse.body);
+      final rollNo = rollNoMatch?.group(1) ?? '';
 
-      await _sendRequest(
-        client,
-        method: 'GET',
-        path: _ajaxJsPath,
-        cookies: cookies,
-        followRedirects: true,
-      );
+      final authToken = cookies['AuthToken'] ?? cookies['authtoken'] ?? '';
 
-      final attendanceBody = jsonEncode({
-        'fromDate': fromDate,
-        'toDate': toDate,
-        'excludeothersubjects': false,
-      });
-
-      final response = await _sendRequest(
+      final showResp = await _sendRequest(
         client,
         method: 'POST',
-        path: _attendancePath,
+        path: '$_prefix/Academics/studentprofile.aspx/ShowStudentProfileNew',
         cookies: cookies,
         followRedirects: false,
         contentType: 'application/json; charset=UTF-8',
-        body: attendanceBody,
+        body: jsonEncode({'RollNo': rollNo, 'isImageDisplay': false}),
         extraHeaders: {
-          'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
-          'x-requested-with': 'XMLHttpRequest',
-          HttpHeaders.acceptHeader:
-              'application/json, text/javascript, */*; q=0.01',
-          'cache-control': 'no-cache',
-          'pragma': 'no-cache',
-          if (webMethodToken != null) 'x-auth-token': webMethodToken,
+          'Origin': 'https://$_portalHost',
+          HttpHeaders.refererHeader: 'https://$_portalHost$profilePath',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-Auth-Token': authToken,
+          'Accept': 'application/json, text/javascript, */*',
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-origin'
         },
       );
-      _debugResponse('POST attendance', response.statusCode, response.body);
+      _debugResponse('POST ShowStudentProfileNew', showResp.statusCode, showResp.body);
 
-      if (response.statusCode == HttpStatus.unauthorized) {
-        // 401 after a successful login means the attendance module itself
-        // is down server-side (portal is broken, not wrong credentials).
+      if (showResp.statusCode == HttpStatus.unauthorized) {
         throw Exception(
           'The portal attendance server is temporarily unavailable. '
           'Please try again later.',
         );
       }
-      if (response.statusCode != HttpStatus.ok) {
+      if (showResp.statusCode != HttpStatus.ok) {
         throw Exception('Could not fetch attendance right now');
       }
 
-      String attendanceHtml;
+      String profileHtml;
       try {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        attendanceHtml = decoded['d'] as String? ?? '';
+        final decoded = jsonDecode(showResp.body) as Map<String, dynamic>;
+        profileHtml = decoded['d'] as String? ?? '';
       } catch (_) {
-        attendanceHtml = response.body;
+        profileHtml = showResp.body;
       }
 
-      final parsed = _parseAttendanceHtml(attendanceHtml);
-      final hasReport = parsed['hasReport'] as bool? ?? false;
-      if ((parsed['subjects'] as List).isEmpty && !hasReport) {
+      if (profileHtml.isEmpty) {
+        throw Exception('No profile data in response');
+      }
+
+      final profileSectionStart =
+          profileHtml.indexOf("<div id='divProfile_Present'>");
+      if (profileSectionStart == -1) {
+        throw Exception('Profile section not found');
+      }
+      final profileSectionEnd =
+          profileHtml.indexOf("</div>", profileSectionStart);
+      final profileSection =
+          profileHtml.substring(profileSectionStart, profileSectionEnd);
+
+      final tableStart = profileSection.indexOf('<table');
+      if (tableStart == -1) throw Exception('Attendance table not found');
+      final tableEnd = profileSection.indexOf('</table>', tableStart);
+      final tableHtml = profileSection.substring(tableStart, tableEnd + 8);
+
+      final bioDataStart = profileHtml.indexOf('>Name<');
+      String studentNameFromHtml = '';
+      if (bioDataStart != -1) {
+        final afterName = profileHtml.substring(bioDataStart);
+        final nameTdMatch = RegExp(
+          r"<td[^>]*colspan=['" '"' r"]?3['" '"' r"]?[^>]*>([^<]+)</td>",
+          caseSensitive: false,
+        ).firstMatch(afterName);
+        if (nameTdMatch != null) {
+          studentNameFromHtml = _cleanHtmlText(nameTdMatch.group(1) ?? '');
+        }
+      }
+
+      final parsed = _parseAttendanceHtml(tableHtml);
+      final parsedMap = Map<String, dynamic>.from(parsed);
+      if (studentNameFromHtml.isNotEmpty) {
+        parsedMap['studentName'] = studentNameFromHtml;
+      }
+
+      final hasReport = parsedMap['hasReport'] as bool? ?? false;
+      if ((parsedMap['subjects'] as List).isEmpty && !hasReport) {
         throw Exception('Attendance data was not found in the portal response');
       }
-      return parsed;
+      return parsedMap;
     } on FormatException {
       rethrow;
     } catch (e) {

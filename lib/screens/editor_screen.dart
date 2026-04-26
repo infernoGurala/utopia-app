@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../services/file_upload_service.dart';
 import '../services/github_service.dart';
 import '../services/github_global_service.dart';
 import '../services/writer_github_service.dart';
+import '../widgets/genz_loading_overlay.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  Block data model
@@ -84,11 +86,8 @@ class EditorBlock {
         return buf.toString().trimRight();
 
       case BlockType.qa:
-        final buf = StringBuffer();
-        buf.writeln('**Q:** ${question.trim()}');
-        buf.writeln();
-        buf.writeln('**A:** ${answer.trim()}');
-        return buf.toString().trimRight();
+        final encodedAnswer = Uri.encodeComponent(answer.trim());
+        return '${question.trim()} [^Answer^](qa://$encodedAnswer)';
 
       case BlockType.code:
         final lang = codeLanguage.trim();
@@ -170,7 +169,7 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
       inFilesSection = false;
     }
 
-    // ── Q&A block: **Q:** ... **A:** ...
+    // ── Q&A legacy block: **Q:** ... **A:** ...
     if (t.startsWith('**Q:**')) {
       final question = t.replaceFirst('**Q:**', '').trim();
       String answer = '';
@@ -183,6 +182,18 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
       }
       blocks.add(EditorBlock(type: BlockType.qa, question: question, answer: answer));
       continue;
+    }
+
+    // ── Q&A new inline block: Question [^Answer^](qa://encoded_answer)
+    if (t.contains('[^Answer^](qa://')) {
+      final match = RegExp(r'^(.*?)\s*\[\^Answer\^\]\(qa:\/\/(.+?)\)$').firstMatch(t);
+      if (match != null) {
+        final q = match.group(1) ?? '';
+        final a = Uri.decodeComponent(match.group(2) ?? '');
+        blocks.add(EditorBlock(type: BlockType.qa, question: q, answer: a));
+        i++;
+        continue;
+      }
     }
 
     // ── File link: [name](url) inside Files section
@@ -421,6 +432,7 @@ class EditorScreen extends StatefulWidget {
   final String initialContent;
   final String folderPath;
   final List<Map<String, dynamic>> notesInFolder;
+  final bool useGlobalRepo;
 
   const EditorScreen({
     super.key,
@@ -429,6 +441,7 @@ class EditorScreen extends StatefulWidget {
     required this.initialContent,
     this.folderPath = '',
     this.notesInFolder = const [],
+    this.useGlobalRepo = false,
   });
 
   @override
@@ -511,24 +524,36 @@ class _EditorScreenState extends State<EditorScreen> {
 
     final content = serializeBlocksToMarkdown(_blocks);
 
-    // Pop immediately for responsiveness
-    Navigator.pop(context, content);
+    setState(() => _saving = true);
+    final success = await _performBackgroundSave(content, user);
 
-    // Background save
-    _performBackgroundSave(content, user);
+    if (mounted) {
+      if (success) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Saved successfully!'), backgroundColor: U.green),
+        );
+        Navigator.pop(context, content);
+      } else {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Failed to save correctly.'), backgroundColor: U.red),
+        );
+      }
+    }
   }
 
-  Future<void> _performBackgroundSave(String content, User user) async {
+  Future<bool> _performBackgroundSave(String content, User user) async {
     try {
-      final isCommunityNote = widget.filePath.contains('/Community/');
-      if (isCommunityNote) {
+      final useGlobal = widget.useGlobalRepo || widget.filePath.contains('/Community/');
+      if (useGlobal) {
         final success = await GitHubGlobalService().updateFile(
           path: widget.filePath,
           content: content,
           message:
-              'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+              'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA user'} via UTOPIA app',
         );
-        if (!success) throw Exception('Sync failed');
+        if (!success) throw Exception('Global repo sync failed');
       } else {
         await WriterGitHubService.updateTextFile(
           filename: widget.filePath,
@@ -538,8 +563,10 @@ class _EditorScreenState extends State<EditorScreen> {
         );
       }
       await GitHubService.primeFileContentCache(widget.filePath, content);
+      return true;
     } catch (e) {
-      debugPrint('EditorScreen: background save failed: $e');
+      debugPrint('EditorScreen: save failed: $e');
+      return false;
     }
   }
 
@@ -931,18 +958,23 @@ class _EditorScreenState extends State<EditorScreen> {
         ),
         actions: [
           if (_hasChanges)
-            _saving
-                ? Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: U.green)),
-                  )
-                : IconButton(
-                    icon: Icon(Icons.check_rounded, color: U.green),
-                    onPressed: _save,
-                  ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: Text('Save', style: GoogleFonts.outfit()),
+                style: FilledButton.styleFrom(
+                  backgroundColor: U.green,
+                  foregroundColor: U.bg,
+                ),
+              ),
+            ),
         ],
       ),
-      body: GestureDetector(
+      body: Stack(
+        children: [
+          GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
@@ -991,6 +1023,9 @@ class _EditorScreenState extends State<EditorScreen> {
           if (_activeFormatController != null) _buildMarkdownToolbar(),
         ],
       ),
+      ),
+          if (_saving) const GenZLoadingOverlay(),
+        ],
       ),
       floatingActionButton: _activeFormatController != null
           ? null

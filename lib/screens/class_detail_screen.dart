@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +12,7 @@ import '../services/github_global_service.dart';
 import '../services/class_service.dart';
 import 'class_settings_screen.dart';
 import 'note_viewer_screen.dart';
+import '../widgets/genz_loading_overlay.dart';
 
 
 const Map<String, (IconData, String)> kFolderIconCatalogue = {
@@ -179,10 +182,62 @@ class ClassDetailScreen extends StatefulWidget {
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
   final GitHubGlobalService _github = GitHubGlobalService();
   List<Map<String, dynamic>> _items = [];
-  bool _editModeEnabled = false;
+  bool _isEditMode = false;
   bool _warningShown = false;
   Map<String, String> _folderIcons = {};
+  bool _isPushing = false;
   bool _loading = true;
+
+  String get _iconsJsonPath => '${widget.universityFolderName}/${widget.classModel.classId}/Notes/.icons.json';
+
+  Future<void> _loadFolderIcons() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final cachedStr = prefs.getString('cache_$_iconsJsonPath');
+    if (cachedStr != null && cachedStr.isNotEmpty) {
+      try {
+        final Map<String, dynamic> data = jsonDecode(cachedStr);
+        if (mounted) {
+          setState(() {
+            _folderIcons.clear();
+            for (final entry in data.entries) {
+              _folderIcons[entry.key] = entry.value as String;
+            }
+          });
+        }
+      } catch (_) {}
+    }
+
+    _github.getFileContentRaw(_iconsJsonPath).then((content) {
+      if (!mounted || content.isEmpty) return;
+      try {
+        final Map<String, dynamic> data = jsonDecode(content);
+        prefs.setString('cache_$_iconsJsonPath', content);
+        setState(() {
+          _folderIcons.clear();
+          for (final entry in data.entries) {
+            _folderIcons[entry.key] = entry.value as String;
+          }
+        });
+      } catch (_) {}
+    }).catchError((_) {});
+  }
+
+  Future<void> _saveIconsToGitHub() async {
+    try {
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(_folderIcons);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cache_$_iconsJsonPath', jsonStr);
+
+      await _github.updateFile(
+        path: _iconsJsonPath,
+        content: jsonStr,
+        message: 'update folder icons',
+      );
+    } catch (_) {}
+  }
+
+
   String _currentPath = '';
   List<String> _pathHistory = [''];
 
@@ -219,14 +274,15 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
   final ClassService _classService = ClassService();
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     setState(() => _loading = true);
-    final items = await _github.getDirectoryContents(_fullPath);
+    final items = await _github.getDirectoryContents(_fullPath, forceRefresh: forceRefresh);
     if (!mounted) return;
     setState(() {
-      _items = items.where((item) => item['name'] != '.keep').toList();
+      _items = items.where((item) => item['name'] != '.keep' && !item['name'].toString().startsWith('.')).toList();
       _loading = false;
     });
+    _loadFolderIcons();
   }
 
   void _navigateToFolder(String folderName) {
@@ -240,11 +296,19 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
 
   Future<void> _setFolderIcon(String folderPath, String iconKey) async {
-    setState(() => _folderIcons[folderPath] = iconKey);
+    setState(() => _isPushing = true);
+    _folderIcons[folderPath] = iconKey;
+    await _saveIconsToGitHub();
+    await _load(forceRefresh: true);
+    if (mounted) setState(() => _isPushing = false);
   }
 
   Future<void> _removeFolderIcon(String folderPath) async {
-    setState(() => _folderIcons.remove(folderPath));
+    setState(() => _isPushing = true);
+    _folderIcons.remove(folderPath);
+    await _saveIconsToGitHub();
+    await _load(forceRefresh: true);
+    if (mounted) setState(() => _isPushing = false);
   }
 
   static String _displayName(String name) {
@@ -331,20 +395,14 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       final parentPath = path.substring(0, path.lastIndexOf('/'));
                       final newPath = parentPath.isEmpty ? ghNewName : '$parentPath/$ghNewName';
 
-                      final originalItems = List<Map<String, dynamic>>.from(_items);
-                      setState(() {
-                        final index = _items.indexWhere((i) => i['path'] == path);
-                        if (index != -1) {
-                          _items[index] = {..._items[index], 'name': ghNewName, 'path': newPath};
-                        }
-                      });
-
+                      setState(() => _isPushing = true);
                       final success = await _github.renameItem(path, newPath);
+                      if (success && mounted) {
+                        await _load(forceRefresh: true);
+                      }
+                      if (mounted) setState(() => _isPushing = false);
 
                       if (mounted) {
-                        if (!success) {
-                          setState(() => _items = originalItems);
-                        }
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(success ? 'Renamed to $displayOld' : 'Failed to rename'), backgroundColor: success ? U.green : U.red),
                         );
@@ -535,16 +593,17 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                   setDialogState(() => isDeleting = true);
                   Navigator.pop(ctx);
                   
-                  final originalItems = List<Map<String, dynamic>>.from(_items);
-                  setState(() { _items.removeWhere((i) => i['path'] == path); });
-
+                  setState(() => _isPushing = true);
                   final success = await _github.deleteItem(path);
+                  if (success && mounted) {
+                    await _load(forceRefresh: true);
+                  }
+                  if (mounted) setState(() => _isPushing = false);
 
                   if (mounted) {
                     if (success) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deleted "$displayName"'), backgroundColor: U.green));
                     } else {
-                      setState(() => _items = originalItems);
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete "$displayName"'), backgroundColor: U.red));
                     }
                   }
@@ -627,26 +686,18 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
                 final targetPath = isFile ? '$_fullPath$ghName' : '$_fullPath$ghName/.keep';
 
-                final originalItems = List<Map<String, dynamic>>.from(_items);
-                setState(() {
-                  _items.insert(0, {
-                    'name': ghName,
-                    'type': isFile ? 'file' : 'dir',
-                    'path': targetPath,
-                    'size': isFile ? 0 : null,
-                    'download_url': isFile ? 'new' : null,
-                  });
-                });
-
+                setState(() => _isPushing = true);
                 final success = await _github.createFolder(
                   targetPath,
                   content: isFile ? '# ${name.replaceAll('.md', '')}\n\n' : '# init\n',
                 );
 
+                if (success && mounted) {
+                  await _load(forceRefresh: true);
+                }
+                if (mounted) setState(() => _isPushing = false);
+
                 if (mounted) {
-                  if (!success) {
-                    setState(() => _items = originalItems);
-                  }
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(success ? '$name created!' : 'Failed to create $name'), backgroundColor: success ? U.green : U.red),
                   );
@@ -710,7 +761,91 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
           onPressed: _navigateBack,
         ),
         actions: [
-          if (_userRole == 'writer')
+          if (_isEditMode)
+            IconButton(
+              icon: Icon(Icons.add_rounded, color: U.primary, size: 24),
+              onPressed: _showAddItemDialog,
+            ),
+          if (_userRole == 'writer') ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 12.0),
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOutCubic,
+                  decoration: BoxDecoration(
+                    color: _isEditMode ? U.primary : U.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _isEditMode ? U.primary : U.border.withValues(alpha: 0.5),
+                      width: 1,
+                    ),
+                    boxShadow: _isEditMode
+                        ? [
+                            BoxShadow(
+                              color: U.primary.withValues(alpha: 0.25),
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 2),
+                            )
+                          ]
+                        : [],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _isEditMode = !_isEditMode);
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      splashColor: _isEditMode ? U.bg.withValues(alpha: 0.2) : U.primary.withValues(alpha: 0.1),
+                      highlightColor: Colors.transparent,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder: (child, animation) => RotationTransition(
+                                turns: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
+                                child: FadeTransition(opacity: animation, child: child),
+                              ),
+                              child: Icon(
+                                _isEditMode ? Icons.check_circle_rounded : Icons.edit_note_rounded,
+                                key: ValueKey(_isEditMode),
+                                size: 18,
+                                color: _isEditMode ? U.bg : U.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            AnimatedSize(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.fastOutSlowIn,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                                child: Text(
+                                  _isEditMode ? 'Done' : 'Edit Mode',
+                                  key: ValueKey(_isEditMode),
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: _isEditMode ? FontWeight.w700 : FontWeight.w600,
+                                    color: _isEditMode ? U.bg : U.text,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
             IconButton(
               icon: Icon(Icons.settings_outlined, color: U.sub),
               onPressed: () {
@@ -722,71 +857,16 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 );
               },
             ),
+          ],
         ],
       ),
-
-      floatingActionButton: _userRole == 'writer' ? FloatingActionButton(
-        onPressed: () {
-          if (_editModeEnabled) {
-            _showAddItemDialog();
-          } else {
-            setState(() => _editModeEnabled = true);
-          }
-        },
-        backgroundColor: _editModeEnabled ? U.primary : U.surface,
-        child: Icon(_editModeEnabled ? Icons.add : Icons.edit_outlined, color: _editModeEnabled ? U.bg : U.text),
-      ) : null,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Class Code',
-                  style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.classModel.classCode,
-                      style: GoogleFonts.outfit(
-                        color: U.text,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 6,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded),
-                      color: U.sub,
-                      onPressed: () {
-                        Clipboard.setData(
-                          ClipboardData(text: widget.classModel.classCode),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Code copied!')),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'THIS FEATURE IS UNDER DEVELOPMENT.',
-                  style: GoogleFonts.outfit(color: U.red.withValues(alpha: 0.8), fontSize: 9, fontWeight: FontWeight.w600, letterSpacing: 0.5),
-                ),
-              ],
-            ),
-          ),
-          Divider(color: U.border, height: 1),
-          Expanded(
-            child: _loading
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: _loading
                 ? Center(child: CircularProgressIndicator(color: U.primary))
                 : _items.isEmpty
                 ? Center(
@@ -848,7 +928,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                                   builder: (_) => NoteViewerScreen(
                                     title: displayTitle,
                                     filePath: path,
-                                    isEditable: _editModeEnabled && _userRole == 'writer',
+                                    isEditable: _isEditMode && _userRole == 'writer',
                                     useGlobalRepo: true,
                                   ),
                                 ),
@@ -906,7 +986,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                                     ],
                                   ),
                                 ),
-                                if (_editModeEnabled && _userRole == 'writer')
+                                if (_isEditMode && _userRole == 'writer')
                                   PopupMenuButton<String>(
                                     color: U.surface,
                                     padding: EdgeInsets.zero,
@@ -968,9 +1048,12 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       );
                     },
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
+            if (_isPushing) const GenZLoadingOverlay(),
+          ],
+        ),
       ),
     );
   }
