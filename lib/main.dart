@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -605,6 +608,13 @@ Future<void> _loadAppToggleSettings() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize sqflite FFI for desktop platforms
+  if (Platform.isLinux || Platform.isWindows || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   _initialAccentKey = await _loadInitialAccent();
   U.applyTheme(_initialAccentKey);
   await _loadAppToggleSettings();
@@ -942,21 +952,30 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 
   void _handleLink(Uri uri) {
+    String? classCode;
+
+    // https://classes.inferalis.space/join/CODE
     if (uri.path.startsWith('/join/')) {
-      final classCode = uri.pathSegments.last;
-      if (classCode.isEmpty) return;
-      // Wait for navigator to be ready, then push the join screen
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final nav = navigatorKey.currentState;
-        if (nav != null) {
-          nav.push(
-            MaterialPageRoute(
-              builder: (_) => JoinClassScreen(classCode: classCode),
-            ),
-          );
-        }
-      });
+      classCode = uri.pathSegments.last;
     }
+    // utopia://join/CODE
+    else if (uri.scheme == 'utopia' && uri.host == 'join') {
+      classCode = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+    }
+
+    if (classCode == null || classCode.isEmpty) return;
+
+    // Wait for navigator to be ready, then push the join screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final nav = navigatorKey.currentState;
+      if (nav != null) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => JoinClassScreen(classCode: classCode!),
+          ),
+        );
+      }
+    });
   }
 
   @override
