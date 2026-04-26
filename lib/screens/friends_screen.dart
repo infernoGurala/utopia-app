@@ -13,7 +13,6 @@ import '../services/sciwordle_service.dart';
 import '../widgets/app_motion.dart';
 import '../widgets/game_champion_badge.dart';
 import 'chat_screen.dart';
-import 'map_screen.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -147,6 +146,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     : Row(
                         key: const ValueKey('title'),
                         children: [
+                          if (Navigator.canPop(context))
+                            IconButton(
+                              icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          if (Navigator.canPop(context)) const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'Friends',
@@ -195,56 +202,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                 ),
               ),
             const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MapScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: U.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: U.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.map_rounded, color: U.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Utopia Map',
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600,
-                                color: U.primary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            Text(
-                              'See where your friends are right now',
-                              style: GoogleFonts.outfit(
-                                color: U.primary.withValues(alpha: 0.8),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right, color: U.primary, size: 20),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
+
             Divider(color: U.border, height: 1, thickness: 0.5),
             Expanded(
               child: StreamBuilder<Map<String, int>>(

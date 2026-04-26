@@ -14,7 +14,6 @@ import '../services/github_global_service.dart';
 import 'class_detail_screen.dart';
 import 'class_settings_screen.dart';
 import 'community_notes_screen.dart';
-import 'notification_history_screen.dart';
 import 'sciwordle_screen.dart';
 import 'timetable_screen.dart';
 
@@ -254,7 +253,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       ),
                       const Spacer(),
                       IconButton(
-                        icon: Icon(Icons.calendar_month_rounded, color: const Color(0xFFF9E2AF), size: 22),
+                        icon: Icon(Icons.calendar_month_rounded, color: U.text, size: 22),
                         tooltip: 'Timetable',
                         onPressed: () {
                           Navigator.push(
@@ -265,42 +264,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: Icon(Icons.notifications_outlined, color: const Color(0xFFCDD6F4), size: 22),
-                        tooltip: 'Notifications',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const NotificationHistoryScreen()),
-                          );
-                        },
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '$_moodWord ',
-                        style: GoogleFonts.outfit(
-                          color: U.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        '•',
-                        style: GoogleFonts.outfit(color: U.dim, fontSize: 13),
-                      ),
-                      Text(
-                        ' Library',
-                        style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                      ),
-                    ],
+                  Text(
+                    'Access your academic resources',
+                    style: GoogleFonts.outfit(color: U.dim, fontSize: 13),
                   ),
                 ],
               )
@@ -320,9 +288,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
                         childAspectRatio: 1.0,
-                        children: [
+                        children: <Widget>[
                           // ── Community Notes (Design A) ──
                           _buildCommunityTile(context),
 
@@ -350,7 +318,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             icon: Icons.add_circle_outline,
                             onTap: _showNewClassMenu,
                           ),
-                        ],
+                        ].asMap().entries.map((e) {
+                          return e.value.animate()
+                            .fadeIn(delay: (100 + e.key * 50).ms, duration: 500.ms)
+                            .slideY(begin: 0.1, end: 0, curve: Curves.easeOut);
+                        }).toList(),
                       ),
                     ),
             ),

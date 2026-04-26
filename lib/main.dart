@@ -444,10 +444,10 @@ const appThemes = [
 ];
 
 final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
-  _orchidTheme,
+  _catppuccinLatteTheme,
 );
 
-final ValueNotifier<bool> iaaEnabledNotifier = ValueNotifier<bool>(false);
+
 final ValueNotifier<bool> morningNotifEnabledNotifier = ValueNotifier<bool>(true);
 final ValueNotifier<bool> sciWordleNotifEnabledNotifier = ValueNotifier<bool>(true);
 
@@ -592,10 +592,7 @@ Future<String?> _loadInitialAccent() async {
 }
 
 Future<void> _loadAppToggleSettings() async {
-  final cachedIaa = await CacheService().getAppSetting('iaa_enabled');
-  if (cachedIaa != null) {
-    iaaEnabledNotifier.value = cachedIaa == 'true';
-  }
+
   final cachedMorning = await CacheService().getAppSetting('morning_notif_enabled');
   if (cachedMorning != null) {
     morningNotifEnabledNotifier.value = cachedMorning == 'true';
@@ -652,7 +649,7 @@ class U {
 
   static String get currentThemeKey => appThemeNotifier.value.key;
 
-  static bool get iaaEnabled => iaaEnabledNotifier.value;
+
   static bool get morningNotifEnabled => morningNotifEnabledNotifier.value;
   static bool get sciWordleNotifEnabled => sciWordleNotifEnabledNotifier.value;
 
@@ -662,7 +659,7 @@ class U {
         return theme;
       }
     }
-    return _orchidTheme;
+    return _catppuccinLatteTheme;
   }
 
   static void applyTheme(String? key) {
@@ -920,7 +917,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       if (PlatformSupport.supportsNotifications) {
         unawaited(NotificationService.ensureNotificationPermissions());
         unawaited(NotificationService.refreshTokenRegistration());
-        unawaited(NotificationService.maybeShowPendingDialog());
+
       }
     }
   }
@@ -999,7 +996,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
             if (snapshot.hasData) {
               unawaited(ChatService().touchPresence());
               if (PlatformSupport.supportsNotifications) {
-                unawaited(NotificationService.maybeShowPendingDialog());
+
               }
               return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
@@ -1101,34 +1098,6 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: U.bg,
       body: Stack(
         children: [
-          // ── Glowing Aura (Interceptor-style) ──
-          Positioned.fill(
-            child: Center(
-              child: AnimatedBuilder(
-                animation: _ac,
-                builder: (context, _) {
-                  final scale = 0.8 + (0.4 * _fade.value);
-                  return Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      width: 250,
-                      height: 250,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            U.primary.withValues(alpha: 0.15),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.2, 1.0],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
           // ── Content ──
           Center(
             child: Column(
@@ -1147,13 +1116,6 @@ class _SplashScreenState extends State<SplashScreen>
                           fontWeight: FontWeight.w700,
                           fontStyle: FontStyle.italic,
                           color: U.primary,
-                          shadows: [
-                            Shadow(
-                              color: U.primary.withValues(alpha: 0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -1167,13 +1129,6 @@ class _SplashScreenState extends State<SplashScreen>
                     fontWeight: FontWeight.w600,
                     color: U.sub,
                     letterSpacing: 8,
-                    shadows: [
-                      Shadow(
-                        color: U.sub.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -1186,13 +1141,6 @@ class _SplashScreenState extends State<SplashScreen>
                       decoration: BoxDecoration(
                         color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
                         borderRadius: BorderRadius.circular(2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: U.primary.withValues(alpha: 0.3 * _fade.value),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ],
                       ),
                     );
                   },

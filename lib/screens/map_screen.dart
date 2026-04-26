@@ -622,6 +622,10 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: U.bg,
         appBar: AppBar(
           backgroundColor: const Color(0xFF1E1E2E),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+            onPressed: () => Navigator.pop(context),
+          ),
           title: Text(
             'Campus Map',
             style: GoogleFonts.outfit(
@@ -661,6 +665,10 @@ class _MapScreenState extends State<MapScreen> {
       backgroundColor: U.bg,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E2E),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(
           'Campus Map',
           style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700),

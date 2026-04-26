@@ -253,12 +253,12 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   Color _percentageColor(double value) {
     if (value >= 75) {
-      return const Color(0xFFA6E3A1);
+      return U.green;
     }
     if (value >= 65) {
-      return const Color(0xFFF9E2AF);
+      return U.peach;
     }
-    return const Color(0xFFF38BA8);
+    return U.red;
   }
 
   IconData _subjectIcon(String subject) {
@@ -497,10 +497,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return Scaffold(
       backgroundColor: U.bg,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
         backgroundColor: U.bg,
         elevation: 0,
-        titleSpacing: 20,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -522,13 +525,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             IconButton(
               onPressed: _refresh,
               tooltip: 'Refresh',
-              icon: const Icon(Icons.refresh_rounded),
+              icon: Icon(Icons.refresh_rounded, color: U.text),
             ),
           if (showLoadedActions)
             IconButton(
               onPressed: _disconnect,
               tooltip: 'Disconnect',
-              icon: const Icon(Icons.logout_rounded),
+              icon: Icon(Icons.logout_rounded, color: U.text),
             ),
           const SizedBox(width: 8),
         ],
@@ -794,7 +797,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               if (_isFromCache)
-                SliverToBoxAdapter(
+              SliverToBoxAdapter(
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     padding: const EdgeInsets.symmetric(
@@ -802,17 +805,17 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF9E2AF).withValues(alpha: 0.10),
+                      color: U.peach.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFFF9E2AF).withValues(alpha: 0.30),
+                        color: U.peach.withValues(alpha: 0.30),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.cloud_off_rounded,
-                          color: Color(0xFFF9E2AF),
+                          color: U.peach,
                           size: 15,
                         ),
                         const SizedBox(width: 8),
@@ -821,7 +824,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                             'Portal unreachable — showing cached data'
                             '${_cacheAgeLabel != null ? ' from $_cacheAgeLabel' : ''}. Pull to retry.',
                             style: GoogleFonts.outfit(
-                              color: const Color(0xFFF9E2AF),
+                              color: U.peach,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
@@ -847,61 +850,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         accent: overallColor,
                         subtitleColor: belowTarget > 0 ? U.red : null,
                       ),
-                      const SizedBox(height: 12),
-                      // ── Total Attendance page button ──────────────────────
-                      GestureDetector(
-                        onTap: () {
-                          debugPrint(
-                            '[Attendance] Navigating to TotalAttendanceScreen',
-                          );
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (_) => TotalAttendanceScreen(
-                                attendanceData: data,
-                                credentials: _savedCredentials ?? const {},
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 13,
-                          ),
-                          decoration: BoxDecoration(
-                            color: U.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: U.border),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.bar_chart_rounded,
-                                color: U.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'View Total Attendance',
-                                  style: GoogleFonts.outfit(
-                                    color: U.text,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                color: U.sub,
-                                size: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 16),
                       Row(
                         children: [
@@ -915,56 +863,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               ),
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => _showYesterdaySheet(),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: U.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: U.border),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.history_rounded,
-                                    color: U.sub,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Yesterday',
-                                    style: GoogleFonts.outfit(
-                                      color: U.sub,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _showDatePickerSheet(),
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: U.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: U.border),
-                              ),
-                              child: Icon(
-                                Icons.calendar_month_rounded,
-                                color: U.sub,
-                                size: 20,
-                              ),
-                            ),
-                          ),
+                          // Yesterday & Calendar hidden for now
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -993,14 +892,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ],
           ),
         ),
-        Positioned(
-          right: 16,
-          bottom: 100,
-          child: _TodayPulseButton(
-            animation: _glowController,
-            onTap: _showTodaySheet,
-          ),
-        ),
+        // Today button hidden for now
       ],
     );
   }
@@ -1186,6 +1078,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       obscureText: obscureText,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
+      enableInteractiveSelection: true,
+      enableSuggestions: !obscureText,
+      autocorrect: false,
       style: GoogleFonts.outfit(color: U.text, fontSize: 14),
       decoration: InputDecoration(
         labelText: labelText,
@@ -1592,12 +1487,12 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
 
   Color _percentageColor(double value) {
     if (value >= 75) {
-      return const Color(0xFFA6E3A1);
+      return U.green;
     }
     if (value >= 65) {
-      return const Color(0xFFF9E2AF);
+      return U.peach;
     }
-    return const Color(0xFFF38BA8);
+    return U.red;
   }
 
   IconData _subjectIcon(String subject) {

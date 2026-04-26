@@ -17,6 +17,7 @@ import '../services/game_champion_service.dart';
 import 'about_utopia_screen.dart';
 import 'developer_panel_screen.dart';
 import 'university_selection_screen.dart';
+import 'iaa_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -197,28 +198,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           stream: userDocStream,
           builder: (context, snapshot) {
             return ListView(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'Profile',
-                        style: GoogleFonts.playfairDisplay(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: U.text,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -1,
-                          shadows: [
-                            Shadow(
-                              color: U.text.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Profile',
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                              color: U.text,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: -1,
+                              shadows: [
+                                Shadow(
+                                  color: U.text.withValues(alpha: 0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                    Text(
+                      'Manage your academic identity',
+                      style: GoogleFonts.outfit(color: U.dim, fontSize: 13),
                     ),
                   ],
                 )
@@ -418,40 +428,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // IAA Assistant Toggle
-                      ValueListenableBuilder<bool>(
-                        valueListenable: iaaEnabledNotifier,
-                        builder: (context, iaaEnabled, _) {
-                          return _groupedToggleTile(
-                            icon: Icons.auto_awesome_rounded,
-                            label: 'Intelligent Academic Assistant',
-                            sub: iaaEnabled
-                                ? 'Enabled · Shows in bottom nav'
-                                : 'Disabled · Hidden from bottom nav',
-                            color: iaaEnabled ? U.primary : U.dim,
-                            value: iaaEnabled,
-                            onChanged: (v) async {
-                              iaaEnabledNotifier.value = v;
-                              unawaited(
-                                CacheService().saveAppSetting(
-                                  'iaa_enabled',
-                                  v.toString(),
-                                ),
-                              );
-                              final uid = FirebaseAuth.instance.currentUser?.uid;
-                              if (uid != null) {
-                                unawaited(
-                                  FirebaseFirestore.instance
-                                      .collection('users')
-                                      .doc(uid)
-                                      .set({
-                                        'iaaEnabled': v,
-                                      }, SetOptions(merge: true)),
-                                );
-                              }
-                            },
-                          );
-                        },
+                      // IAA Assistant
+                      _groupedTile(
+                        icon: Icons.auto_awesome_rounded,
+                        label: 'Intelligent Academic Assistant',
+                        sub: 'Get AI-powered insights',
+                        color: const Color(0xFF7F77DD),
+                        onTap: () => Navigator.of(context).push(IAAScreen.route()),
                       ),
                       Divider(
                         height: 1,
@@ -566,60 +549,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Icon(Icons.chevron_right, color: U.dim, size: 18),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _groupedToggleTile({
-    required IconData icon,
-    required String label,
-    required String sub,
-    required Color color,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.outfit(
-                    color: U.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  sub,
-                  style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: U.primary,
-            activeTrackColor: U.primary.withValues(alpha: 0.35),
-            inactiveThumbColor: U.dim,
-            inactiveTrackColor: U.border,
-          ),
-        ],
       ),
     );
   }

@@ -15,7 +15,6 @@ import '../widgets/app_motion.dart';
 import 'editor_screen.dart';
 import 'sciwordle_screen.dart';
 import 'note_viewer_screen.dart';
-import 'notification_history_screen.dart';
 import 'search_screen.dart';
 import 'timetable_screen.dart';
 
@@ -345,12 +344,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  void _openNotifications() {
-    Navigator.of(
-      context,
-    ).push(buildContainerRoute(const NotificationHistoryScreen()));
-  }
-
   void _openSearch() {
     Navigator.of(context).push(buildContainerRoute(const SearchScreen()));
   }
@@ -402,25 +395,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '$_subtitleWord ',
-              style: GoogleFonts.outfit(
-                color: U.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text('•', style: GoogleFonts.outfit(color: U.dim, fontSize: 13)),
-            Text(
-              ' Library',
-              style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-            ),
-          ],
-        ),
       ],
     )
         .animate()
@@ -442,31 +416,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           icon: Icons.calendar_month_rounded,
           tooltip: 'Timetable',
           onTap: _openTimetable,
-          iconColor: const Color(0xFFF9E2AF),
         ),
         const SizedBox(width: 10),
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('notifications')
-              .where(
-                'uid',
-                isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '',
-              )
-              .snapshots(),
-          builder: (context, snapshot) {
-            final unread =
-                snapshot.data?.docs
-                    .where((doc) => !(doc.data()['read'] as bool? ?? false))
-                    .length ??
-                0;
-            return _HeaderAction(
-              icon: Icons.notifications_outlined,
-              tooltip: 'Notifications',
-              onTap: _openNotifications,
-              badgeCount: unread,
-            );
-          },
-        ),
       ],
     )
         .animate()
@@ -764,13 +715,13 @@ class _HeaderAction extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
   final int badgeCount;
-  final Color iconColor;
+  final Color? iconColor;
   const _HeaderAction({
     required this.icon,
     required this.tooltip,
     required this.onTap,
     this.badgeCount = 0,
-    this.iconColor = const Color(0xFFCDD6F4),
+    this.iconColor,
   });
 
   @override
@@ -786,7 +737,7 @@ class _HeaderAction extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Center(child: Icon(icon, color: iconColor, size: 22)),
+              Center(child: Icon(icon, color: iconColor ?? U.text, size: 22)),
               if (badgeCount > 0)
                 Positioned(
                   right: 8,

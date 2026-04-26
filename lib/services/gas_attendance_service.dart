@@ -1,31 +1,27 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Google Apps Script (GAS) middleware service for attendance fetching.
+/// Cloudflare Worker attendance API service.
 ///
-/// Replace [ausGasUrl] and [acetGasUrl] with your deployed GAS web app URLs.
-/// The GAS script handles login + scraping server-side so the app never
-/// touches the university portal directly.
+/// Replaces the old Google Apps Script middleware. The Worker handles
+/// portal login + scraping server-side and returns clean JSON.
 class GasAttendanceService {
-  // ──────────────────────────────────────────────────────────────────────────
-  // ★  Update these URLs after deploying your Google Apps Script web apps  ★
-  // Both URLs MUST use HTTPS (as all script.google.com URLs do) so that
-  // credentials are encrypted in transit.
-  // ──────────────────────────────────────────────────────────────────────────
-  static const String ausGasUrl =
-      'https://script.google.com/macros/s/YOUR_AUS_SCRIPT_ID/exec';
-  static const String acetGasUrl =
-      'https://script.google.com/macros/s/YOUR_ACET_SCRIPT_ID/exec';
-  // ──────────────────────────────────────────────────────────────────────────
+  static const String _workerUrl =
+      'https://attendance-api.inferalis.space/login';
+
+  static const String _healthUrl =
+      'https://attendance-api.inferalis.space/health';
 
   static const Duration _timeout = Duration(seconds: 45);
 
-  /// Fetches attendance via the GAS middleware endpoint.
+  /// Fetches attendance via the Cloudflare Worker endpoint.
   ///
   /// [college] must be `'aus'` or `'acet'`.
-  /// [fromDate] / [toDate] are optional date strings in `dd-MM-yyyy` format;
-  /// leave empty to fetch the full semester.
+  /// [fromDate] / [toDate] are accepted for API compatibility but
+  /// the Worker always returns full-semester data.
   static Future<Map<String, dynamic>> fetchAttendance(
     String rollNumber,
     String password, {
@@ -33,43 +29,48 @@ class GasAttendanceService {
     String fromDate = '',
     String toDate = '',
   }) async {
-    final url = college == 'acet' ? acetGasUrl : ausGasUrl;
+    final trimmedRoll = rollNumber.trim();
 
-    // Runtime guard: fail fast with a clear message if the URLs are still placeholders
-    if (url.contains('YOUR_') || url.contains('_SCRIPT_ID')) {
-      throw Exception(
-        'Google Apps Script URL for $college has not been configured yet. '
-        'Update GasAttendanceService.${college == 'acet' ? 'acetGasUrl' : 'ausGasUrl'} '
-        'with your deployed GAS web app URL.',
+    debugPrint('[ATT] ═══════════════════════════════════════════');
+    debugPrint('[ATT] Starting fetch for roll: $trimmedRoll, college: $college');
+    debugPrint('[ATT] Password length: ${password.length}');
+    debugPrint('[ATT] API URL: $_workerUrl');
+    debugPrint('[ATT] Using http package: ${http.Client}');
+
+    // ── Health check ──
+    try {
+      debugPrint('[ATT] Running health check: $_healthUrl');
+      final healthResponse = await http
+          .get(Uri.parse(_healthUrl))
+          .timeout(const Duration(seconds: 10));
+      debugPrint('[ATT] Health check status: ${healthResponse.statusCode}');
+      debugPrint(
+        '[ATT] Health check body: '
+        '${healthResponse.body.substring(0, min(200, healthResponse.body.length))}',
       );
+    } catch (healthError) {
+      debugPrint('[ATT] Health check FAILED: $healthError');
+      debugPrint('[ATT] This indicates a network/DNS/URL issue');
     }
 
-    // Debug: log the outgoing request (credentials redacted in production)
-    // ignore: avoid_print
-    print(
-      '[GAS] fetchAttendance → college=$college, '
-      'roll=${rollNumber.trim()}, '
-      'fromDate=${fromDate.isEmpty ? "empty" : fromDate}, '
-      'toDate=${toDate.isEmpty ? "empty" : toDate}, '
-      'url=$url',
-    );
-
-    final payload = jsonEncode({
-      'rollNumber': rollNumber.trim(),
+    // ── Build request ──
+    final body = {
+      'rollNumber': trimmedRoll,
       'password': password,
       'college': college,
-      'fromDate': fromDate,
-      'toDate': toDate,
-    });
+    };
+    final payload = jsonEncode(body);
 
-    // ignore: avoid_print
-    print('[GAS] POST payload size: ${payload.length} bytes');
+    debugPrint('[ATT] Request body: $payload');
+    debugPrint('[ATT] Request body size: ${payload.length} bytes');
 
+    // ── Make the API call ──
     final http.Response response;
     try {
+      debugPrint('[ATT] Sending POST request...');
       response = await http
           .post(
-            Uri.parse(url),
+            Uri.parse(_workerUrl),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -77,58 +78,89 @@ class GasAttendanceService {
             body: payload,
           )
           .timeout(_timeout);
-    } catch (e) {
-      // ignore: avoid_print
-      print('[GAS] Network error: $e');
-      throw Exception('Could not reach the attendance server. Check your internet connection.');
+    } catch (e, stackTrace) {
+      debugPrint('[ATT] Network exception type: ${e.runtimeType}');
+      debugPrint('[ATT] Network exception message: $e');
+      debugPrint('[ATT] Stack trace: $stackTrace');
+      throw Exception(
+        'Could not reach the attendance server. Check your internet connection.',
+      );
     }
 
-    // ignore: avoid_print
-    print('[GAS] Response status: ${response.statusCode}');
-    // ignore: avoid_print
-    print(
-      '[GAS] Response body preview: '
-      '${response.body.length <= 600 ? response.body : response.body.substring(0, 600)}',
+    // ── Log raw response ──
+    debugPrint('[ATT] Response status code: ${response.statusCode}');
+    debugPrint(
+      '[ATT] Response body (first 500 chars): '
+      '${response.body.substring(0, min(500, response.body.length))}',
     );
+    debugPrint('[ATT] Response body length: ${response.body.length}');
+    debugPrint('[ATT] Response headers: ${response.headers}');
 
     if (response.statusCode != 200) {
-      throw Exception('Attendance server returned an error (${response.statusCode})');
+      debugPrint('[ATT] Non-200 status code, throwing error');
+      throw Exception(
+        'Attendance server returned an error (${response.statusCode})',
+      );
     }
 
+    // ── Parse JSON ──
     final Map<String, dynamic> json;
     try {
       json = jsonDecode(response.body) as Map<String, dynamic>;
-    } catch (e) {
-      // ignore: avoid_print
-      print('[GAS] JSON decode error: $e');
+      debugPrint('[ATT] JSON parsed successfully');
+      debugPrint('[ATT] Top-level keys: ${json.keys.toList()}');
+    } catch (e, stackTrace) {
+      debugPrint('[ATT] JSON decode error: $e');
+      debugPrint('[ATT] JSON decode stack: $stackTrace');
       throw Exception('Unexpected response from the attendance server');
     }
 
-    final success = json['success'] as bool? ?? false;
-    if (!success) {
+    // ── Check ok field ──
+    final ok = json['ok'] as bool? ?? false;
+    debugPrint('[ATT] Parsed ok field: $ok');
+
+    if (!ok) {
       final error = (json['error'] as String?)?.trim() ?? '';
-      // ignore: avoid_print
-      print('[GAS] Server returned success=false, error=$error');
+      debugPrint('[ATT] Server returned ok=false, error="$error"');
       if (error.isEmpty) {
         throw Exception('Could not fetch attendance right now');
       }
-      // Preserve friendly error messages from the script (e.g. "Invalid credentials")
       throw Exception(error);
     }
 
+    // ── Extract data ──
     final data = json['data'];
+    debugPrint('[ATT] data field type: ${data.runtimeType}');
+
     if (data == null || data is! Map<String, dynamic>) {
-      // ignore: avoid_print
-      print('[GAS] Response missing "data" field or wrong type');
-      throw Exception('Attendance data was not found in the portal response');
+      debugPrint('[ATT] Response missing "data" field or wrong type');
+      debugPrint('[ATT] Full response keys: ${json.keys.toList()}');
+      throw Exception(
+        'Attendance data was not found in the server response',
+      );
     }
 
-    // ignore: avoid_print
-    print(
-      '[GAS] fetchAttendance success — '
-      'subjects=${(data['subjects'] as List?)?.length ?? 0}, '
-      'overall=${data['overallPercentage']}',
-    );
+    debugPrint('[ATT] Parsed data keys: ${data.keys.toList()}');
+    debugPrint('[ATT] Subject count: ${(data['subjects'] as List?)?.length}');
+    debugPrint('[ATT] Overall percentage: ${data['overallPercentage']}');
+    debugPrint('[ATT] Total classes: ${data['totalClasses']}');
+    debugPrint('[ATT] Total attended: ${data['totalAttended']}');
+    debugPrint('[ATT] Student name: ${data['studentName']}');
+    debugPrint('[ATT] Has report: ${data['hasReport']}');
+
+    // Log first subject for verification
+    final subjects = data['subjects'] as List?;
+    if (subjects != null && subjects.isNotEmpty) {
+      final first = subjects[0];
+      debugPrint('[ATT] First subject sample: $first');
+      debugPrint('[ATT]   subject: ${first['subject']}');
+      debugPrint('[ATT]   totalClasses: ${first['totalClasses']}');
+      debugPrint('[ATT]   attendedClasses: ${first['attendedClasses']}');
+      debugPrint('[ATT]   percentage: ${first['percentage']}');
+    }
+
+    debugPrint('[ATT] ✓ fetchAttendance completed successfully');
+    debugPrint('[ATT] ═══════════════════════════════════════════');
 
     return data;
   }
