@@ -573,40 +573,48 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             child: Column(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: U.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(
-                    Icons.fact_check_rounded,
-                    color: U.primary,
-                    size: 28,
-                  ),
-                )
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        Icons.fact_check_rounded,
+                        color: U.primary,
+                        size: 28,
+                      ),
+                    )
                     .animate()
                     .fadeIn(duration: 500.ms)
-                    .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), duration: 500.ms, curve: Curves.easeOutBack),
+                    .scale(
+                      begin: const Offset(0.8, 0.8),
+                      end: const Offset(1, 1),
+                      duration: 500.ms,
+                      curve: Curves.easeOutBack,
+                    ),
                 const SizedBox(height: 12),
                 Text(
-                  'Connect Attendance',
-                  style: GoogleFonts.outfit(
-                    color: U.text,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                )
+                      'Connect Attendance',
+                      style: GoogleFonts.outfit(
+                        color: U.text,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
                     .animate()
                     .fadeIn(delay: 100.ms, duration: 500.ms)
-                    .slideY(begin: 0.1, end: 0, delay: 100.ms, duration: 500.ms),
+                    .slideY(
+                      begin: 0.1,
+                      end: 0,
+                      delay: 100.ms,
+                      duration: 500.ms,
+                    ),
                 const SizedBox(height: 6),
                 Text(
                   'Your data stays on this device only',
                   style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                )
-                    .animate()
-                    .fadeIn(delay: 200.ms, duration: 500.ms),
+                ).animate().fadeIn(delay: 200.ms, duration: 500.ms),
               ],
             ),
           ),
@@ -704,12 +712,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     await AttendanceServerPreference.setServer(
                                       AttendanceServerPreference.kServer1,
                                     );
-                                    setState(() => _selectedServer =
-                                        AttendanceServerPreference.kServer1);
+                                    setState(
+                                      () => _selectedServer =
+                                          AttendanceServerPreference.kServer1,
+                                    );
                                   },
                                   child: Container(
                                     height: 32,
-                                    color: _selectedServer ==
+                                    color:
+                                        _selectedServer ==
                                             AttendanceServerPreference.kServer1
                                         ? U.primary
                                         : U.surface,
@@ -717,13 +728,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       child: Text(
                                         'In-App',
                                         style: GoogleFonts.outfit(
-                                          color: _selectedServer ==
+                                          color:
+                                              _selectedServer ==
                                                   AttendanceServerPreference
                                                       .kServer1
                                               ? U.bg
                                               : U.sub,
                                           fontSize: 12,
-                                          fontWeight: _selectedServer ==
+                                          fontWeight:
+                                              _selectedServer ==
                                                   AttendanceServerPreference
                                                       .kServer1
                                               ? FontWeight.w700
@@ -740,12 +753,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                     await AttendanceServerPreference.setServer(
                                       AttendanceServerPreference.kServer2,
                                     );
-                                    setState(() => _selectedServer =
-                                        AttendanceServerPreference.kServer2);
+                                    setState(
+                                      () => _selectedServer =
+                                          AttendanceServerPreference.kServer2,
+                                    );
                                   },
                                   child: Container(
                                     height: 32,
-                                    color: _selectedServer ==
+                                    color:
+                                        _selectedServer ==
                                             AttendanceServerPreference.kServer2
                                         ? U.primary
                                         : U.surface,
@@ -753,13 +769,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                                       child: Text(
                                         'Cloud',
                                         style: GoogleFonts.outfit(
-                                          color: _selectedServer ==
+                                          color:
+                                              _selectedServer ==
                                                   AttendanceServerPreference
                                                       .kServer2
                                               ? U.bg
                                               : U.sub,
                                           fontSize: 12,
-                                          fontWeight: _selectedServer ==
+                                          fontWeight:
+                                              _selectedServer ==
                                                   AttendanceServerPreference
                                                       .kServer2
                                               ? FontWeight.w700
@@ -904,7 +922,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               if (_isFromCache)
-              SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Container(
                     margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     padding: const EdgeInsets.symmetric(
@@ -920,11 +938,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.cloud_off_rounded,
-                          color: U.peach,
-                          size: 15,
-                        ),
+                        Icon(Icons.cloud_off_rounded, color: U.peach, size: 15),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -942,13 +956,42 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                   ),
                 ),
               SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: U.sub.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: U.sub.withValues(alpha: 0.30)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: U.sub, size: 15),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Some features may not work due to server issues.',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _GradientHero(
-
                         icon: Icons.timeline_rounded,
                         eyebrow: _headlineFor(overall),
                         title: '${overall.toStringAsFixed(1)}%',
@@ -974,7 +1017,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           GestureDetector(
                             onTap: _showYesterdaySheet,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: U.surface,
                                 borderRadius: BorderRadius.circular(10),
@@ -995,7 +1041,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                           GestureDetector(
                             onTap: _showDatePickerSheet,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: U.surface,
                                 borderRadius: BorderRadius.circular(10),
@@ -1004,7 +1053,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.calendar_month_outlined, size: 14, color: U.sub),
+                                  Icon(
+                                    Icons.calendar_month_outlined,
+                                    size: 14,
+                                    color: U.sub,
+                                  ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Date',
@@ -1048,7 +1101,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         ),
         // Today floating button
         Positioned(
-          left: 24,
           right: 24,
           bottom: 44,
           child: _TodayPulseButton(
@@ -1068,7 +1120,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 Icon(Icons.info_outline_rounded, size: 14, color: U.sub),
                 const SizedBox(width: 6),
                 Text(
-                  'Fetched via ${data['serverUsed'] == 'server2' ? 'Cloud' : data['serverUsed'] == 'server1' ? 'In-App' : 'Cache'}',
+                  'Fetched via ${data['serverUsed'] == 'server2'
+                      ? 'Cloud'
+                      : data['serverUsed'] == 'server1'
+                      ? 'In-App'
+                      : 'Cache'}',
                   style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
                 ),
               ],
@@ -1544,6 +1600,7 @@ class _TodaySubjectRow extends StatelessWidget {
         border: Border.all(color: U.border),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 38,
@@ -1566,6 +1623,7 @@ class _TodaySubjectRow extends StatelessWidget {
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -1711,65 +1769,170 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: U.border,
-                  borderRadius: BorderRadius.circular(999),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: U.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              widget.title,
-              style: GoogleFonts.outfit(
-                color: U.text,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 18),
+              Text(
+                widget.title,
+                style: GoogleFonts.outfit(
+                  color: U.text,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Attendance for ${widget.dateLabel}',
-              style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-            ),
-            const SizedBox(height: 18),
-            StatefulBuilder(
-              builder: (context, setSheetState) {
-                return FutureBuilder<Map<String, dynamic>>(
-                  future: _future,
-                  builder: (context, snapshot) {
-                    debugPrint(
-                      '[DEBUG][Sheet] FutureBuilder state: ${snapshot.connectionState}, hasError: ${snapshot.hasError}, hasData: ${snapshot.hasData}',
-                    );
-
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      debugPrint('[DEBUG][Sheet] Loading... showing spinner');
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 28),
-                        child: Center(child: CircularProgressIndicator()),
+              const SizedBox(height: 4),
+              Text(
+                'Attendance for ${widget.dateLabel}',
+                style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+              ),
+              const SizedBox(height: 18),
+              StatefulBuilder(
+                builder: (context, setSheetState) {
+                  return FutureBuilder<Map<String, dynamic>>(
+                    future: _future,
+                    builder: (context, snapshot) {
+                      debugPrint(
+                        '[DEBUG][Sheet] FutureBuilder state: ${snapshot.connectionState}, hasError: ${snapshot.hasError}, hasData: ${snapshot.hasData}',
                       );
-                    }
 
-                    if (snapshot.hasError) {
-                      debugPrint('[DEBUG][Sheet] Error: ${snapshot.error}');
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        debugPrint('[DEBUG][Sheet] Loading... showing spinner');
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 28),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        debugPrint('[DEBUG][Sheet] Error: ${snapshot.error}');
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _TodayStatusCard(
+                              icon: Icons.cloud_off_rounded,
+                              title: 'Could not load attendance',
+                              subtitle: _friendlyErrorMessage(
+                                snapshot.error ?? 'Something went wrong',
+                              ),
+                              tint: U.red,
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: FilledButton.icon(
+                                onPressed: () {
+                                  setSheetState(() {
+                                    _loadData();
+                                  });
+                                },
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: U.primary,
+                                  foregroundColor: U.bg,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(
+                                  'Try again',
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      debugPrint('[DEBUG][Sheet] Data loaded successfully');
+                      final dateData =
+                          snapshot.data ?? const <String, dynamic>{};
+                      final totalClasses =
+                          (dateData['totalClasses'] as num?)?.toInt() ?? 0;
+                      final totalAttended =
+                          (dateData['totalAttended'] as num?)?.toInt() ?? 0;
+                      final overall =
+                          (dateData['overallPercentage'] as num?)?.toDouble() ??
+                          0;
+                      final subjects =
+                          (dateData['subjects'] as List<dynamic>? ?? const [])
+                              .cast<Map<String, dynamic>>();
+                      final activeSubjects = subjects.where((subject) {
+                        final held =
+                            (subject['totalClasses'] as num?)?.toInt() ?? 0;
+                        return held > 0;
+                      }).toList();
+                      final overallColor = _percentageColor(overall);
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _TodayStatusCard(
-                            icon: Icons.cloud_off_rounded,
-                            title: 'Could not load attendance',
-                            subtitle: _friendlyErrorMessage(
-                              snapshot.error ?? 'Something went wrong',
-                            ),
-                            tint: U.red,
+                            icon: totalClasses == 0
+                                ? Icons.event_available_rounded
+                                : Icons.calendar_today_rounded,
+                            title: totalClasses == 0
+                                ? 'No classes recorded'
+                                : '$totalAttended of $totalClasses classes attended',
+                            subtitle: totalClasses == 0
+                                ? 'Nothing has been marked for this day.'
+                                : '${overall.toStringAsFixed(1)}% attendance',
+                            tint: totalClasses == 0 ? U.primary : overallColor,
                           ),
+                          if (activeSubjects.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            Text(
+                              'Subjects',
+                              style: GoogleFonts.outfit(
+                                color: U.text,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ...activeSubjects.map(
+                              (subject) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _TodaySubjectRow(
+                                  name: subject['subject'].toString(),
+                                  totalClasses:
+                                      (subject['totalClasses'] as num?)
+                                          ?.toInt() ??
+                                      0,
+                                  attendedClasses:
+                                      (subject['attendedClasses'] as num?)
+                                          ?.toInt() ??
+                                      0,
+                                  percentage:
+                                      (subject['percentage'] as num?)
+                                          ?.toDouble() ??
+                                      0,
+                                  icon: _subjectIcon(
+                                    subject['subject'].toString(),
+                                  ),
+                                  color: _percentageColor(
+                                    (subject['percentage'] as num?)
+                                            ?.toDouble() ??
+                                        0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
@@ -1788,7 +1951,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                               ),
                               icon: const Icon(Icons.refresh_rounded),
                               label: Text(
-                                'Try again',
+                                'Refresh',
                                 style: GoogleFonts.outfit(
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -1797,111 +1960,12 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                           ),
                         ],
                       );
-                    }
-
-                    debugPrint('[DEBUG][Sheet] Data loaded successfully');
-                    final dateData = snapshot.data ?? const <String, dynamic>{};
-                    final totalClasses =
-                        (dateData['totalClasses'] as num?)?.toInt() ?? 0;
-                    final totalAttended =
-                        (dateData['totalAttended'] as num?)?.toInt() ?? 0;
-                    final overall =
-                        (dateData['overallPercentage'] as num?)?.toDouble() ??
-                        0;
-                    final subjects =
-                        (dateData['subjects'] as List<dynamic>? ?? const [])
-                            .cast<Map<String, dynamic>>();
-                    final activeSubjects = subjects.where((subject) {
-                      final held =
-                          (subject['totalClasses'] as num?)?.toInt() ?? 0;
-                      return held > 0;
-                    }).toList();
-                    final overallColor = _percentageColor(overall);
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _TodayStatusCard(
-                          icon: totalClasses == 0
-                              ? Icons.event_available_rounded
-                              : Icons.calendar_today_rounded,
-                          title: totalClasses == 0
-                              ? 'No classes recorded'
-                              : '$totalAttended of $totalClasses classes attended',
-                          subtitle: totalClasses == 0
-                              ? 'Nothing has been marked for this day.'
-                              : '${overall.toStringAsFixed(1)}% attendance',
-                          tint: totalClasses == 0 ? U.primary : overallColor,
-                        ),
-                        if (activeSubjects.isNotEmpty) ...[
-                          const SizedBox(height: 14),
-                          Text(
-                            'Subjects',
-                            style: GoogleFonts.outfit(
-                              color: U.text,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          ...activeSubjects.map(
-                            (subject) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _TodaySubjectRow(
-                                name: subject['subject'].toString(),
-                                totalClasses:
-                                    (subject['totalClasses'] as num?)
-                                        ?.toInt() ??
-                                    0,
-                                attendedClasses:
-                                    (subject['attendedClasses'] as num?)
-                                        ?.toInt() ??
-                                    0,
-                                percentage:
-                                    (subject['percentage'] as num?)
-                                        ?.toDouble() ??
-                                    0,
-                                icon: _subjectIcon(
-                                  subject['subject'].toString(),
-                                ),
-                                color: _percentageColor(
-                                  (subject['percentage'] as num?)?.toDouble() ??
-                                      0,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              setSheetState(() {
-                                _loadData();
-                              });
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: U.primary,
-                              foregroundColor: U.bg,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: Text(
-                              'Refresh',
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ],
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

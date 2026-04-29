@@ -49,7 +49,7 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isSignedIn() &&
         (request.auth.uid in resource.data.writerUids ||
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'memberUids']));
       allow delete: if isSignedIn() &&
         request.auth.uid == resource.data.creatorUid;
     }
