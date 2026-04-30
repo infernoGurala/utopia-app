@@ -7,9 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
 import '../services/file_upload_service.dart';
-import '../services/github_service.dart';
-import '../services/github_global_service.dart';
-import '../services/writer_github_service.dart';
+import '../services/supabase_notes_service.dart';
+import '../services/supabase_global_service.dart';
 import '../widgets/genz_loading_overlay.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -546,23 +545,24 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<bool> _performBackgroundSave(String content, User user) async {
     try {
       final useGlobal = widget.useGlobalRepo || widget.filePath.contains('/Community/');
+      final uid = user.uid;
+      final name = user.displayName ?? user.email ?? 'UTOPIA user';
+
       if (useGlobal) {
-        final success = await GitHubGlobalService().updateFile(
-          path: widget.filePath,
-          content: content,
-          message:
-              'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA user'} via UTOPIA app',
+        await SupabaseGlobalService.instance.updateNote(
+          widget.filePath,
+          content,
+          uid,
+          name,
         );
-        if (!success) throw Exception('Global repo sync failed');
       } else {
-        await WriterGitHubService.updateTextFile(
-          filename: widget.filePath,
-          content: content,
-          commitMessage:
-              'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+        await SupabaseNotesService().updateNote(
+          widget.filePath,
+          content,
+          uid,
+          name,
         );
       }
-      await GitHubService.primeFileContentCache(widget.filePath, content);
       return true;
     } catch (e) {
       debugPrint('EditorScreen: save failed: $e');
@@ -611,7 +611,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _blockTypeItem(Icons.functions_outlined, 'LaTeX', 'Math equations', BlockType.latex, ctx),
               _blockTypeItem(Icons.table_chart_outlined, 'Table', 'Rows & columns', BlockType.table, ctx),
               _blockTypeItem(Icons.account_tree_outlined, 'Flow Chart', 'Mermaid diagram', BlockType.mermaid, ctx),
-              _blockTypeItem(Icons.upload_file_outlined, 'Upload File', 'PDF, docs (≤20 MB)', BlockType.file, ctx),
+              _blockTypeItem(Icons.upload_file_outlined, 'Upload File', 'PDF, docs (≤9 MB)', BlockType.file, ctx),
             ],
           ),
         ),
@@ -910,7 +910,7 @@ class _EditorScreenState extends State<EditorScreen> {
       case BlockType.mermaid:
         return _MermaidBlockBody(block: block, onChanged: _markChanged);
       case BlockType.file:
-        return _FileBlockBody(block: block);
+        return _FileBlockBody(block: block, onRenamed: () => setState(() => _hasChanges = true));
     }
   }
 
@@ -1681,7 +1681,8 @@ class _MermaidBlockBody extends StatelessWidget {
 // ── File Block (display only, already uploaded) ──
 class _FileBlockBody extends StatelessWidget {
   final EditorBlock block;
-  const _FileBlockBody({required this.block});
+  final VoidCallback? onRenamed;
+  const _FileBlockBody({required this.block, this.onRenamed});
 
   @override
   Widget build(BuildContext context) {
@@ -1704,19 +1705,70 @@ class _FileBlockBody extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  block.fileDisplayName.isEmpty ? 'File' : block.fileDisplayName,
-                  style: GoogleFonts.outfit(color: U.text, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Uploaded — link embedded',
-                  style: GoogleFonts.outfit(color: U.green, fontSize: 11),
-                ),
-              ],
+            child: GestureDetector(
+              onTap: () async {
+                final controller = TextEditingController(
+                  text: block.fileDisplayName.isEmpty ? 'File' : block.fileDisplayName,
+                );
+                final newName = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: U.card,
+                    title: Text('Rename Link', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+                    content: TextField(
+                      controller: controller,
+                      style: GoogleFonts.outfit(color: U.text),
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Display name',
+                        hintStyle: GoogleFonts.outfit(color: U.sub),
+                        filled: true,
+                        fillColor: U.bg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: U.border),
+                        ),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                        style: FilledButton.styleFrom(backgroundColor: U.primary),
+                        child: Text('Rename', style: GoogleFonts.outfit(color: U.bg)),
+                      ),
+                    ],
+                  ),
+                );
+                if (newName != null && newName.isNotEmpty && newName != block.fileDisplayName) {
+                  block.fileDisplayName = newName;
+                  onRenamed?.call();
+                }
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          block.fileDisplayName.isEmpty ? 'File' : block.fileDisplayName,
+                          style: GoogleFonts.outfit(color: U.text, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      Icon(Icons.edit_outlined, color: U.dim, size: 14),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Uploaded — tap to rename link',
+                    style: GoogleFonts.outfit(color: U.green, fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ),
           Icon(Icons.link_rounded, color: U.dim, size: 16),

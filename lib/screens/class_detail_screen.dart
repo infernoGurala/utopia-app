@@ -3,12 +3,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import '../widgets/professional_loading.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main.dart';
 import '../models/class_model.dart';
-import '../services/github_global_service.dart';
+import '../services/supabase_global_service.dart';
 import '../services/class_service.dart';
 import 'class_settings_screen.dart';
 import 'note_viewer_screen.dart';
@@ -180,7 +181,7 @@ class ClassDetailScreen extends StatefulWidget {
 }
 
 class _ClassDetailScreenState extends State<ClassDetailScreen> {
-  final GitHubGlobalService _github = GitHubGlobalService();
+  final SupabaseGlobalService _github = SupabaseGlobalService.instance;
   List<Map<String, dynamic>> _items = [];
   bool _isEditMode = false;
   bool _warningShown = false;
@@ -191,49 +192,14 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   String get _iconsJsonPath => '${widget.universityFolderName}/${widget.classModel.classId}/Notes/.icons.json';
 
   Future<void> _loadFolderIcons() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    final cachedStr = prefs.getString('cache_$_iconsJsonPath');
-    if (cachedStr != null && cachedStr.isNotEmpty) {
-      try {
-        final Map<String, dynamic> data = jsonDecode(cachedStr);
-        if (mounted) {
-          setState(() {
-            _folderIcons.clear();
-            for (final entry in data.entries) {
-              _folderIcons[entry.key] = entry.value as String;
-            }
-          });
-        }
-      } catch (_) {}
-    }
-
-    _github.getFileContentRaw(_iconsJsonPath).then((content) {
-      if (!mounted || content.isEmpty) return;
-      try {
-        final Map<String, dynamic> data = jsonDecode(content);
-        prefs.setString('cache_$_iconsJsonPath', content);
+    try {
+      final icons = await _github.getFolderIcons('${widget.universityFolderName}/${widget.classModel.classId}/Notes/');
+      if (mounted) {
         setState(() {
           _folderIcons.clear();
-          for (final entry in data.entries) {
-            _folderIcons[entry.key] = entry.value as String;
-          }
+          _folderIcons.addAll(icons);
         });
-      } catch (_) {}
-    }).catchError((_) {});
-  }
-
-  Future<void> _saveIconsToGitHub() async {
-    try {
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(_folderIcons);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cache_$_iconsJsonPath', jsonStr);
-
-      await _github.updateFile(
-        path: _iconsJsonPath,
-        content: jsonStr,
-        message: 'update folder icons',
-      );
+      }
     } catch (_) {}
   }
 
@@ -243,6 +209,36 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
   String get _fullPath =>
       '${widget.universityFolderName}/${widget.classModel.classId}/Notes/$_currentPath';
+
+  static String _formatRelativeTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.isNegative) return 'just now';
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) {
+      final m = diff.inMinutes;
+      return m == 1 ? '1 min ago' : '$m mins ago';
+    }
+    if (diff.inHours < 24) {
+      final h = diff.inHours;
+      return h == 1 ? '1 hour ago' : '$h hours ago';
+    }
+    if (diff.inDays < 7) {
+      final d = diff.inDays;
+      return d == 1 ? '1 day ago' : '$d days ago';
+    }
+    if (diff.inDays < 30) {
+      final w = diff.inDays ~/ 7;
+      return w == 1 ? '1 week ago' : '$w weeks ago';
+    }
+    if (diff.inDays < 365) {
+      final m = diff.inDays ~/ 30;
+      return m == 1 ? '1 month ago' : '$m months ago';
+    }
+    final y = diff.inDays ~/ 365;
+    return y == 1 ? '1 year ago' : '$y years ago';
+  }
 
   String _userRole = 'reader';
 
@@ -276,7 +272,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
   Future<void> _load({bool forceRefresh = false}) async {
     setState(() => _loading = true);
-    final items = await _github.getDirectoryContents(_fullPath, forceRefresh: forceRefresh);
+    final items = await _github.getDirectoryContents(_fullPath);
     if (!mounted) return;
     setState(() {
       _items = items.where((item) => item['name'] != '.keep' && !item['name'].toString().startsWith('.')).toList();
@@ -298,16 +294,18 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   Future<void> _setFolderIcon(String folderPath, String iconKey) async {
     setState(() => _isPushing = true);
     _folderIcons[folderPath] = iconKey;
-    await _saveIconsToGitHub();
-    await _load(forceRefresh: true);
+    try {
+      await _github.setFolderIcon(folderPath, iconKey);
+    } catch (_) {}
     if (mounted) setState(() => _isPushing = false);
   }
 
   Future<void> _removeFolderIcon(String folderPath) async {
     setState(() => _isPushing = true);
     _folderIcons.remove(folderPath);
-    await _saveIconsToGitHub();
-    await _load(forceRefresh: true);
+    try {
+      await _github.setFolderIcon(folderPath, '');
+    } catch (_) {}
     if (mounted) setState(() => _isPushing = false);
   }
 
@@ -396,7 +394,15 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       final newPath = parentPath.isEmpty ? ghNewName : '$parentPath/$ghNewName';
 
                       setState(() => _isPushing = true);
-                      final success = await _github.renameItem(path, newPath);
+                      bool success = false;
+                      try {
+                        if (path.endsWith('.md')) {
+                          await _github.renameNote(path, ghNewName);
+                        } else {
+                          await _github.renameFolder(path, ghNewName);
+                        }
+                        success = true;
+                      } catch (_) {}
                       if (success && mounted) {
                         await _load(forceRefresh: true);
                       }
@@ -594,7 +600,17 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                   Navigator.pop(ctx);
                   
                   setState(() => _isPushing = true);
-                  final success = await _github.deleteItem(path);
+                  bool success = false;
+                  try {
+                    if (path.endsWith('.md')) {
+                      await _github.deleteNote(path);
+                    } else {
+                      await _github.deleteFolder(path);
+                    }
+                    success = true;
+                  } catch (e) {
+                    debugPrint("Delete failed: $e");
+                  }
                   if (success && mounted) {
                     await _load(forceRefresh: true);
                   }
@@ -687,10 +703,20 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 final targetPath = isFile ? '$_fullPath$ghName' : '$_fullPath$ghName/.keep';
 
                 setState(() => _isPushing = true);
-                final success = await _github.createFolder(
-                  targetPath,
-                  content: isFile ? '# ${name.replaceAll('.md', '')}\n\n' : '# init\n',
-                );
+                final parentPathStr = _fullPath.endsWith('/') ? _fullPath.substring(0, _fullPath.length - 1) : _fullPath;
+                final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                bool success = false;
+                try {
+                  if (isFile) {
+                    final displayName = name.replaceAll('.md', '');
+                    await _github.createNote(parentPathStr, displayName, '# $displayName\n\n', 'class', widget.universityFolderName, widget.classModel.classId, uid);
+                  } else {
+                    await _github.createFolder(parentPathStr, ghName, 'class', widget.universityFolderName, widget.classModel.classId, uid);
+                  }
+                  success = true;
+                } catch (e) {
+                  debugPrint("Create failed: $e");
+                }
 
                 if (success && mounted) {
                   await _load(forceRefresh: true);
@@ -867,7 +893,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             children: [
               Expanded(
                 child: _loading
-                ? Center(child: CircularProgressIndicator(color: U.primary))
+                ? ProfessionalLoading(message: 'Loading notes...')
                 : _items.isEmpty
                 ? Center(
                     child: Text(
@@ -981,6 +1007,21 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                                           child: Text(
                                             _formatFileSize(item['size'] as int),
                                             style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                                          ),
+                                        ),
+                                      if (_isEditMode && (item['updated_at'] != null || item['created_at'] != null))
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 3),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.schedule_rounded, size: 11, color: U.dim),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                _formatRelativeTime(DateTime.parse((item['updated_at'] ?? item['created_at']) as String)),
+                                                style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w400),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                     ],

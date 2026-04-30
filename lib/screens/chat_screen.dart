@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
-import '../services/chat_emoji_catalog.dart';
 import '../services/chat_service.dart';
 import '../services/game_champion_service.dart';
 import '../services/notification_service.dart';
@@ -41,28 +40,14 @@ class _ChatScreenState extends State<ChatScreen> {
   late final Stream<QuerySnapshot<Map<String, dynamic>>> _messagesStream;
   Timer? _typingDebounce;
   bool _sending = false;
-  bool _emojiPickerOpen = false;
   bool _typingActive = false;
   String? _lastError;
   Map<String, dynamic>? _replyTo;
   String? _editingMessageId;
-  final List<ChatEmoji> _draftEmojis = [];
 
   String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   String get _chatId => _chatService.chatIdFor(_currentUid, widget.otherUserId);
 
-  void _closeEmojiPicker({bool focusComposer = false}) {
-    if (_emojiPickerOpen) {
-      setState(() => _emojiPickerOpen = false);
-    }
-    if (focusComposer) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _composerFocusNode.requestFocus();
-        }
-      });
-    }
-  }
 
   @override
   void initState() {
@@ -93,8 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _handleComposerChanged() {
-    final hasText =
-        _messageController.text.trim().isNotEmpty || _draftEmojis.isNotEmpty;
+    final hasText = _messageController.text.trim().isNotEmpty;
     if (hasText != _typingActive) {
       _typingActive = hasText;
       unawaited(
@@ -121,35 +105,8 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _toggleEmojiPicker() {
-    if (_emojiPickerOpen) {
-      _closeEmojiPicker(focusComposer: true);
-      return;
-    }
-    _composerFocusNode.unfocus();
-    setState(() => _emojiPickerOpen = true);
-  }
-
-  void _insertEmoji(ChatEmoji emoji) {
-    setState(() {
-      _draftEmojis.add(emoji);
-    });
-    _handleComposerChanged();
-  }
-
-  void _removeDraftEmoji(int index) {
-    setState(() {
-      _draftEmojis.removeAt(index);
-    });
-    _handleComposerChanged();
-  }
-
   Future<bool> _handleBackNavigation() async {
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
-    if (_emojiPickerOpen) {
-      _closeEmojiPicker();
-      return false;
-    }
     if (_composerFocusNode.hasFocus || keyboardVisible) {
       _composerFocusNode.unfocus();
       return false;
@@ -223,19 +180,14 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (action == 'edit') {
-      final parsedEmojis = ChatEmojiCatalog.extractEmojis(text);
-      final parsedText = ChatEmojiCatalog.stripEmojiTokens(text);
       setState(() {
         _editingMessageId = messageId;
         _replyTo = null;
         _lastError = null;
-        _draftEmojis
-          ..clear()
-          ..addAll(parsedEmojis);
       });
       _messageController
-        ..text = parsedText
-        ..selection = TextSelection.collapsed(offset: parsedText.length);
+        ..text = text
+        ..selection = TextSelection.collapsed(offset: text.length);
       _handleComposerChanged();
       return;
     }
@@ -249,7 +201,6 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted && _editingMessageId == messageId) {
           setState(() {
             _messageController.clear();
-            _draftEmojis.clear();
             _cancelComposerMode();
           });
         }
@@ -289,13 +240,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _send() async {
-    final text = _messageController.text.trim();
-    final composedText = [
-      if (text.isNotEmpty) text,
-      if (_draftEmojis.isNotEmpty)
-        _draftEmojis.map((emoji) => emoji.token).join(' '),
-    ].join(text.isNotEmpty && _draftEmojis.isNotEmpty ? ' ' : '');
-    if (_sending || composedText.trim().isEmpty) {
+    final composedText = _messageController.text.trim();
+    if (_sending || composedText.isEmpty) {
       return;
     }
 
@@ -319,7 +265,6 @@ class _ChatScreenState extends State<ChatScreen> {
           _lastError = null;
           _replyTo = null;
           _editingMessageId = null;
-          _draftEmojis.clear();
         });
       }
       _typingDebounce?.cancel();
@@ -360,7 +305,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -375,7 +319,6 @@ class _ChatScreenState extends State<ChatScreen> {
       },
       child: Scaffold(
         backgroundColor: U.bg,
-        resizeToAvoidBottomInset: false,
         appBar: AppBar(
           backgroundColor: U.bg,
           titleSpacing: 0,
@@ -499,13 +442,7 @@ class _ChatScreenState extends State<ChatScreen> {
             },
           ),
         ),
-        body: AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.only(
-            bottom: _emojiPickerOpen ? 0 : keyboardInset,
-          ),
-          child: Column(
+        body: Column(
             children: [
               Expanded(
                 child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -682,267 +619,149 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               // Composer Container
               Container(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-                decoration: BoxDecoration(
-                  color: U.bg,
-                ),
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                color: U.bg,
                 child: SafeArea(
                   top: false,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: _toggleEmojiPicker,
-                        splashRadius: 22,
-                        padding: const EdgeInsets.only(bottom: 12),
-                        icon: Icon(
-                          _emojiPickerOpen
-                              ? Icons.keyboard_rounded
-                              : Icons.emoji_emotions_outlined,
-                          color: U.primary,
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: U.card,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: U.border.withValues(alpha: 0.5)),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (_isEditing || _replyTo != null) ...[
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.fromLTRB(
-                                    10,
-                                    8,
-                                    6,
-                                    8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: U.surface,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: U.border),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 3,
-                                        height: 34,
-                                        decoration: BoxDecoration(
-                                          color: _isEditing
-                                              ? U.peach
-                                              : U.primary,
-                                          borderRadius: BorderRadius.circular(
-                                            99,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: U.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: U.border),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_isEditing || _replyTo != null) ...[
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+                                    decoration: BoxDecoration(
+                                      color: U.bg,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 3,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: _isEditing ? U.peach : U.primary,
+                                            borderRadius: BorderRadius.circular(99),
                                           ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              _isEditing
-                                                  ? 'Editing message'
-                                                  : (_replyTo?['senderName'] ??
-                                                            'Reply')
-                                                        .toString(),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: GoogleFonts.outfit(
-                                                color: _isEditing
-                                                    ? U.peach
-                                                    : U.primary,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            if (_isEditing)
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
                                               Text(
-                                                'Send to save changes',
+                                                _isEditing
+                                                    ? 'Editing message'
+                                                    : (_replyTo?['senderName'] ?? 'Reply').toString(),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: GoogleFonts.outfit(
+                                                  color: _isEditing ? U.peach : U.primary,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                _isEditing
+                                                    ? 'Send to save changes'
+                                                    : (_replyTo?['text'] ?? '').toString(),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: GoogleFonts.outfit(
                                                   color: U.sub,
-                                                  fontSize: 12,
-                                                ),
-                                              )
-                                            else
-                                              ChatEmojiCatalog.buildInlinePreview(
-                                                (_replyTo?['text'] ?? '')
-                                                    .toString(),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                fontSize: 12,
-                                                textColor: U.sub,
-                                                emojiSize: 18,
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        onPressed: () => setState(
-                                          () => _cancelComposerMode(),
-                                        ),
-                                        splashRadius: 18,
-                                        icon: Icon(
-                                          Icons.close_rounded,
-                                          color: U.sub,
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              if (_draftEmojis.isNotEmpty) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: 8,
-                                    top: 2,
-                                  ),
-                                  child: Wrap(
-                                    spacing: 10,
-                                    runSpacing: 8,
-                                    children: List.generate(
-                                      _draftEmojis.length,
-                                      (index) {
-                                        final emoji = _draftEmojis[index];
-                                        return Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 4,
-                                                top: 2,
-                                              ),
-                                              child: Image.asset(
-                                                emoji.assetPath,
-                                                width: 28,
-                                                height: 28,
-                                                fit: BoxFit.contain,
-                                              ),
-                                            ),
-                                            Positioned(
-                                              right: -2,
-                                              top: -4,
-                                              child: GestureDetector(
-                                                onTap: () =>
-                                                    _removeDraftEmoji(index),
-                                                child: Container(
-                                                  width: 16,
-                                                  height: 16,
-                                                  decoration: BoxDecoration(
-                                                    color: U.surface,
-                                                    shape: BoxShape.circle,
-                                                    border: Border.all(
-                                                      color: U.border,
-                                                    ),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.close_rounded,
-                                                    color: U.sub,
-                                                    size: 11,
-                                                  ),
+                                                  fontSize: 13,
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        );
-                                      },
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          onPressed: () => setState(() => _cancelComposerMode()),
+                                          splashRadius: 18,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          icon: Icon(Icons.close_rounded, color: U.sub, size: 18),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                TextField(
+                                  focusNode: _composerFocusNode,
+                                  controller: _messageController,
+                                  minLines: 1,
+                                  maxLines: 5,
+                                  style: GoogleFonts.outfit(
+                                    color: U.text,
+                                    fontSize: 15,
+                                  ),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                                    hintText: _isEditing ? 'Edit message' : 'Message...',
+                                    hintStyle: GoogleFonts.outfit(
+                                      color: U.sub,
+                                      fontSize: 15,
                                     ),
                                   ),
                                 ),
-                              ],
-                              TextField(
-                                focusNode: _composerFocusNode,
-                                onTap: () {
-                                  if (_emojiPickerOpen) {
-                                    _closeEmojiPicker();
-                                  }
-                                },
-                                controller: _messageController,
-                                minLines: 1,
-                                maxLines: 5,
-                                style: GoogleFonts.outfit(
-                                  color: U.text,
-                                  fontSize: 15,
-                                ),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                                  hintText: _isEditing
-                                      ? 'Edit message'
-                                      : 'Message...',
-                                  hintStyle: GoogleFonts.outfit(
-                                    color: U.sub,
-                                    fontSize: 15,
+                                if (_lastError != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _lastError!,
+                                    style: GoogleFonts.outfit(
+                                      color: U.red,
+                                      fontSize: 11,
+                                    ),
                                   ),
-                                ),
-                              ),
-                              if (_lastError != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  _lastError!,
-                                  style: GoogleFonts.outfit(
-                                    color: U.red,
-                                    fontSize: 11,
-                                  ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: U.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: _sending ? null : _send,
-                          icon: _sending
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 1.6,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4, right: 6),
+                          child: IconButton(
+                            onPressed: _sending ? null : _send,
+                            splashRadius: 22,
+                            icon: _sending
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      color: U.primary,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Icon(
+                                    _isEditing ? Icons.check_rounded : Icons.send_rounded,
+                                    color: U.primary,
+                                    size: 22,
                                   ),
-                                )
-                              : Icon(
-                                  _isEditing
-                                      ? Icons.check_rounded
-                                      : Icons.send_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-              if (_emojiPickerOpen)
-                _EmojiPickerPanel(onEmojiSelected: _insertEmoji),
             ],
           ),
-        ),
       ),
     );
   }
@@ -966,125 +785,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _EmojiPickerPanel extends StatefulWidget {
-  const _EmojiPickerPanel({required this.onEmojiSelected});
 
-  final ValueChanged<ChatEmoji> onEmojiSelected;
 
-  @override
-  State<_EmojiPickerPanel> createState() => _EmojiPickerPanelState();
-}
-
-class _EmojiPickerPanelState extends State<_EmojiPickerPanel> {
-  String _categoryKey = ChatEmojiCatalog.categories.first.key;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeCategory = ChatEmojiCatalog.categories.firstWhere(
-      (category) => category.key == _categoryKey,
-      orElse: () => ChatEmojiCatalog.categories.first,
-    );
-    final emojis = ChatEmojiCatalog.forCategory(activeCategory.key);
-    return Container(
-      height: 332,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-      decoration: BoxDecoration(
-        color: U.surface,
-        border: Border(top: BorderSide(color: U.border, width: 0.5)),
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 44,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: ChatEmojiCatalog.categories.length,
-              separatorBuilder: (context, index) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final category = ChatEmojiCatalog.categories[index];
-                final selected = category.key == activeCategory.key;
-                return InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => setState(() => _categoryKey = category.key),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? U.primary.withValues(alpha: 0.16)
-                          : U.card,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: selected ? U.primary : U.border,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          category.icon,
-                          size: 18,
-                          color: selected ? U.primary : U.sub,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          category.label,
-                          style: GoogleFonts.outfit(
-                            color: selected ? U.primary : U.sub,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: GridView.builder(
-              itemCount: emojis.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 5,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                childAspectRatio: 1,
-              ),
-              itemBuilder: (context, index) {
-                final emoji = emojis[index];
-                return InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => widget.onEmojiSelected(emoji),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: U.card,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: U.border),
-                    ),
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Image.asset(
-                          emoji.assetPath,
-                          width: 26,
-                          height: 26,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _MessageBubble extends StatefulWidget {
   const _MessageBubble({
@@ -1168,7 +870,6 @@ class _MessageBubbleState extends State<_MessageBubble> {
     final bubbleColor = _isMe
         ? Color.alphaBlend(U.primary.withValues(alpha: 0.14), U.card)
         : U.card;
-    final singleEmojiAssetPath = _singleEmojiAssetPath();
     final avatar = CircleAvatar(
       radius: 14,
       backgroundColor: _isMe ? U.primary.withValues(alpha: 0.18) : U.border,
@@ -1220,22 +921,6 @@ class _MessageBubbleState extends State<_MessageBubble> {
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
-                        if (singleEmojiAssetPath != null &&
-                            widget.replyTo == null &&
-                            widget.messageType == 'text')
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 2,
-                              vertical: 2,
-                            ),
-                            child: Image.asset(
-                              singleEmojiAssetPath,
-                              width: 42,
-                              height: 42,
-                              fit: BoxFit.contain,
-                            ),
-                          )
-                        else
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -1280,14 +965,14 @@ class _MessageBubbleState extends State<_MessageBubble> {
                                           ),
                                         ),
                                         const SizedBox(height: 2),
-                                          ChatEmojiCatalog.buildInlinePreview(
-                                            (widget.replyTo?['text'] ?? '')
-                                                .toString(),
-                                            fontSize: 12,
-                                            textColor: U.sub,
-                                            emojiSize: 18,
+                                          Text(
+                                            (widget.replyTo?['text'] ?? '').toString(),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.outfit(
+                                              color: U.sub,
+                                              fontSize: 12,
+                                            ),
                                           ),
                                       ],
                                     ),
@@ -1371,19 +1056,13 @@ class _MessageBubbleState extends State<_MessageBubble> {
         onTap: widget.onOpenNoteShare,
       );
     }
-    return ChatEmojiCatalog.buildInlinePreview(
+    return Text(
       widget.text,
-      fontSize: 15,
-      textColor: U.text,
-      emojiSize: 22,
+      style: GoogleFonts.outfit(
+        color: U.text,
+        fontSize: 15,
+      ),
     );
-  }
-
-  String? _singleEmojiAssetPath() {
-    if (widget.isDeleted || widget.messageType != 'text') {
-      return null;
-    }
-    return ChatEmojiCatalog.singleEmojiAssetPath(widget.text);
   }
 }
 

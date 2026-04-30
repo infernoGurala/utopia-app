@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
-import '../services/github_service.dart';
+import '../services/supabase_notes_service.dart';
 import '../services/role_service.dart';
 import '../widgets/app_motion.dart';
 import 'editor_screen.dart';
@@ -25,7 +25,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  final _github = GitHubService();
+  final _notes = SupabaseNotesService();
   static const List<String> _libraryMoodWords = [
     'focus',
     'clarity',
@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 900), () {
         if (!mounted) return;
-        unawaited(_github.warmLibraryForOffline());
+        // Offline warmup is no longer needed with Supabase
       });
     });
   }
@@ -130,8 +130,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _load() async {
     if (mounted) setState(() => _syncing = true);
-    final folders = await _github.getFolders(isWriter: _isSuperUser);
-    _scheduleOfflineWarmup();
+    final folders = await _notes.getFolders();
+    // _scheduleOfflineWarmup();
     if (!mounted) return;
     setState(() {
       _folders = folders.where((f) {
@@ -148,7 +148,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool currentlyHidden,
   ) async {
     final newHidden = !currentlyHidden;
-    final success = await _github.updateHiddenFoldersForFolder(path, newHidden);
+    bool success = false;
+    try {
+      await _notes.setFolderHidden(path, newHidden);
+      success = true;
+    } catch (_) {
+      success = false;
+    }
 
     if (success) {
       setState(() {
@@ -232,10 +238,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _github.deleteFolder(
-                path,
-                deleteFiles: true,
-              );
+              bool success = false;
+              try {
+                await _notes.deleteFolder(path);
+                success = true;
+              } catch (_) {}
               if (success) {
                 await _load();
               } else {
@@ -303,7 +310,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               final name = controller.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(context);
-              final success = await _github.createFolder(name);
+              bool success = false;
+              try {
+                await _notes.createFolder(name);
+                success = true;
+              } catch (_) {}
               if (success) {
                 await _load();
                 if (mounted) {
@@ -855,7 +866,7 @@ class TopicListScreen extends StatefulWidget {
 }
 
 class _TopicListScreenState extends State<TopicListScreen> {
-  final _github = GitHubService();
+  final _supabaseNotes = SupabaseNotesService();
   List<Map<String, dynamic>> _files = [];
   String _indexContent = '';
   String? _indexFilePath;
@@ -866,19 +877,6 @@ class _TopicListScreenState extends State<TopicListScreen> {
   @override
   void initState() {
     super.initState();
-    final memoryFiles = _github.getCachedFilesSync(widget.folderPath);
-    if (memoryFiles.isNotEmpty) {
-      _applyTopicFiles(memoryFiles);
-      final indexFile = _findIndexFile(memoryFiles);
-      if (indexFile != null) {
-        final indexPath = indexFile['path'].toString();
-        final raw = _github.getCachedNoteContentSync(indexPath) ?? '';
-        _indexFilePath = indexPath;
-        _indexRawContent = raw;
-        _indexContent = _extractDescription(raw);
-      }
-    }
-    _loadCached();
     unawaited(_load());
     RoleService().isSuperUser().then((v) {
       if (mounted) setState(() => _isSuperUser = v);
@@ -905,45 +903,31 @@ class _TopicListScreenState extends State<TopicListScreen> {
     });
   }
 
-  Future<void> _loadIndexFromCache(List<Map<String, dynamic>> files) async {
-    final indexFile = _findIndexFile(files);
-    if (indexFile == null) return;
-    final indexPath = indexFile['path'].toString();
-    final raw = await CacheService().getNoteContent(indexPath);
-    if (!mounted) return;
-    setState(() {
-      _indexFilePath = indexPath;
-      _indexRawContent = raw ?? '';
-      _indexContent = _extractDescription(raw ?? '');
-    });
-  }
-
-  Future<void> _loadCached() async {
-    final files = await CacheService().getFiles(widget.folderPath);
-    if (!mounted || files.isEmpty) return;
-    unawaited(_github.warmFolderForOffline(widget.folderPath));
-    _applyTopicFiles(files);
-    unawaited(_loadIndexFromCache(files));
-  }
-
   Future<void> _load() async {
-    final files = await _github.getFiles(widget.folderPath);
-    unawaited(_github.warmFolderForOffline(widget.folderPath));
-    _applyTopicFiles(files);
-    unawaited(_refreshIndexContent(files));
+    try {
+      final files = await _supabaseNotes.getFiles(widget.folderPath);
+      _applyTopicFiles(files);
+      unawaited(_refreshIndexContent(files));
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   Future<void> _refreshIndexContent(List<Map<String, dynamic>> files) async {
     final indexFile = _findIndexFile(files);
     if (indexFile == null) return;
     final indexPath = indexFile['path'].toString();
-    final raw = await _github.getFileContent(indexPath);
-    if (!mounted) return;
-    setState(() {
-      _indexFilePath = indexPath;
-      _indexRawContent = raw;
-      _indexContent = _extractDescription(raw);
-    });
+    try {
+      final raw = await _supabaseNotes.getNoteContent(indexPath);
+      if (!mounted) return;
+      setState(() {
+        _indexFilePath = indexPath;
+        _indexRawContent = raw;
+        _indexContent = _extractDescription(raw);
+      });
+    } catch (e) {
+      debugPrint('Error: $e');
+    }
   }
 
   String _extractDescription(String raw) {
@@ -1022,14 +1006,14 @@ class _TopicListScreenState extends State<TopicListScreen> {
               final name = controller.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(context);
-              final success = await _github.createFile(
-                widget.folderPath,
-                name,
-                '# $name\n\nStart writing your notes here...',
-              );
-              if (success) {
+              try {
+                await _supabaseNotes.createNote(
+                  widget.folderPath,
+                  name,
+                  '# $name\n\nStart writing your notes here...',
+                );
                 await _load();
-              } else {
+              } catch (e) {
                 if (mounted) {
                   scaffoldMessenger.showSnackBar(
                     SnackBar(
@@ -1104,10 +1088,10 @@ class _TopicListScreenState extends State<TopicListScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await _github.deleteFile(path);
-              if (success) {
+              try {
+                await _supabaseNotes.deleteNote(path);
                 await _load();
-              } else {
+              } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

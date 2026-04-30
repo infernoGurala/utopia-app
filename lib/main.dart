@@ -13,6 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:app_links/app_links.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'firebase_options.dart';
 import 'services/app_update_service.dart';
 import 'services/cache_service.dart';
@@ -27,6 +28,7 @@ import 'widgets/app_update_prompt.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 late final Future<AppInitializationState> appInitialization;
+SupabaseClient get supabase => Supabase.instance.client;
 
 class AppInitializationState {
   const AppInitializationState({
@@ -434,8 +436,45 @@ const _catppuccinLatteTheme = AppTheme(
   mermaidLine: '#8839EF',
 );
 
+const _rosePineDawnTheme = AppTheme(
+  key: 'rose-pine-dawn',
+  label: 'Rosé Pine Dawn',
+  description: 'Warm pastel light theme',
+  isDark: false,
+  bg: Color(0xFFFAF4ED),
+  surface: Color(0xFFF2E9E1),
+  card: Color(0xFFFFFAF3),
+  border: Color(0xFFDFDAD9),
+  text: Color(0xFF575279),
+  sub: Color(0xFF797593),
+  dim: Color(0xFF9893A5),
+  primary: Color(0xFFD7827E),
+  teal: Color(0xFF286983),
+  red: Color(0xFFB4637A),
+  green: Color(0xFF286983),
+  peach: Color(0xFFEA9D34),
+  blue: Color(0xFF286983),
+  gold: Color(0xFFEA9D34),
+  sky: Color(0xFF56949F),
+  lavender: Color(0xFF907AA9),
+  gray: Color(0xFF797593),
+  mdH1: Color(0xFFD7827E),
+  mdH2: Color(0xFF56949F),
+  mdH3: Color(0xFF907AA9),
+  mdBold: Color(0xFFEA9D34),
+  mdItalic: Color(0xFF286983),
+  mdCode: Color(0xFFB4637A),
+  mdLink: Color(0xFF56949F),
+  mdBlockquote: Color(0xFF9893A5),
+  mdDel: Color(0xFF9893A5),
+  mermaidPrimary: '#D7827E',
+  mermaidBackground: '#FFFAF3',
+  mermaidLine: '#D7827E',
+);
+
 const appThemes = [
   _catppuccinLatteTheme,
+  _rosePineDawnTheme,
   _orchidTheme,
   _tokyonightTheme,
   _catppuccinMochaTheme,
@@ -465,10 +504,10 @@ void _applySystemUiForTheme(AppTheme theme) {
           usesLightIcons ? Brightness.light : Brightness.dark,
       statusBarBrightness:
           usesLightIcons ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: theme.bg,
+      systemNavigationBarColor: Colors.transparent,
       systemNavigationBarIconBrightness:
           usesLightIcons ? Brightness.light : Brightness.dark,
-      systemNavigationBarDividerColor: theme.border,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 }
@@ -577,6 +616,25 @@ Future<AppInitializationState> _initializeApp() async {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       unawaited(NotificationService.initialize());
     }
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final url = data['url'] as String?;
+        final anonKey = data['anon_key'] as String?;
+        if (url != null && anonKey != null) {
+          await Supabase.initialize(url: url, anonKey: anonKey);
+        } else {
+          debugPrint('Supabase config missing url or anon_key');
+        }
+      } else {
+        debugPrint('Supabase config document not found');
+      }
+    } catch (e) {
+      debugPrint('Failed to initialize Supabase: $e');
+    }
+
     return const AppInitializationState(firebaseReady: true);
   } catch (e) {
     return AppInitializationState(
@@ -620,6 +678,7 @@ void main() async {
   await _loadAppToggleSettings();
   appInitialization = _initializeApp();
   _applySystemUiForTheme(appThemeNotifier.value);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const UtopiaApp());
 }
 

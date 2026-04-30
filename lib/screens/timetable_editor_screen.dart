@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/writer_github_service.dart';
+import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class TimetableEditorScreen extends StatefulWidget {
@@ -43,7 +43,7 @@ class _TimetableEditorScreenState extends State<TimetableEditorScreen>
 
   Future<void> _loadTimetable() async {
     try {
-      final data = await WriterGitHubService.fetchRawJson('timetable.json');
+      final data = await WriterFirestoreService.fetchConfig('timetable');
       if (!mounted) {
         return;
       }
@@ -149,11 +149,7 @@ class _TimetableEditorScreenState extends State<TimetableEditorScreen>
         };
       }
 
-      await WriterGitHubService.updateJsonFile(
-        filename: 'timetable.json',
-        jsonData: json,
-        commitMessage: 'Updated timetable via UTOPIA app',
-      );
+      await WriterFirestoreService.updateConfig('timetable', json);
 
       if (!mounted) {
         return;

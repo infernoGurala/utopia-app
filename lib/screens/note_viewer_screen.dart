@@ -10,13 +10,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
 import '../services/chat_service.dart';
 import '../services/file_cache_service.dart';
-import '../services/github_service.dart';
-import '../services/github_global_service.dart';
+import '../services/supabase_notes_service.dart';
+import '../services/supabase_global_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
 import 'editor_screen.dart';
@@ -48,7 +49,7 @@ class NoteViewerScreen extends StatefulWidget {
 }
 
 class _NoteViewerScreenState extends State<NoteViewerScreen> {
-  final _github = GitHubService();
+  final _notes = SupabaseNotesService();
   final _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
   String _rawContent = '';
@@ -100,15 +101,19 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     }
 
     final isCommunityNote = widget.filePath.contains('/Community/') || widget.useGlobalRepo;
-    final globalGitHub = GitHubGlobalService();
+    final globalService = SupabaseGlobalService.instance;
 
     for (final candidate in allCandidates) {
-      if (isCommunityNote) {
-        raw = await globalGitHub.getFileContentRaw(candidate);
-      } else {
-        raw = await _github.getFileContent(candidate);
+      try {
+        if (isCommunityNote) {
+          raw = await globalService.getNoteContent(candidate);
+        } else {
+          raw = await _notes.getNoteContent(candidate);
+        }
+        if (raw.isNotEmpty) break;
+      } catch (e, stack) {
+        debugPrint('Error loading note content: $e\n$stack');
       }
-      if (raw.isNotEmpty) break;
     }
 
     if (raw.isEmpty && mounted) {
@@ -368,6 +373,34 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     return null;
   }
 
+  Future<Map<String, dynamic>?> _findNoteByName(String name) async {
+    final target = _normalizeName(name);
+    if (target.isEmpty) return null;
+    try {
+      final response = await Supabase.instance.client
+          .from('notes')
+          .select('name, path, folder_path')
+          .ilike('name', '%$target%')
+          .limit(1)
+          .maybeSingle();
+      return response;
+    } catch (_) {}
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _findNoteByPath(String path) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('notes')
+          .select('name, path, folder_path')
+          .ilike('path', '%$path%')
+          .limit(1)
+          .maybeSingle();
+      return response;
+    } catch (_) {}
+    return null;
+  }
+
   Future<Map<String, dynamic>?> _resolveInternalNote(String href) async {
     final allFiles = await CacheService().getAllFiles();
 
@@ -395,7 +428,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
         return cachedByName;
       }
 
-      return _github.findNoteByName(name);
+      return _findNoteByName(name);
     }
 
     final uri = Uri.tryParse(href);
@@ -415,7 +448,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     }
 
     for (final candidate in pathCandidates) {
-      final exactMatch = await _github.findNoteByPath(candidate);
+      final exactMatch = await _findNoteByPath(candidate);
       if (exactMatch != null) {
         return exactMatch;
       }
@@ -444,7 +477,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       return cachedByName;
     }
 
-    return _github.findNoteByName(fallbackName);
+    return _findNoteByName(fallbackName);
   }
 
   String _folderFromPath() {
@@ -3076,8 +3109,6 @@ class _CachedImage extends StatefulWidget {
 }
 
 class _CachedImageState extends State<_CachedImage> {
-  final _github = GitHubService();
-  final _cache = FileCacheService();
   String? _localPath;
   String? _networkUrl;
   bool _loading = true;
@@ -3091,73 +3122,22 @@ class _CachedImageState extends State<_CachedImage> {
 
   Future<void> _resolve() async {
     try {
-      final repoImagePath = await _github.getOrFetchRepoImage(
-        widget.src,
-        noteFolderPath: widget.folderPath,
-        notePath: widget.notePath,
-      );
-
-      if (repoImagePath != null &&
-          repoImagePath.isNotEmpty &&
-          await File(repoImagePath).exists()) {
-        if (mounted) {
-          setState(() {
-            _localPath = repoImagePath;
-            _loading = false;
-          });
-        }
-        return;
-      }
-
-      final url = await _github.resolveImageUrl(
-        widget.src,
-        noteFolderPath: widget.folderPath,
-        notePath: widget.notePath,
-      );
-
-      if (url == null || url.isEmpty) {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _error = true;
-          });
-        }
-        return;
-      }
-
-      _networkUrl = url;
-
-      final cached = await _cache.getCachedImagePath(url);
-      if (cached != null && await File(cached).exists()) {
-        if (mounted) {
-          setState(() {
-            _localPath = cached;
-            _loading = false;
-          });
-        }
-        return;
-      }
-
-      if (mounted) {
+      if (widget.src.startsWith('http')) {
         setState(() {
+          _networkUrl = widget.src;
           _loading = false;
         });
-      }
-
-      final path = await _cache.downloadFile(url);
-      if (path != null) {
-        final healedPath = await _cache.getCachedImagePath(url);
-        if (healedPath != null && mounted) {
-          setState(() {
-            _localPath = healedPath;
-          });
-        }
+      } else {
+        setState(() {
+          _error = true;
+          _loading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _loading = false;
           _error = true;
+          _loading = false;
         });
       }
     }
@@ -3292,7 +3272,7 @@ class _CachedImageState extends State<_CachedImage> {
   Widget _errorBuilder(BuildContext context, Object error, StackTrace? stack) {
     final url = _networkUrl;
     if (_localPath != null && url != null) {
-      unawaited(_cache.deleteCached(url));
+      unawaited(FileCacheService().deleteCached(url));
       _localPath = null;
     }
     return _errorPlaceholder();
@@ -3422,15 +3402,14 @@ class _RawMarkdownEditorState extends State<_RawMarkdownEditor> {
     // Pop immediately for responsiveness
     Navigator.pop(context, content);
 
-    // Background save to global repo
+    // Background save to Supabase
     try {
-      await GitHubGlobalService().updateFile(
-        path: widget.filePath,
-        content: content,
-        message:
-            'Updated ${widget.filePath} by ${user.displayName ?? user.email ?? 'UTOPIA writer'} via UTOPIA app',
+      await SupabaseGlobalService.instance.updateNote(
+        widget.filePath,
+        content,
+        user.uid,
+        user.displayName ?? user.email ?? 'Unknown',
       );
-      await GitHubService.primeFileContentCache(widget.filePath, content);
     } catch (e) {
       debugPrint('RawMarkdownEditor: background save failed: $e');
     }

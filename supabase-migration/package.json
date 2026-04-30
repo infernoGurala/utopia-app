@@ -1,0 +1,14 @@
+{
+  "name": "utopia-supabase-migration",
+  "version": "1.0.0",
+  "description": "Migration script from GitHub to Supabase",
+  "main": "migrate.js",
+  "type": "module",
+  "scripts": {
+    "start": "node migrate.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "dotenv": "^16.4.5"
+  }
+}

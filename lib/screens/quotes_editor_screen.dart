@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
-import '../services/writer_github_service.dart';
+import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class QuotesEditorScreen extends StatefulWidget {
@@ -25,14 +25,14 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
 
   Future<void> _loadQuotes() async {
     try {
-      final data = await WriterGitHubService.fetchRawJson('quotes.json');
+      final data = await WriterFirestoreService.fetchConfig('quotes');
       final loadedQuotes = <String>[];
       if (data is Map<String, dynamic> && data['quotes'] is List) {
         loadedQuotes.addAll(
           (data['quotes'] as List).map((item) => item.toString()),
         );
       } else if (data is List) {
-        loadedQuotes.addAll(data.map((item) => item.toString()));
+        loadedQuotes.addAll((data as List).map((item) => item.toString()));
       }
       if (!mounted) {
         return;
@@ -129,13 +129,9 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
     });
 
     try {
-      await WriterGitHubService.updateJsonFile(
-        filename: 'quotes.json',
-        jsonData: {
-          'quotes': _quotes.where((quote) => quote.trim().isNotEmpty).toList(),
-        },
-        commitMessage: 'Updated quotes via UTOPIA app',
-      );
+      await WriterFirestoreService.updateConfig('quotes', {
+        'quotes': _quotes.where((quote) => quote.trim().isNotEmpty).toList(),
+      });
       if (!mounted) {
         return;
       }

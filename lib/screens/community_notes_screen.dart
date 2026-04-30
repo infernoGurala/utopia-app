@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/professional_loading.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
-import '../services/github_global_service.dart';
+import '../services/supabase_global_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -208,7 +209,7 @@ class CommunityNotesScreen extends StatefulWidget {
 }
 
 class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
-  final GitHubGlobalService _github = GitHubGlobalService();
+  final SupabaseGlobalService _github = SupabaseGlobalService.instance;
   List<Map<String, dynamic>> _items = [];
   bool _loading = true;
   bool _syncing = false;
@@ -221,6 +222,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   /// Cached folder-icon overrides: folderPath → iconKey from kFolderIconCatalogue.
   final Map<String, String> _folderIcons = {};
+
+  /// Per-user icon color overrides: path → Color hex int.
+  final Map<String, int> _iconColors = {};
+
+  /// Per-user pinned program paths (root folders only).
+  final Set<String> _pinnedPaths = {};
 
   /// Cached last-modified dates: itemPath → DateTime.
   final Map<String, DateTime> _lastModifiedDates = {};
@@ -247,60 +254,85 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   }
 
   /// Smart icon resolver — checks Firestore override first, then name heuristics.
+  /// Default palette for automatic coloring (no two adjacent same).
+  static const _autoPalette = <Color>[
+    Color(0xFF6366F1), // indigo
+    Color(0xFF10B981), // emerald
+    Color(0xFFF59E0B), // amber
+    Color(0xFFEC4899), // pink
+    Color(0xFF3B82F6), // blue
+    Color(0xFF8B5CF6), // violet
+    Color(0xFF14B8A6), // teal
+    Color(0xFFF97316), // orange
+  ];
+
+  /// Get a color for an item by index, ensuring no two adjacent are the same.
+  Color _colorForIndex(int index) {
+    return _autoPalette[index % _autoPalette.length];
+  }
+
   /// For number overrides (num_X), returns a generic icon — the caller should
   /// check _folderIcons directly to render a number badge instead.
-  (IconData, Color) _iconFor(String name, String path) {
+  (IconData, Color) _iconFor(String name, String path, {int index = 0}) {
+    // 0. Check user-set color override
+    final customColorInt = _iconColors[path];
+
     // 1. Check user-set icon override
     final overrideKey = _folderIcons[path];
     if (overrideKey != null) {
       // Number icon — caller renders a badge; return placeholder
       if (overrideKey.startsWith('num_')) {
-        return (Icons.tag_outlined, U.teal);
+        return (Icons.tag_outlined, customColorInt != null ? Color(customColorInt) : U.teal);
       }
       if (kFolderIconCatalogue.containsKey(overrideKey)) {
-        return (kFolderIconCatalogue[overrideKey]!.$1, U.primary);
+        return (kFolderIconCatalogue[overrideKey]!.$1, customColorInt != null ? Color(customColorInt) : U.primary);
       }
     }
+
+    // If user set a custom color, use it with heuristic icon
+    Color resolveColor(Color defaultColor) =>
+        customColorInt != null ? Color(customColorInt) : defaultColor;
+
     // 2. Name-based heuristics (from old library)
     final key = name.toLowerCase();
-    if (key.contains('thermo'))        return (Icons.local_fire_department_outlined, U.peach);
+    if (key.contains('thermo'))        return (Icons.local_fire_department_outlined, resolveColor(U.peach));
     if (key.contains('math') || key.contains('calculus') || key.contains('algebra'))
-                                       return (Icons.functions_outlined, U.primary);
+                                       return (Icons.functions_outlined, resolveColor(U.primary));
     if (key.contains('electric') || key.contains('beee') || key.contains('circuit'))
-                                       return (Icons.electrical_services_outlined, U.peach);
+                                       return (Icons.electrical_services_outlined, resolveColor(U.peach));
     if (key.contains('chemistry') || key.contains('chem'))
-                                       return (Icons.science_outlined, U.teal);
+                                       return (Icons.science_outlined, resolveColor(U.teal));
     if (key.contains('economics') || key.contains('econ') || key.contains('manage'))
-                                       return (Icons.bar_chart_outlined, U.green);
+                                       return (Icons.bar_chart_outlined, resolveColor(U.green));
     if (key.contains('code') || key.contains('programming') || key.contains('pps') || key.contains('dsa') || key.contains('algorithm'))
-                                       return (Icons.code_outlined, U.primary);
+                                       return (Icons.code_outlined, resolveColor(U.primary));
     if (key.contains('iot') || key.contains('sensor') || key.contains('embedded'))
-                                       return (Icons.sensors_outlined, U.blue);
+                                       return (Icons.sensors_outlined, resolveColor(U.blue));
     if (key.contains('physics') || key.contains('mechanics') || key.contains('dynamics'))
-                                       return (Icons.speed_outlined, U.lavender);
+                                       return (Icons.speed_outlined, resolveColor(U.lavender));
     if (key.contains('civil') || key.contains('structure') || key.contains('concrete'))
-                                       return (Icons.architecture_outlined, U.gold);
-    if (key.contains('lab'))           return (Icons.biotech_outlined, U.teal);
+                                       return (Icons.architecture_outlined, resolveColor(U.gold));
+    if (key.contains('lab'))           return (Icons.biotech_outlined, resolveColor(U.teal));
     if (key.contains('design') || key.contains('drawing') || key.contains('cad'))
-                                       return (Icons.draw_outlined, U.sky);
+                                       return (Icons.draw_outlined, resolveColor(U.sky));
     if (key.contains('network') || key.contains('computer network'))
-                                       return (Icons.lan_outlined, U.blue);
+                                       return (Icons.lan_outlined, resolveColor(U.blue));
     if (key.contains('database') || key.contains('dbms') || key.contains('sql'))
-                                       return (Icons.storage_outlined, U.teal);
+                                       return (Icons.storage_outlined, resolveColor(U.teal));
     if (key.contains('operating') || key.contains('os'))
-                                       return (Icons.developer_board_outlined, U.peach);
+                                       return (Icons.developer_board_outlined, resolveColor(U.peach));
     if (key.contains('machine') || key.contains('manufacturing') || key.contains('workshop'))
-                                       return (Icons.precision_manufacturing_outlined, U.gold);
+                                       return (Icons.precision_manufacturing_outlined, resolveColor(U.gold));
     if (key.contains('english') || key.contains('communication') || key.contains('language'))
-                                       return (Icons.language_outlined, U.sky);
+                                       return (Icons.language_outlined, resolveColor(U.sky));
     if (key.contains('exam') || key.contains('prep') || key.contains('question') || key.contains('bank'))
-                                       return (Icons.quiz_outlined, U.peach);
-    if (key.contains('archive'))       return (Icons.archive_outlined, U.sub);
-    if (key.contains('doc'))           return (Icons.school_outlined, U.primary);
-    if (key.contains('sem'))           return (Icons.collections_bookmark_outlined, U.lavender);
-    if (key.contains('unit'))          return (Icons.topic_outlined, U.teal);
-    // fallback
-    return (Icons.folder_outlined, U.primary);
+                                       return (Icons.quiz_outlined, resolveColor(U.peach));
+    if (key.contains('archive'))       return (Icons.archive_outlined, resolveColor(U.sub));
+    if (key.contains('doc'))           return (Icons.school_outlined, resolveColor(U.primary));
+    if (key.contains('sem'))           return (Icons.collections_bookmark_outlined, resolveColor(U.lavender));
+    if (key.contains('unit'))          return (Icons.topic_outlined, resolveColor(U.teal));
+    // fallback — use auto palette so adjacent folders get different colors
+    return (Icons.folder_outlined, customColorInt != null ? Color(customColorInt) : _colorForIndex(index));
   }
 
   String get _fullPath =>
@@ -349,12 +381,70 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     }
   }
 
+  String get _pinPrefsKey => 'pinned_programs_${widget.universityFolderName}';
+  String get _colorPrefsKey => 'icon_colors_${widget.universityFolderName}';
+
+  Future<void> _loadPinnedPrograms() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_pinPrefsKey) ?? [];
+    if (mounted) setState(() => _pinnedPaths..clear()..addAll(list));
+  }
+
+  Future<void> _savePinnedPrograms() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_pinPrefsKey, _pinnedPaths.toList());
+  }
+
+  void _togglePin(String path) {
+    setState(() {
+      if (_pinnedPaths.contains(path)) {
+        _pinnedPaths.remove(path);
+      } else {
+        _pinnedPaths.add(path);
+      }
+    });
+    _savePinnedPrograms();
+  }
+
+  Future<void> _loadIconColors() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_colorPrefsKey);
+    if (raw != null && raw.isNotEmpty) {
+      final map = Map<String, dynamic>.from(json.decode(raw));
+      if (mounted) {
+        setState(() {
+          _iconColors.clear();
+          for (final entry in map.entries) {
+            _iconColors[entry.key] = entry.value as int;
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _saveIconColors() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_colorPrefsKey, json.encode(_iconColors));
+  }
+
+  void _setIconColor(String path, Color color) {
+    setState(() => _iconColors[path] = color.value);
+    _saveIconColors();
+  }
+
+  void _removeIconColor(String path) {
+    setState(() => _iconColors.remove(path));
+    _saveIconColors();
+  }
+
   @override
   void initState() {
     super.initState();
     _load();
     _fetchUniversityName();
     _loadFolderIcons();
+    _loadPinnedPrograms();
+    _loadIconColors();
   }
 
   String _universityName = '';
@@ -392,38 +482,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   /// Load icon overrides from GitHub .icons.json for this university.
   Future<void> _loadFolderIcons() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // 1. Instantly load from local cache to prevent icon pop-in delay
-    final cachedStr = prefs.getString('cache_$_iconsJsonPath');
-    if (cachedStr != null && cachedStr.isNotEmpty) {
-      try {
-        final Map<String, dynamic> data = jsonDecode(cachedStr);
-        if (mounted) {
-          setState(() {
-            _folderIcons.clear();
-            for (final entry in data.entries) {
-              _folderIcons[entry.key] = entry.value as String;
-            }
-          });
-        }
-      } catch (_) {}
-    }
-
-    // 2. Fetch fresh data from GitHub in background
-    _github.getFileContentRaw(_iconsJsonPath).then((content) {
-      if (!mounted || content.isEmpty) return;
-      try {
-        final Map<String, dynamic> data = jsonDecode(content);
-        prefs.setString('cache_$_iconsJsonPath', content); // Update cache
+    try {
+      final icons = await _github.getFolderIcons('${widget.universityFolderName}/Community/');
+      if (mounted) {
         setState(() {
           _folderIcons.clear();
-          for (final entry in data.entries) {
-            _folderIcons[entry.key] = entry.value as String;
-          }
+          _folderIcons.addAll(icons);
         });
-      } catch (_) {}
-    }).catchError((_) {});
+      }
+    } catch (_) {}
   }
 
   /// Schedule a background reload 2 seconds after a GitHub mutation,
@@ -438,8 +505,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   Future<void> _setFolderIcon(String folderPath, String iconKey) async {
     setState(() => _isPushing = true);
     _folderIcons[folderPath] = iconKey;
-    await _saveIconsToGitHub();
-    await _load(forceRefresh: true);
+    try {
+      await _github.setFolderIcon(folderPath, iconKey);
+    } catch (_) {}
     if (mounted) setState(() => _isPushing = false);
   }
 
@@ -447,27 +515,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   Future<void> _removeFolderIcon(String folderPath) async {
     setState(() => _isPushing = true);
     _folderIcons.remove(folderPath);
-    await _saveIconsToGitHub();
-    await _load(forceRefresh: true);
+    try {
+      await _github.setFolderIcon(folderPath, '');
+    } catch (_) {}
     if (mounted) setState(() => _isPushing = false);
   }
 
   /// Write the current _folderIcons map to GitHub as .icons.json.
-  Future<void> _saveIconsToGitHub() async {
-    try {
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(_folderIcons);
-      
-      // Save locally immediately for fast loads
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cache_$_iconsJsonPath', jsonStr);
 
-      await _github.updateFile(
-        path: _iconsJsonPath,
-        content: jsonStr,
-        message: 'update community folder icons',
-      );
-    } catch (_) {}
-  }
 
   /// Show the icon picker bottom sheet — minimal, categorized, with number input.
   void _showIconPicker(String folderPath) {
@@ -653,6 +708,22 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   void _sortItems() {
     _items.sort((a, b) {
+      final aPath = a['path'] as String? ?? '';
+      final bPath = b['path'] as String? ?? '';
+
+      // Pinned items always come first
+      final aPinned = _pinnedPaths.contains(aPath);
+      final bPinned = _pinnedPaths.contains(bPath);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      final aSort = a['sort_index'] as int? ?? 0;
+      final bSort = b['sort_index'] as int? ?? 0;
+
+      if (aSort != bSort) {
+        return aSort.compareTo(bSort);
+      }
+
       final aIsFolder = a['type'] == 'dir';
       final bIsFolder = b['type'] == 'dir';
       if (aIsFolder && !bIsFolder) return -1;
@@ -732,29 +803,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     // Capture the path at call time to guard against navigation race conditions
     final requestedPath = _fullPath;
 
-    final items = await _github.getDirectoryContents(
-      requestedPath,
-      forceRefresh: forceRefresh,
-      onRefresh: (freshItems) {
-        // Background refresh completed — only update if we're still on the same path
-        if (!mounted || _fullPath != requestedPath) return;
-        setState(() {
-          _items = freshItems
-              .where((item) => !(item['name'] as String).startsWith('.'))
-              .toList();
-          _sortItems();
-          _syncing = false;
-        });
-      },
-    );
+    final items = await _github.getDirectoryContents(requestedPath);
     if (!mounted || _fullPath != requestedPath) return;
     setState(() {
       _items = items
           .where((item) => !(item['name'] as String).startsWith('.'))
           .toList();
       _sortItems();
-      _loading = false;
       _syncing = false;
+      _loading = false;
     });
     // Fetch last-modified dates in the background after items are available
     _fetchLastModifiedDates();
@@ -785,6 +842,50 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     });
     _load();
     _scrollToBreadcrumbEnd();
+  }
+
+  List<Map<String, dynamic>> get _displayItems {
+    return _items.where((item) {
+      final name = item['name'] as String?;
+      return name != null && !name.startsWith('.');
+    }).toList();
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex == newIndex) return;
+
+    final display = _displayItems;
+    final movedItem = display[oldIndex];
+
+    setState(() {
+      // Remove from current position
+      _items.remove(movedItem);
+
+      // Find where to insert: place before the item currently at newIndex
+      if (newIndex < display.length - 1) {
+        // The display list hasn't changed yet (we removed from _items, not display)
+        final target = display[newIndex >= oldIndex ? newIndex + 1 : newIndex];
+        final targetIdx = _items.indexOf(target);
+        _items.insert(targetIdx == -1 ? _items.length : targetIdx, movedItem);
+      } else {
+        _items.add(movedItem);
+      }
+
+      // Re-assign sort indices
+      for (int i = 0; i < _items.length; i++) {
+        _items[i]['sort_index'] = i;
+      }
+    });
+
+    // Persist to Supabase
+    _github.updateSortOrder(_items).catchError((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save order'), backgroundColor: U.red),
+        );
+      }
+    });
   }
 
   void _navigateBack() {
@@ -888,10 +989,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       Navigator.pop(ctx);
 
                       setState(() => _isPushing = true);
-                      final success = await _github.createBranchStructure(
-                        widget.universityFolderName,
-                        ghName,
-                      );
+                      bool success = false;
+                      try {
+                        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                        await _github.createFolder('${widget.universityFolderName}/Community', ghName, 'community', widget.universityFolderName, null, uid);
+                        success = true;
+                      } catch (e) {
+                        debugPrint("Create branch failed: $e");
+                      }
                       if (success && mounted) {
                         await _load(forceRefresh: true);
                       }
@@ -1026,12 +1131,21 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           : '$_fullPath$ghName/.keep';
 
                       setState(() => _isPushing = true);
-                      final success = await _github.createFolder(
-                        targetPath,
-                        content: isFile
-                            ? '# ${name.replaceAll('.md', '')}\n\n'
-                            : '# init\n',
-                      );
+                      final parentPathStr = _fullPath.endsWith('/') ? _fullPath.substring(0, _fullPath.length - 1) : _fullPath;
+                      final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+                      bool success = false;
+                      try {
+                        if (isFile) {
+                          final displayName = name.replaceAll('.md', '');
+                          await _github.createNote(parentPathStr, displayName, '# $displayName\n\n', 'community', widget.universityFolderName, null, uid);
+                        } else {
+                          await _github.createFolder(parentPathStr, ghName, 'community', widget.universityFolderName, null, uid);
+                        }
+                        success = true;
+                      } catch (e) {
+                        debugPrint("Create item failed: $e");
+                      }
                       if (success && mounted) {
                         await _load(forceRefresh: true);
                       }
@@ -1150,10 +1264,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isAtRoot = _currentPath.isEmpty;
-    final displayItems = _items.where((item) {
-      final name = item['name'] as String?;
-      return name != null && !name.startsWith('.');
-    }).toList();
+    final displayItems = _displayItems;
     // Show breadcrumbs from depth >= 1 (inside a program folder, starting at semester level)
     final showBreadcrumbs = _depth >= 1 && !isAtRoot;
 
@@ -1317,21 +1428,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 // ── Main content ──
             Expanded(
               child: _loading
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: U.primary),
-                    const SizedBox(height: 16),
-                    Text(
-                      _kLoadingMessages[Random().nextInt(_kLoadingMessages.length)],
-                      style: GoogleFonts.outfit(
-                        color: U.sub,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
+            ? ProfessionalLoading(
+                message: _kLoadingMessages[Random().nextInt(_kLoadingMessages.length)],
               )
             : displayItems.isEmpty
             ? Center(
@@ -1363,7 +1461,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 color: U.primary,
                 backgroundColor: U.surface,
                 onRefresh: () => _load(forceRefresh: true),
-                child: isAtRoot
+                child: (isAtRoot && !_isEditMode)
                     ? GridView.builder(
                         padding: const EdgeInsets.all(24),
                         gridDelegate:
@@ -1391,15 +1489,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           );
                         },
                       )
-                    : ListView.separated(
+                    : ReorderableListView.builder(
                         padding: const EdgeInsets.only(bottom: 116),
                         itemCount: displayItems.length,
-                        separatorBuilder: (_, __) => Divider(
-                          color: U.border,
-                          height: 1,
-                          thickness: 0.5,
-                          indent: 56,
-                        ),
+                        onReorder: _onReorder,
+                        buildDefaultDragHandles: _isEditMode,
                         itemBuilder: (context, index) {
                           final item = displayItems[index];
                           final name = item['name'] as String;
@@ -1408,56 +1502,66 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           final path = item['path'] as String;
 
                           // ── Resolve icon & color ──
-                          final iconInfo = _iconFor(name, path);
+                          final iconInfo = _iconFor(name, path, index: index);
                           final IconData itemIcon;
                           final Color itemColor;
+                          // Check if user has an icon override for this path
+                          final hasIconOverride = _folderIcons.containsKey(path);
+                          final hasColorOverride = _iconColors.containsKey(path);
                           if (isFolder) {
                             itemIcon = iconInfo.$1;
                             itemColor = iconInfo.$2;
+                          } else if (hasIconOverride || hasColorOverride) {
+                            // Use user-overridden icon/color for files too
+                            itemIcon = hasIconOverride ? iconInfo.$1 : Icons.article_outlined;
+                            itemColor = iconInfo.$2;
                           } else {
-                            // Files — use article or number badge style
-                            final numBadge = RegExp(r'^(\d+)').firstMatch(name)?.group(1);
-                            if (numBadge != null) {
-                              itemIcon = Icons.article_outlined;
-                              itemColor = U.teal;
-                            } else {
-                              itemIcon = Icons.article_outlined;
-                              itemColor = U.sub;
-                            }
+                            // Files — use article icon with auto-palette color
+                            itemIcon = Icons.article_outlined;
+                            itemColor = _colorForIndex(index);
                           }
 
                           // ── Staggered entrance animation (old library style) ──
-                          return TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: 1),
-                            duration: Duration(milliseconds: 250 + index * 45),
-                            curve: Curves.easeOut,
-                            builder: (context, v, child) => Opacity(
-                              opacity: v,
-                              child: Transform.translate(
-                                offset: Offset(0, 16 * (1 - v)),
-                                child: child,
-                              ),
-                            ),
-                            child: InkWell(
+                          return Column(
+                            key: ValueKey(path),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (index > 0)
+                                Divider(
+                                  color: U.border,
+                                  height: 1,
+                                  thickness: 0.5,
+                                  indent: 56,
+                                ),
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: 1),
+                                duration: Duration(milliseconds: 250 + index * 45),
+                                curve: Curves.easeOut,
+                                builder: (context, v, child) => Opacity(
+                                  opacity: v,
+                                  child: Transform.translate(
+                                    offset: Offset(0, 16 * (1 - v)),
+                                    child: child,
+                                  ),
+                                ),
+                                child: InkWell(
                               onTap: () async {
                                 if (isFolder) {
                                   _navigateToFolder(name);
                                 } else {
-                                  final downloadUrl = item['download_url'] as String?;
-                                  if (downloadUrl != null && downloadUrl.isNotEmpty) {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => NoteViewerScreen(
-                                          title: _displayName(name).replaceAll('.md', ''),
-                                          filePath: path,
-                                          isEditable: _isEditMode,
-                                        ),
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => NoteViewerScreen(
+                                        title: _displayName(name).replaceAll('.md', ''),
+                                        filePath: path,
+                                        isEditable: _isEditMode,
+                                        useGlobalRepo: true,
                                       ),
-                                    );
-                                    if (result is String) {
-                                      // silent reload handled by NoteViewerScreen
-                                    }
+                                    ),
+                                  );
+                                  if (result is String) {
+                                    // silent reload handled by NoteViewerScreen
                                   }
                                 }
                               },
@@ -1553,7 +1657,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                             ),
                                           // Show last updated in edit mode for all items
                                           if (_isEditMode &&
-                                              _lastModifiedDates.containsKey(path))
+                                              (item['updated_at'] != null || item['created_at'] != null))
                                             Padding(
                                               padding: const EdgeInsets.only(top: 3),
                                               child: Row(
@@ -1566,7 +1670,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                   ),
                                                   const SizedBox(width: 4),
                                                   Text(
-                                                    _formatRelativeTime(_lastModifiedDates[path]!),
+                                                    _formatRelativeTime(DateTime.parse((item['updated_at'] ?? item['created_at']) as String)),
                                                     style: GoogleFonts.outfit(
                                                       color: U.dim,
                                                       fontSize: 11,
@@ -1636,7 +1740,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                   ],
                                 ),
                               ),
-                            ),
+                            ),  // closes InkWell
+                              ),  // closes TweenAnimationBuilder
+                            ],
                           );
                         },
                       ),
@@ -1644,7 +1750,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             ),
               ],
             ),
-            if (_isPushing) const GenZLoadingOverlay(),
+            if (_isPushing) Positioned.fill(
+              child: AbsorbPointer(
+                absorbing: true,
+                child: Container(
+                  color: U.bg.withValues(alpha: 0.7),
+                  child: const ProfessionalLoading(message: 'Saving changes...'),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1706,7 +1820,17 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         
                         setState(() => _isPushing = true);
 
-                        final success = await _github.deleteItem(path);
+                        bool success = false;
+                        try {
+                          if (path.endsWith('.md')) {
+                            await _github.deleteNote(path);
+                          } else {
+                            await _github.deleteFolder(path);
+                          }
+                          success = true;
+                        } catch (e) {
+                          debugPrint("Delete failed: $e");
+                        }
                         if (success && mounted) {
                           await _load(forceRefresh: true);
                         }
@@ -1828,7 +1952,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         _items,
                       );
                       setState(() => _isPushing = true);
-                      final success = await _github.renameItem(path, newPath);
+                      bool success = false;
+                      try {
+                        if (path.endsWith('.md')) {
+                          await _github.renameNote(path, ghNewName);
+                        } else {
+                          await _github.renameFolder(path, ghNewName);
+                        }
+                        success = true;
+                      } catch (_) {}
                       if (success && mounted) {
                         await _load(forceRefresh: true);
                       }
@@ -1918,9 +2050,17 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             );
             return;
           }
-          final deleted = await _github.deleteItem(path);
+          bool deleted = false;
+          try {
+            if (path.endsWith('.md')) {
+              await _github.deleteNote(path);
+            } else {
+              await _github.deleteFolder(path);
+            }
+            deleted = true;
+          } catch (_) {}
           if (!deleted) {
-            throw Exception('GitHub deletion failed — check permissions or network and try again.');
+            throw Exception('Deletion failed — check permissions or network and try again.');
           }
           await deletionDoc.reference.update({
             'isDeleted': true,
@@ -2002,12 +2142,119 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             },
           ),
           ListTile(
+            leading: Icon(Icons.palette_outlined, color: U.primary),
+            title: Text('Change Icon', style: GoogleFonts.outfit(color: U.primary)),
+            onTap: () {
+              Navigator.pop(ctx);
+              final path = item['path'] as String;
+              _showIconPicker(path);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.color_lens_outlined, color: U.teal),
+            title: Text('Change Color', style: GoogleFonts.outfit(color: U.teal)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showColorPicker(item['path'] as String);
+            },
+          ),
+          ListTile(
             leading: Icon(Icons.delete_outline, color: U.red),
             title: Text('Delete', style: GoogleFonts.outfit(color: U.red)),
             onTap: () {
               Navigator.pop(ctx);
               _showDeleteDialog(item);
             },
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  void _showColorPicker(String path) {
+    final colors = <(String, Color)>[
+      ('Default', Colors.transparent),
+      ('Red', const Color(0xFFF43F5E)),
+      ('Rose', const Color(0xFFEC4899)),
+      ('Orange', const Color(0xFFF97316)),
+      ('Amber', const Color(0xFFF59E0B)),
+      ('Yellow', const Color(0xFFEAB308)),
+      ('Lime', const Color(0xFF84CC16)),
+      ('Green', const Color(0xFF22C55E)),
+      ('Emerald', const Color(0xFF10B981)),
+      ('Teal', const Color(0xFF14B8A6)),
+      ('Cyan', const Color(0xFF06B6D4)),
+      ('Sky', const Color(0xFF0EA5E9)),
+      ('Blue', const Color(0xFF3B82F6)),
+      ('Indigo', const Color(0xFF6366F1)),
+      ('Violet', const Color(0xFF8B5CF6)),
+      ('Purple', const Color(0xFFA855F7)),
+      ('Fuchsia', const Color(0xFFD946EF)),
+      ('Pink', const Color(0xFFEC4899)),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: U.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 16),
+          Text('Pick a Color', style: GoogleFonts.outfit(color: U.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: colors.map((entry) {
+                final label = entry.$1;
+                final color = entry.$2;
+                final isDefault = color == Colors.transparent;
+                final isSelected = isDefault
+                    ? !_iconColors.containsKey(path)
+                    : _iconColors[path] == color.value;
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (isDefault) {
+                      _removeIconColor(path);
+                    } else {
+                      _setIconColor(path, color);
+                    }
+                  },
+                  child: Tooltip(
+                    message: label,
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isDefault ? U.bg : color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected ? U.text : U.border,
+                          width: isSelected ? 2.5 : 1,
+                        ),
+                      ),
+                      child: isDefault
+                          ? Icon(Icons.auto_fix_high, size: 16, color: U.sub)
+                          : isSelected
+                              ? const Icon(Icons.check, size: 16, color: Colors.white)
+                              : null,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -2051,6 +2298,33 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               Navigator.pop(ctx);
               final path = item['path'] as String;
               _showIconPicker(path);
+            },
+          ),
+          Builder(builder: (_) {
+            final path = item['path'] as String;
+            final isPinned = _pinnedPaths.contains(path);
+            return ListTile(
+              leading: Icon(
+                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                color: isPinned ? U.gold : U.sub,
+              ),
+              title: Text(
+                isPinned ? 'Unpin' : 'Pin to Top',
+                style: GoogleFonts.outfit(color: isPinned ? U.gold : U.text),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                _togglePin(path);
+                _sortItems();
+              },
+            );
+          }),
+          ListTile(
+            leading: Icon(Icons.color_lens_outlined, color: U.teal),
+            title: Text('Change Color', style: GoogleFonts.outfit(color: U.teal)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showColorPicker(item['path'] as String);
             },
           ),
           ListTile(
@@ -2103,6 +2377,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     DateTime? lastModified,
     VoidCallback? onEditTap,
   }) {
+    final isPinned = _pinnedPaths.contains(folderPath);
     // Curated color pairs for vibrant gradients
     final colorPairs = [
       [const Color(0xFF6366F1), const Color(0xFFA855F7)], // Indigo -> Purple
@@ -2128,6 +2403,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: () => _togglePin(folderPath),
       borderRadius: BorderRadius.circular(28),
       child: Container(
         decoration: BoxDecoration(
@@ -2241,6 +2517,20 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   ],
                 ),
               ),
+              // Pin badge
+              if (isPinned)
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.push_pin, color: Colors.white, size: 12),
+                  ),
+                ),
               // Edit icon overlay when in edit mode
               if (isEditMode && onEditTap != null)
                 Positioned(

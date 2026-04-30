@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 import '../models/university_model.dart';
 import '../services/university_service.dart';
-import '../services/github_global_service.dart';
+import '../services/university_service.dart';
 
 class UniversitySelectionScreen extends StatefulWidget {
   const UniversitySelectionScreen({super.key});
@@ -71,9 +71,7 @@ class _UniversitySelectionScreenState extends State<UniversitySelectionScreen> {
       showAppLoading();
       await _universityService.setUserSelectedUniversity(user.uid, uni.id);
       
-      // Clear all cached data so the app starts fresh with the new university
-      GitHubGlobalService().invalidateConfigCache();
-      await GitHubGlobalService().invalidateAllCache();
+      // Supabase does not need full app clear yet
       
       if (mounted) {
         // Force full app restart by navigating to root and letting AuthGate rebuild

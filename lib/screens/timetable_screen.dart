@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
-import '../services/writer_github_service.dart';
+import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class TimetableScreen extends StatefulWidget {
@@ -67,7 +67,7 @@ class _TimetableScreenState extends State<TimetableScreen>
     }
 
     try {
-      final raw = await WriterGitHubService.fetchRawJson('timetable.json');
+      final raw = await WriterFirestoreService.fetchConfig('timetable');
       if (raw is! Map<String, dynamic>) {
         throw Exception('Unexpected timetable format.');
       }

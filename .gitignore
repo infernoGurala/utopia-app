@@ -66,3 +66,4 @@ _transfer_backup/
 key.properties
 **/*.g.dart
 **/*.freezed.dart
+supabase-migration/.env

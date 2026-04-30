@@ -11,9 +11,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/ai_service.dart';
 import '../services/attendance_service.dart';
 import '../services/cache_service.dart';
-import '../services/github_service.dart';
+import '../services/supabase_global_service.dart';
 import '../services/secure_storage_service.dart';
-import '../services/writer_github_service.dart';
+import '../services/writer_firestore_service.dart';
 
 class IAAScreen extends StatefulWidget {
   const IAAScreen({super.key});
@@ -157,7 +157,7 @@ class _IAAScreenState extends State<IAAScreen> {
     }
 
     try {
-      final data = await WriterGitHubService.fetchRawJson('timetable.json');
+      final data = await WriterFirestoreService.fetchConfig('timetable');
       final rawJson = jsonEncode(data);
       _timetableJsonCache = rawJson;
       return rawJson;
@@ -260,11 +260,10 @@ class _IAAScreenState extends State<IAAScreen> {
         return null;
       }
 
-      final githubService = GitHubService();
       final excerpts = <String>[];
 
       for (final match in matches.take(3)) {
-        final content = await githubService.getFileContent(match.path);
+        final content = await SupabaseGlobalService.instance.getNoteContent(match.path);
         final trimmed = content.trim();
         if (trimmed.isEmpty) {
           continue;

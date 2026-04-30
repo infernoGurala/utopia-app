@@ -9,11 +9,11 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Maximum file size allowed for upload (20 MB).
-const int kMaxUploadBytes = 20 * 1024 * 1024;
+/// Maximum file size allowed for upload (9 MB).
+const int kMaxUploadBytes = 9 * 1024 * 1024;
 
-/// Hard limit — reject files above 30 MB outright.
-const int kHardLimitBytes = 30 * 1024 * 1024;
+/// Hard limit — reject files above 15 MB outright.
+const int kHardLimitBytes = 15 * 1024 * 1024;
 
 /// Service for uploading files to Cloudinary using signed uploads.
 class FileUploadService {
@@ -100,12 +100,12 @@ class FileUploadService {
     if (size > kHardLimitBytes) {
       throw FileUploadException(
         'File is too large (${(size / 1024 / 1024).toStringAsFixed(1)} MB). '
-        'Maximum allowed is 30 MB.',
+        'Maximum allowed is 15 MB.',
       );
     }
     if (size > kMaxUploadBytes) {
       throw FileUploadException(
-        'File exceeds recommended size of 20 MB '
+        'File exceeds recommended size of 9 MB '
         '(${(size / 1024 / 1024).toStringAsFixed(1)} MB). '
         'Please use a smaller file.',
       );

@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
 import '../services/class_service.dart';
-import '../services/github_global_service.dart';
+import '../services/supabase_global_service.dart';
 import 'class_detail_screen.dart';
 import 'class_settings_screen.dart';
 import 'community_notes_screen.dart';
@@ -26,7 +26,7 @@ class LibraryHomeScreen extends StatefulWidget {
 
 class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   final ClassService _classService = ClassService();
-  final GitHubGlobalService _githubGlobalService = GitHubGlobalService();
+  final SupabaseGlobalService _globalService = SupabaseGlobalService.instance;
 
   static const _moodWords = [
     'focus',
@@ -139,8 +139,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
       if (uniId != null) {
         _universityId = uniId;
-        unawaited(_githubGlobalService.ensureUniversityFolderExists(uniId));
-        unawaited(_preloadCommunityIcons());
       }
 
       final classes = await _classService.getClassesForUser(user.uid, universityId: _universityId);
@@ -167,18 +165,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     }
   }
 
-  /// Preload community icons seamlessly to local memory so CommunityNotesScreen has zero pop-in.
-  Future<void> _preloadCommunityIcons() async {
-    if (_universityId.isEmpty) return;
-    final path = '$_universityId/Community/.icons.json';
-    try {
-      final content = await _githubGlobalService.getFileContentRaw(path);
-      if (content.isNotEmpty) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cache_$path', content);
-      }
-    } catch (_) {}
-  }
+
 
   /// Fetch display names for class owners and cache them.
   Future<void> _fetchOwnerNames(List<ClassModel> classes) async {
@@ -989,11 +976,14 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                                     .createClass(name, _universityId, user.uid);
 
                                 try {
-                                  await _githubGlobalService
-                                      .ensureClassFolderExists(
-                                        _universityId,
-                                        newClass.classId,
-                                      );
+                                  await SupabaseGlobalService.instance.createFolder(
+                                    '${_universityId}/${newClass.classId}',
+                                    'Notes',
+                                    'class',
+                                    _universityId,
+                                    newClass.classId,
+                                    user.uid,
+                                  );
                                 } catch (_) {}
 
                                 final classes = await _classService

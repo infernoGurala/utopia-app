@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../services/notification_service.dart';
-import '../services/writer_github_service.dart';
+import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
 import 'broadcast_screen.dart';
 import 'quotes_editor_screen.dart';
@@ -38,7 +38,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
 
   Future<void> _loadHolidayState() async {
     try {
-      final data = await WriterGitHubService.fetchRawJson('morning_notif.json');
+      final data = await WriterFirestoreService.fetchConfig('morning_notif');
       final notif = data is Map<String, dynamic>
           ? Map<String, dynamic>.from(data)
           : <String, dynamic>{};
@@ -73,19 +73,13 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     });
 
     try {
-      final fileData = await WriterGitHubService.fetchFileData(
-        'morning_notif.json',
-      );
-      final currentData = fileData.jsonData is Map<String, dynamic>
-          ? Map<String, dynamic>.from(fileData.jsonData as Map<String, dynamic>)
+      final data = await WriterFirestoreService.fetchConfig('morning_notif');
+      final currentData = data is Map<String, dynamic>
+          ? Map<String, dynamic>.from(data)
           : <String, dynamic>{};
       final nextData = Map<String, dynamic>.from(currentData);
       nextData['holiday'] = value;
-      await WriterGitHubService.updateJsonFile(
-        filename: 'morning_notif.json',
-        jsonData: nextData,
-        commitMessage: 'Updated holiday toggle via UTOPIA app',
-      );
+      await WriterFirestoreService.updateConfig('morning_notif', nextData);
 
       if (!mounted) {
         return;
@@ -162,9 +156,12 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
         _sendingMorningNotification = true;
       });
 
-      final pat = await WriterGitHubService.fetchPat();
+      final patDoc = await WriterFirestoreService.fetchConfig('github');
+      final pat = patDoc?['pat'] as String? ?? '';
+      const owner = 'infernoGurala';
+      const repo = 'utopia-content';
       final url =
-          'https://api.github.com/repos/${WriterGitHubService.owner}/${WriterGitHubService.repo}/actions/workflows/morning_notification.yml/dispatches';
+          'https://api.github.com/repos/$owner/$repo/actions/workflows/morning_notification.yml/dispatches';
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -311,9 +308,10 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
         _sendingPersonalMorningNotification = true;
       });
 
-      final pat = await WriterGitHubService.fetchPat();
-      final owner = WriterGitHubService.owner;
-      final repo = WriterGitHubService.repo;
+      final patDoc = await WriterFirestoreService.fetchConfig('github');
+      final pat = patDoc?['pat'] as String? ?? '';
+      const owner = 'infernoGurala';
+      const repo = 'utopia-content';
       const workflowFile = 'personal_morning_notification.yml';
       const ref = 'main';
 
