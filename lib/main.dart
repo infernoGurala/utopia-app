@@ -40,6 +40,30 @@ class AppInitializationState {
   final String? blockingMessage;
 }
 
+bool _isSupabaseInitialized = false;
+
+Future<void> ensureSupabaseInitialized() async {
+  if (_isSupabaseInitialized) return;
+  try {
+    final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
+    if (doc.exists && doc.data() != null) {
+      final data = doc.data()!;
+      final url = data['url'] as String?;
+      final anonKey = data['anon_key'] as String?;
+      if (url != null && anonKey != null) {
+        await Supabase.initialize(url: url, anonKey: anonKey);
+        _isSupabaseInitialized = true;
+      } else {
+        debugPrint('Supabase config missing url or anon_key');
+      }
+    } else {
+      debugPrint('Supabase config document not found');
+    }
+  } catch (e) {
+    debugPrint('Failed to initialize Supabase: $e');
+  }
+}
+
 class AppTheme {
   const AppTheme({
     required this.key,
@@ -505,6 +529,7 @@ void _applySystemUiForTheme(AppTheme theme) {
       statusBarBrightness:
           usesLightIcons ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness:
           usesLightIcons ? Brightness.light : Brightness.dark,
       systemNavigationBarContrastEnforced: false,
@@ -617,23 +642,7 @@ Future<AppInitializationState> _initializeApp() async {
       unawaited(NotificationService.initialize());
     }
 
-    try {
-      final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        final url = data['url'] as String?;
-        final anonKey = data['anon_key'] as String?;
-        if (url != null && anonKey != null) {
-          await Supabase.initialize(url: url, anonKey: anonKey);
-        } else {
-          debugPrint('Supabase config missing url or anon_key');
-        }
-      } else {
-        debugPrint('Supabase config document not found');
-      }
-    } catch (e) {
-      debugPrint('Failed to initialize Supabase: $e');
-    }
+    // Supabase initialization is now handled dynamically after authentication
 
     return const AppInitializationState(firebaseReady: true);
   } catch (e) {
@@ -677,8 +686,8 @@ void main() async {
   U.applyTheme(_initialAccentKey);
   await _loadAppToggleSettings();
   appInitialization = _initializeApp();
-  _applySystemUiForTheme(appThemeNotifier.value);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  _applySystemUiForTheme(appThemeNotifier.value);
   runApp(const UtopiaApp());
 }
 
@@ -751,10 +760,28 @@ class UtopiaApp extends StatelessWidget {
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
         final isDark = theme.isDark;
-        return MaterialApp(
-          title: 'UTOPIA',
+        final overlayStyle = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          systemNavigationBarContrastEnforced: false,
+        );
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: MaterialApp(
+            title: 'UTOPIA',
           debugShowCheckedModeBanner: false,
           navigatorKey: navigatorKey,
+          builder: (context, child) {
+            return ColoredBox(
+              color: U.bg,
+              child: child ?? const SizedBox.shrink(),
+            );
+          },
           theme: ThemeData(
             useMaterial3: true,
             brightness: isDark ? Brightness.dark : Brightness.light,
@@ -923,6 +950,11 @@ class UtopiaApp extends StatelessWidget {
                     isDark ? Brightness.light : Brightness.dark,
                 statusBarBrightness:
                     isDark ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarDividerColor: Colors.transparent,
+                systemNavigationBarIconBrightness:
+                    isDark ? Brightness.light : Brightness.dark,
+                systemNavigationBarContrastEnforced: false,
               ),
               titleTextStyle: GoogleFonts.outfit(
                 color: U.text,
@@ -934,6 +966,7 @@ class UtopiaApp extends StatelessWidget {
             dividerColor: U.border,
           ),
           home: const AppLoadingOverlay(child: AuthGate()),
+        ),
         );
       },
     );
@@ -1076,32 +1109,40 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
               if (PlatformSupport.supportsNotifications) {
 
               }
-              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(snapshot.data!.uid)
-                    .snapshots(),
-                builder: (context, userSnapshot) {
-                  final themeAccent =
-                      userSnapshot.data?.data()?['themeAccent'] as String?;
-                  if (themeAccent != null) {
-                    unawaited(
-                      CacheService().saveAppSetting(
-                        'theme_accent',
-                        themeAccent,
-                      ),
-                    );
+              return FutureBuilder(
+                future: ensureSupabaseInitialized(),
+                builder: (context, supabaseSnapshot) {
+                  if (supabaseSnapshot.connectionState == ConnectionState.waiting) {
+                    return const SplashScreen();
                   }
+                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(snapshot.data!.uid)
+                        .snapshots(),
+                    builder: (context, userSnapshot) {
+                      final themeAccent =
+                          userSnapshot.data?.data()?['themeAccent'] as String?;
+                      if (themeAccent != null) {
+                        unawaited(
+                          CacheService().saveAppSetting(
+                            'theme_accent',
+                            themeAccent,
+                          ),
+                        );
+                      }
 
-                  final selectedUniversityId = 
-                      userSnapshot.data?.data()?['selectedUniversityId'] as String?;
+                      final selectedUniversityId = 
+                          userSnapshot.data?.data()?['selectedUniversityId'] as String?;
 
-                  if (userSnapshot.connectionState == ConnectionState.active && 
-                      selectedUniversityId == null) {
-                    return const UniversitySelectionScreen();
-                  }
+                      if (userSnapshot.connectionState == ConnectionState.active && 
+                          selectedUniversityId == null) {
+                        return const UniversitySelectionScreen();
+                      }
 
-                  return const AppShell();
+                      return const AppShell();
+                    },
+                  );
                 },
               );
             }

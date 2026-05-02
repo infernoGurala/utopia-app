@@ -836,9 +836,11 @@ class _SciwordleScreenState extends State<SciwordleScreen>
         color: U.card,
         border: Border(top: BorderSide(color: U.border)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           ...rows.asMap().entries.map((entry) {
             final rowIndex = entry.key;
             final row = entry.value;
@@ -906,6 +908,7 @@ class _SciwordleScreenState extends State<SciwordleScreen>
             );
           }),
         ],
+      ),
       ),
     );
   }
