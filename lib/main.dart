@@ -21,6 +21,7 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/platform_support.dart';
 import 'screens/app_shell.dart';
+import 'screens/splash_screen.dart';
 import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
@@ -996,7 +997,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
     _loadUpdateInfo();
     _initDeepLinks();
-    Future.delayed(SplashScreen.minimumDisplayDuration, () {
+    Future.delayed(cinematicSplashDuration, () {
       if (mounted) {
         setState(() => _greetingCyclePassed = true);
       }
@@ -1077,7 +1078,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       builder: (context, initSnapshot) {
         if (initSnapshot.connectionState != ConnectionState.done ||
             !_greetingCyclePassed) {
-          return const SplashScreen();
+          return const CinematicSplashScreen();
         }
         final initState =
             initSnapshot.data ??
@@ -1102,7 +1103,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SplashScreen();
+              return const CinematicSplashScreen();
             }
             if (snapshot.hasData) {
               unawaited(ChatService().touchPresence());
@@ -1113,7 +1114,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                 future: ensureSupabaseInitialized(),
                 builder: (context, supabaseSnapshot) {
                   if (supabaseSnapshot.connectionState == ConnectionState.waiting) {
-                    return const SplashScreen();
+                    return const CinematicSplashScreen();
                   }
                   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
@@ -1155,123 +1156,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 }
 
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-  static const greetings = ['Hello', 'నమస్కారం', 'नमस्ते', 'こんにちは', '안녕하세요'];
-  static const greetingStepDelay = Duration(milliseconds: 65);
-  static const greetingAnimDuration = Duration(milliseconds: 45);
-  static Duration get minimumDisplayDuration {
-    final transitions = greetings.length - 1;
-    final perTransition =
-        greetingStepDelay.inMilliseconds +
-        (greetingAnimDuration.inMilliseconds * 2);
-    return Duration(milliseconds: transitions * perTransition);
-  }
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  int _idx = 0;
-  late AnimationController _ac;
-  late Animation<double> _fade;
-  late Animation<double> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ac = AnimationController(
-      vsync: this,
-      duration: SplashScreen.greetingAnimDuration,
-    );
-    _fade = CurvedAnimation(parent: _ac, curve: Curves.easeInOut);
-    _slide = Tween<double>(
-      begin: 6,
-      end: 0,
-    ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
-    _ac.forward();
-    _cycle();
-  }
-
-  Future<void> _cycle() async {
-    for (int i = 1; i < SplashScreen.greetings.length; i++) {
-      await Future.delayed(SplashScreen.greetingStepDelay);
-      if (!mounted) return;
-      await _ac.reverse();
-      setState(() => _idx = i);
-      await _ac.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // ── Content ──
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedBuilder(
-                  animation: _ac,
-                  builder: (context, _) => Opacity(
-                    opacity: _fade.value,
-                    child: Transform.translate(
-                      offset: Offset(0, _slide.value),
-                      child: Text(
-                        SplashScreen.greetings[_idx],
-                        style: GoogleFonts.playfairDisplay(
-                          fontSize: 42,
-                          fontWeight: FontWeight.w700,
-                          fontStyle: FontStyle.italic,
-                          color: U.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'UTOPIA',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: U.sub,
-                    letterSpacing: 8,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                AnimatedBuilder(
-                  animation: _ac,
-                  builder: (context, _) {
-                    return Container(
-                      width: 4 + (20 * _fade.value),
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// Old SplashScreen removed — replaced by CinematicSplashScreen in
+// lib/screens/splash_screen.dart
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
