@@ -619,144 +619,142 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               // Composer Container
               Container(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
                 color: U.bg,
                 child: SafeArea(
                   top: false,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: U.surface,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: U.border),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_isEditing || _replyTo != null) ...[
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
-                                    decoration: BoxDecoration(
-                                      color: U.bg,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 3,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: _isEditing ? U.peach : U.primary,
-                                            borderRadius: BorderRadius.circular(99),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Divider(color: U.border, height: 1, thickness: 0.5),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (_isEditing || _replyTo != null) ...[
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.fromLTRB(8, 6, 4, 6),
+                                      decoration: BoxDecoration(
+                                        color: U.surface,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 3,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: _isEditing ? U.peach : U.primary,
+                                              borderRadius: BorderRadius.circular(99),
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                _isEditing
-                                                    ? 'Editing message'
-                                                    : (_replyTo?['senderName'] ?? 'Reply').toString(),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: GoogleFonts.outfit(
-                                                  color: _isEditing ? U.peach : U.primary,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _isEditing
+                                                      ? 'Editing message'
+                                                      : (_replyTo?['senderName'] ?? 'Reply').toString(),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: GoogleFonts.outfit(
+                                                    color: _isEditing ? U.peach : U.primary,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
                                                 ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                _isEditing
-                                                    ? 'Send to save changes'
-                                                    : (_replyTo?['text'] ?? '').toString(),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: GoogleFonts.outfit(
-                                                  color: U.sub,
-                                                  fontSize: 13,
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  _isEditing
+                                                      ? 'Send to save changes'
+                                                      : (_replyTo?['text'] ?? '').toString(),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: GoogleFonts.outfit(
+                                                    color: U.sub,
+                                                    fontSize: 13,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        IconButton(
-                                          onPressed: () => setState(() => _cancelComposerMode()),
-                                          splashRadius: 18,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                          icon: Icon(Icons.close_rounded, color: U.sub, size: 18),
-                                        ),
-                                      ],
+                                          IconButton(
+                                            onPressed: () => setState(() => _cancelComposerMode()),
+                                            splashRadius: 18,
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                            icon: Icon(Icons.close_rounded, color: U.sub, size: 18),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                                TextField(
-                                  focusNode: _composerFocusNode,
-                                  controller: _messageController,
-                                  minLines: 1,
-                                  maxLines: 5,
-                                  style: GoogleFonts.outfit(
-                                    color: U.text,
-                                    fontSize: 15,
-                                  ),
-                                  decoration: InputDecoration(
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 6),
-                                    hintText: _isEditing ? 'Edit message' : 'Message...',
-                                    hintStyle: GoogleFonts.outfit(
-                                      color: U.sub,
+                                  ],
+                                  TextField(
+                                    focusNode: _composerFocusNode,
+                                    controller: _messageController,
+                                    minLines: 1,
+                                    maxLines: 5,
+                                    style: GoogleFonts.outfit(
+                                      color: U.text,
                                       fontSize: 15,
                                     ),
-                                  ),
-                                ),
-                                if (_lastError != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _lastError!,
-                                    style: GoogleFonts.outfit(
-                                      color: U.red,
-                                      fontSize: 11,
+                                    decoration: InputDecoration(
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                      hintText: _isEditing ? 'Edit message' : 'Message...',
+                                      hintStyle: GoogleFonts.outfit(
+                                        color: U.sub,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
+                                  if (_lastError != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _lastError!,
+                                      style: GoogleFonts.outfit(
+                                        color: U.red,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 2, left: 8),
+                              child: IconButton(
+                                onPressed: _sending ? null : _send,
+                                splashRadius: 22,
+                                icon: _sending
+                                    ? SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: U.primary,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        _isEditing ? Icons.check_rounded : Icons.send_rounded,
+                                        color: U.primary,
+                                        size: 22,
+                                      ),
+                              ),
+                            ),
+                          ],
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4, right: 6),
-                          child: IconButton(
-                            onPressed: _sending ? null : _send,
-                            splashRadius: 22,
-                            icon: _sending
-                                ? SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: U.primary,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Icon(
-                                    _isEditing ? Icons.check_rounded : Icons.send_rounded,
-                                    color: U.primary,
-                                    size: 22,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),

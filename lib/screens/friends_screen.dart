@@ -8,12 +8,18 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/chat_emoji_catalog.dart';
 import '../services/chat_service.dart';
+import '../services/follow_service.dart';
 import '../services/game_champion_service.dart';
 import '../services/sciwordle_service.dart';
 import '../widgets/app_motion.dart';
 import '../widgets/game_champion_badge.dart';
 import 'chat_screen.dart';
+import 'follow_requests_screen.dart';
+import 'user_profile_screen.dart';
 
+/// Friends screen – shows:
+///   • Tab 0: Following (people the current user follows back, i.e., mutual)
+///   • Tab 1: Requests badge (navigates to [FollowRequestsScreen])
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
 
@@ -21,23 +27,31 @@ class FriendsScreen extends StatefulWidget {
   State<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> {
+class _FriendsScreenState extends State<FriendsScreen>
+    with SingleTickerProviderStateMixin {
   final ChatService _chatService = ChatService();
+  final FollowService _followService = FollowService();
   final SciwordleService _sciService = SciwordleService();
-  late final Stream<QuerySnapshot<Map<String, dynamic>>> _usersStream;
+
+  late final TabController _tabController;
+
   StreamSubscription<Map<String, Map<String, dynamic>>>?
-  _recentChatsSubscription;
+      _recentChatsSubscription;
   Map<String, Map<String, dynamic>> _recentChats = const {};
   Map<String, int> _streaks = {};
 
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
 
+  String get _currentUid =>
+      FirebaseAuth.instance.currentUser?.uid ?? '';
+
   @override
   void initState() {
     super.initState();
-    _usersStream = _chatService.usersStream();
-    _recentChatsSubscription = _chatService.recentChatsStream().listen((value) {
+    _tabController = TabController(length: 2, vsync: this);
+    _recentChatsSubscription =
+        _chatService.recentChatsStream().listen((value) {
       if (!mounted) return;
       setState(() => _recentChats = value);
     });
@@ -58,6 +72,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _recentChatsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -65,14 +80,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? '';
-
     return Scaffold(
       backgroundColor: U.bg,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header ────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
               child: AnimatedSwitcher(
@@ -101,7 +115,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
                                       style: GoogleFonts.outfit(
                                           color: U.text, fontSize: 14),
                                       decoration: InputDecoration(
-                                        hintText: 'Search people...',
+                                        hintText: 'Search following...',
                                         hintStyle: GoogleFonts.outfit(
                                             color: U.dim),
                                         border: InputBorder.none,
@@ -123,14 +137,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           ),
                           const SizedBox(width: 12),
                           InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isSearching = false;
-                                _searchController.clear();
-                              });
-                            },
+                            onTap: () => setState(() {
+                              _isSearching = false;
+                              _searchController.clear();
+                            }),
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
                                 'Cancel',
                                 style: GoogleFonts.outfit(
@@ -148,12 +161,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         children: [
                           if (Navigator.canPop(context))
                             IconButton(
-                              icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+                              icon: Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: U.text,
+                                size: 20,
+                              ),
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               onPressed: () => Navigator.pop(context),
                             ),
-                          if (Navigator.canPop(context)) const SizedBox(width: 12),
+                          if (Navigator.canPop(context))
+                            const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'Friends',
@@ -164,10 +182,63 @@ class _FriendsScreenState extends State<FriendsScreen> {
                               ),
                             ),
                           ),
-                          IconButton(
-                            onPressed: () {
-                              setState(() => _isSearching = true);
+                          // Requests bell
+                          StreamBuilder<int>(
+                            stream: _followService
+                                .pendingRequestsCountStream(_currentUid),
+                            builder: (context, snap) {
+                              final count = snap.data ?? 0;
+                              return Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        buildForwardRoute(
+                                          FollowRequestsScreen(
+                                              currentUid: _currentUid),
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      Icons.person_add_outlined,
+                                      color: U.primary,
+                                      size: 22,
+                                    ),
+                                    tooltip: 'Follow Requests',
+                                    splashRadius: 20,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  if (count > 0)
+                                    Positioned(
+                                      right: 6,
+                                      top: 6,
+                                      child: Container(
+                                        width: 16,
+                                        height: 16,
+                                        decoration: BoxDecoration(
+                                          color: U.red,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            count > 9 ? '9+' : '$count',
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
                             },
+                          ),
+                          IconButton(
+                            onPressed: () =>
+                                setState(() => _isSearching = true),
                             icon: Icon(
                               Icons.search_rounded,
                               color: U.primary,
@@ -181,149 +252,19 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       ),
               ),
             ),
-            if (!_isSearching) const SizedBox(height: 2),
-            if (!_isSearching)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: _usersStream,
-                  builder: (context, snapshot) {
-                    final total = snapshot.data?.docs
-                        .where((doc) => doc.id != currentUid)
-                        .length;
-                    final countText = total != null && total > 0
-                        ? '  •  $total people'
-                        : '';
-                    return Text(
-                      'Everyone using UTOPIA$countText',
-                      style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
-                    );
-                  },
-                ),
-              ),
-            const SizedBox(height: 12),
 
+            const SizedBox(height: 10),
             Divider(color: U.border, height: 1, thickness: 0.5),
+
+            // ── Following list ─────────────────────────────────────────────
             Expanded(
-              child: StreamBuilder<Map<String, int>>(
-                stream: GameChampionService.topScoreRanksStream(),
-                builder: (context, scoreRanksSnapshot) {
-                  return StreamBuilder<Map<String, int>>(
-                    stream: GameChampionService.topStreakRanksStream(),
-                    builder: (context, streakRanksSnapshot) {
-                      return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        stream: _usersStream,
-                        builder: (context, usersSnapshot) {
-                          if (usersSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const _FriendsSkeleton();
-                          }
-
-                          if (usersSnapshot.hasError) {
-                            return const _FriendsEmptyState(
-                              icon: Icons.people_outline,
-                              title: 'Could not load people',
-                              subtitle: 'Try again in a moment.',
-                            );
-                          }
-
-                          final query = _searchController.text.trim().toLowerCase();
-                          final users =
-                              usersSnapshot.data?.docs
-                                  .map((doc) => {'uid': doc.id, ...doc.data()})
-                                  .where((user) {
-                                    if (user['uid'] == currentUid) return false;
-                                    if (query.isEmpty) return true;
-                                    final displayName = (user['displayName'] ?? '').toString().toLowerCase();
-                                    final email = (user['email'] ?? '').toString().toLowerCase();
-                                    return displayName.contains(query) || email.contains(query);
-                                  })
-                                  .toList() ??
-                              <Map<String, dynamic>>[];
-
-                          users.sort((a, b) {
-                            final chatMetaA =
-                                _recentChats[_chatService.chatIdFor(
-                                  currentUid,
-                                  a['uid'].toString(),
-                                )];
-                            final chatMetaB =
-                                _recentChats[_chatService.chatIdFor(
-                                  currentUid,
-                                  b['uid'].toString(),
-                                )];
-                            final timeA =
-                                chatMetaA?['lastMessageTime'] as Timestamp?;
-                            final timeB =
-                                chatMetaB?['lastMessageTime'] as Timestamp?;
-                            if (timeA != null && timeB != null)
-                              return timeB.compareTo(timeA);
-                            if (timeA != null) return -1;
-                            if (timeB != null) return 1;
-                            final nameA = (a['displayName'] ?? '')
-                                .toString()
-                                .toLowerCase();
-                            final nameB = (b['displayName'] ?? '')
-                                .toString()
-                                .toLowerCase();
-                            return nameA.compareTo(nameB);
-                          });
-
-                          if (users.isEmpty) {
-                            return const _FriendsEmptyState(
-                              icon: Icons.person_search_outlined,
-                              title: 'No users found',
-                              subtitle:
-                                  'People will appear here after they sign in.',
-                            );
-                          }
-
-                          return ListView.separated(
-                            padding: EdgeInsets.zero,
-                            itemCount: users.length,
-                            separatorBuilder: (context, index) => Divider(
-                              color: U.border,
-                              height: 1,
-                              thickness: 0.5,
-                              indent: 72,
-                            ),
-                            itemBuilder: (context, index) {
-                              final user = users[index];
-                              final chatMeta =
-                                  _recentChats[_chatService.chatIdFor(
-                                    currentUid,
-                                    user['uid'].toString(),
-                                  )];
-                              return _FriendRow(
-                                user: user,
-                                scoreRank: scoreRanksSnapshot
-                                    .data?[user['uid'].toString()],
-                                streakRank: streakRanksSnapshot
-                                    .data?[user['uid'].toString()],
-                                streak: _streaks[user['uid'].toString()] ?? 0,
-                                chatMeta: chatMeta,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    buildForwardRoute(
-                                      ChatScreen(
-                                        otherUserId: user['uid'].toString(),
-                                        displayName:
-                                            (user['displayName'] ?? 'Friend')
-                                                .toString(),
-                                        email: (user['email'] ?? '').toString(),
-                                        photoUrl: user['photoUrl']?.toString(),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+              child: _FollowingList(
+                currentUid: _currentUid,
+                chatService: _chatService,
+                followService: _followService,
+                recentChats: _recentChats,
+                streaks: _streaks,
+                query: _searchController.text.trim().toLowerCase(),
               ),
             ),
           ],
@@ -333,6 +274,185 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 }
 
+// ─── Following list ───────────────────────────────────────────────────────────
+
+class _FollowingList extends StatelessWidget {
+  const _FollowingList({
+    required this.currentUid,
+    required this.chatService,
+    required this.followService,
+    required this.recentChats,
+    required this.streaks,
+    required this.query,
+  });
+
+  final String currentUid;
+  final ChatService chatService;
+  final FollowService followService;
+  final Map<String, Map<String, dynamic>> recentChats;
+  final Map<String, int> streaks;
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Map<String, int>>(
+      stream: GameChampionService.topScoreRanksStream(),
+      builder: (context, scoreRanksSnap) {
+        return StreamBuilder<Map<String, int>>(
+          stream: GameChampionService.topStreakRanksStream(),
+          builder: (context, streakRanksSnap) {
+            // Get UIDs this user is following
+            return StreamBuilder<List<String>>(
+              stream: followService.followingUidsStream(currentUid),
+              builder: (context, followingSnap) {
+                if (followingSnap.connectionState ==
+                    ConnectionState.waiting) {
+                  return const _FriendsSkeleton();
+                }
+
+                final followingUids = followingSnap.data ?? [];
+
+                if (followingUids.isEmpty) {
+                  return const _FriendsEmptyState(
+                    icon: Icons.person_add_outlined,
+                    title: 'Not following anyone yet',
+                    subtitle:
+                        'Go to Everyone in your university to find and follow people.',
+                  );
+                }
+
+                // Fetch user docs for following UIDs
+                return StreamBuilder<
+                    QuerySnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .where(FieldPath.documentId,
+                          whereIn: followingUids.take(10).toList())
+                      .snapshots(),
+                  builder: (context, usersSnap) {
+                    if (usersSnap.connectionState ==
+                        ConnectionState.waiting) {
+                      return const _FriendsSkeleton();
+                    }
+
+                    var users = (usersSnap.data?.docs ?? [])
+                        .map((d) => {'uid': d.id, ...d.data()})
+                        .where((u) {
+                      if (query.isEmpty) return true;
+                      final name = (u['displayName'] ?? '')
+                          .toString()
+                          .toLowerCase();
+                      final email =
+                          (u['email'] ?? '').toString().toLowerCase();
+                      return name.contains(query) ||
+                          email.contains(query);
+                    }).toList();
+
+                    // Sort by most recent chat
+                    users.sort((a, b) {
+                      final metaA = recentChats[chatService.chatIdFor(
+                          currentUid, a['uid'].toString())];
+                      final metaB = recentChats[chatService.chatIdFor(
+                          currentUid, b['uid'].toString())];
+                      final timeA =
+                          metaA?['lastMessageTime'] as Timestamp?;
+                      final timeB =
+                          metaB?['lastMessageTime'] as Timestamp?;
+                      if (timeA != null && timeB != null)
+                        return timeB.compareTo(timeA);
+                      if (timeA != null) return -1;
+                      if (timeB != null) return 1;
+                      return (a['displayName'] ?? '')
+                          .toString()
+                          .toLowerCase()
+                          .compareTo((b['displayName'] ?? '')
+                              .toString()
+                              .toLowerCase());
+                    });
+
+                    if (users.isEmpty) {
+                      return const _FriendsEmptyState(
+                        icon: Icons.person_search_outlined,
+                        title: 'No results',
+                        subtitle: 'Try a different search term.',
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: users.length,
+                      separatorBuilder: (_, __) => Divider(
+                        color: U.border,
+                        height: 1,
+                        thickness: 0.5,
+                        indent: 72,
+                      ),
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        final uid = user['uid'].toString();
+                        final chatMeta = recentChats[
+                            chatService.chatIdFor(currentUid, uid)];
+
+                        return _FriendRow(
+                          user: user,
+                          scoreRank: scoreRanksSnap.data?[uid],
+                          streakRank: streakRanksSnap.data?[uid],
+                          streak: streaks[uid] ?? 0,
+                          chatMeta: chatMeta,
+                          currentUid: currentUid,
+                          followService: followService,
+                          onTap: () async {
+                            // Only allow chat if mutual follow
+                            final canChat = await followService.canChat(
+                                currentUid, uid);
+                            if (!context.mounted) return;
+                            if (canChat) {
+                              Navigator.of(context).push(
+                                buildForwardRoute(
+                                  ChatScreen(
+                                    otherUserId: uid,
+                                    displayName: (user['displayName'] ??
+                                            'Friend')
+                                        .toString(),
+                                    email:
+                                        (user['email'] ?? '').toString(),
+                                    photoUrl: user['photoUrl']?.toString(),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              // Navigate to profile instead
+                              Navigator.of(context).push(
+                                buildForwardRoute(
+                                  UserProfileScreen(
+                                    uid: uid,
+                                    displayName: (user['displayName'] ??
+                                            'Student')
+                                        .toString(),
+                                    email:
+                                        (user['email'] ?? '').toString(),
+                                    photoUrl: user['photoUrl']?.toString(),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// ─── Friend row ───────────────────────────────────────────────────────────────
+
 class _FriendRow extends StatelessWidget {
   const _FriendRow({
     required this.user,
@@ -340,6 +460,8 @@ class _FriendRow extends StatelessWidget {
     this.streakRank,
     required this.streak,
     required this.chatMeta,
+    required this.currentUid,
+    required this.followService,
     required this.onTap,
   });
 
@@ -348,6 +470,8 @@ class _FriendRow extends StatelessWidget {
   final int? streakRank;
   final int streak;
   final Map<String, dynamic>? chatMeta;
+  final String currentUid;
+  final FollowService followService;
   final VoidCallback onTap;
 
   @override
@@ -357,7 +481,9 @@ class _FriendRow extends StatelessWidget {
     final photoUrl = user['photoUrl']?.toString();
     final lastSeen = user['lastSeen'];
     final lastMessageRaw = (chatMeta?['lastMessageRaw'] ?? '').toString();
-    final lastMessagePreview = (chatMeta?['lastMessage'] ?? '').toString();
+    final lastMessagePreview =
+        (chatMeta?['lastMessage'] ?? '').toString();
+    final bio = (user['bio'] ?? '').toString().trim();
     final isOnline =
         lastSeen is Timestamp &&
         DateTime.now().difference(lastSeen.toDate()) <=
@@ -371,6 +497,7 @@ class _FriendRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         child: Row(
           children: [
+            // Avatar with online dot
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -381,9 +508,10 @@ class _FriendRow extends StatelessWidget {
                   child: CircleAvatar(
                     radius: 22,
                     backgroundColor: U.primary.withValues(alpha: 0.16),
-                    backgroundImage: photoUrl != null && photoUrl.isNotEmpty
-                        ? NetworkImage(photoUrl)
-                        : null,
+                    backgroundImage:
+                        photoUrl != null && photoUrl.isNotEmpty
+                            ? NetworkImage(photoUrl)
+                            : null,
                     child: photoUrl == null || photoUrl.isEmpty
                         ? Text(
                             displayName.isEmpty
@@ -415,6 +543,8 @@ class _FriendRow extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 14),
+
+            // Name + last message / bio
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,8 +574,11 @@ class _FriendRow extends StatelessWidget {
                       : Text(
                           lastMessagePreview.isNotEmpty
                               ? lastMessagePreview
-                              : email,
-                          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                              : bio.isNotEmpty
+                                  ? bio
+                                  : email,
+                          style: GoogleFonts.outfit(
+                              color: U.sub, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -453,6 +586,8 @@ class _FriendRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+
+            // Right column: streak + online status
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
@@ -500,6 +635,8 @@ class _FriendRow extends StatelessWidget {
   }
 }
 
+// ─── Skeleton / Empty ─────────────────────────────────────────────────────────
+
 class _FriendsSkeleton extends StatelessWidget {
   const _FriendsSkeleton();
 
@@ -508,31 +645,29 @@ class _FriendsSkeleton extends StatelessWidget {
     return ListView.separated(
       padding: EdgeInsets.zero,
       itemCount: 8,
-      separatorBuilder: (context, index) =>
+      separatorBuilder: (_, __) =>
           Divider(color: U.border, height: 1, thickness: 0.5, indent: 72),
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(
-            children: const [
-              SkeletonBox(height: 44, width: 44, radius: 22),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SkeletonBox(height: 16, width: 140, radius: 8),
-                    SizedBox(height: 8),
-                    SkeletonBox(height: 12, width: 180, radius: 8),
-                  ],
-                ),
+      itemBuilder: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: const [
+            SkeletonBox(height: 44, width: 44, radius: 22),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(height: 16, width: 140, radius: 8),
+                  SizedBox(height: 8),
+                  SkeletonBox(height: 12, width: 180, radius: 8),
+                ],
               ),
-              SizedBox(width: 12),
-              SkeletonBox(height: 12, width: 52, radius: 8),
-            ],
-          ),
-        );
-      },
+            ),
+            SizedBox(width: 12),
+            SkeletonBox(height: 12, width: 52, radius: 8),
+          ],
+        ),
+      ),
     );
   }
 }

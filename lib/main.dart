@@ -21,7 +21,6 @@ import 'services/chat_service.dart';
 import 'services/notification_service.dart';
 import 'services/platform_support.dart';
 import 'screens/app_shell.dart';
-import 'screens/splash_screen.dart';
 import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
@@ -39,30 +38,6 @@ class AppInitializationState {
 
   final bool firebaseReady;
   final String? blockingMessage;
-}
-
-bool _isSupabaseInitialized = false;
-
-Future<void> ensureSupabaseInitialized() async {
-  if (_isSupabaseInitialized) return;
-  try {
-    final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
-    if (doc.exists && doc.data() != null) {
-      final data = doc.data()!;
-      final url = data['url'] as String?;
-      final anonKey = data['anon_key'] as String?;
-      if (url != null && anonKey != null) {
-        await Supabase.initialize(url: url, anonKey: anonKey);
-        _isSupabaseInitialized = true;
-      } else {
-        debugPrint('Supabase config missing url or anon_key');
-      }
-    } else {
-      debugPrint('Supabase config document not found');
-    }
-  } catch (e) {
-    debugPrint('Failed to initialize Supabase: $e');
-  }
 }
 
 class AppTheme {
@@ -173,77 +148,6 @@ const _orchidTheme = AppTheme(
   mermaidLine: '#CBA6F7',
 );
 
-const _tokyonightTheme = AppTheme(
-  key: 'tokyonight',
-  label: 'Tokyo Night',
-  description: 'Elegant dark theme with blue undertones',
-  isDark: true,
-  bg: Color(0xFF1A1B26),
-  surface: Color(0xFF24283B),
-  card: Color(0xFF292E42),
-  border: Color(0xFF414868),
-  text: Color(0xFFC0CAF5),
-  sub: Color(0xFF8B8FB3),
-  dim: Color(0xFF3B4261),
-  primary: Color(0xFF7AA2F7),
-  teal: Color(0xFF7DCFFF),
-  red: Color(0xFFF7768E),
-  green: Color(0xFF9ECE6A),
-  peach: Color(0xFFFF9E64),
-  blue: Color(0xFF7AA2F7),
-  gold: Color(0xFFFFD57E),
-  sky: Color(0xFF7DCFFF),
-  lavender: Color(0xFFBB9AF7),
-  gray: Color(0xFF565F89),
-  mdH1: Color(0xFF7AA2F7),
-  mdH2: Color(0xFF7DCFFF),
-  mdH3: Color(0xFFBB9AF7),
-  mdBold: Color(0xFFFF9E64),
-  mdItalic: Color(0xFF9ECE6A),
-  mdCode: Color(0xFFF7768E),
-  mdLink: Color(0xFF7AA2F7),
-  mdBlockquote: Color(0xFF7AA2F7),
-  mdDel: Color(0xFF3B4261),
-  mermaidPrimary: '#7AA2F7',
-  mermaidBackground: '#292E42',
-  mermaidLine: '#7AA2F7',
-);
-
-const _catppuccinMochaTheme = AppTheme(
-  key: 'catppuccin-mocha',
-  label: 'Catppuccin Mocha',
-  description: 'Lavender meets chocolate',
-  isDark: true,
-  bg: Color(0xFF1E1E2E),
-  surface: Color(0xFF313244),
-  card: Color(0xFF45475A),
-  border: Color(0xFF585B70),
-  text: Color(0xFFCDD6F4),
-  sub: Color(0xFFA6ADC8),
-  dim: Color(0xFF6C7086),
-  primary: Color(0xFFCBA6F7),
-  teal: Color(0xFF94E2D5),
-  red: Color(0xFFF38BA8),
-  green: Color(0xFFA6E3A1),
-  peach: Color(0xFFFAB387),
-  blue: Color(0xFF89B4FA),
-  gold: Color(0xFFF9E2AF),
-  sky: Color(0xFF89DCEB),
-  lavender: Color(0xFFB4BEFE),
-  gray: Color(0xFF8B92A4),
-  mdH1: Color(0xFFCBA6F7),
-  mdH2: Color(0xFF94E2D5),
-  mdH3: Color(0xFFB4BEFE),
-  mdBold: Color(0xFFFAB387),
-  mdItalic: Color(0xFFA6E3A1),
-  mdCode: Color(0xFFF38BA8),
-  mdLink: Color(0xFF89B4FA),
-  mdBlockquote: Color(0xFFCBA6F7),
-  mdDel: Color(0xFF6C7086),
-  mermaidPrimary: '#CBA6F7',
-  mermaidBackground: '#45475A',
-  mermaidLine: '#CBA6F7',
-);
 
 const _gruvboxTheme = AppTheme(
   key: 'gruvbox',
@@ -317,76 +221,76 @@ const _everforestTheme = AppTheme(
   mermaidLine: '#A7C080',
 );
 
-const _ayuTheme = AppTheme(
-  key: 'ayu',
-  label: 'Ayu',
-  description: 'Fast, clean and modern',
-  isDark: true,
-  bg: Color(0xFF0D1117),
-  surface: Color(0xFF161B22),
-  card: Color(0xFF21262D),
-  border: Color(0xFF30363D),
-  text: Color(0xFFB3B1AD),
-  sub: Color(0xFF8A9199),
-  dim: Color(0xFF525A66),
-  primary: Color(0xFF39BAE6),
-  teal: Color(0xFF5FD4A4),
-  red: Color(0xFFF07178),
-  green: Color(0xFF87D96C),
-  peach: Color(0xFFFFB454),
-  blue: Color(0xFF39BAE6),
-  gold: Color(0xFFFFB454),
-  sky: Color(0xFF5FD4A4),
-  lavender: Color(0xFFC77DBA),
-  gray: Color(0xFF8A9199),
-  mdH1: Color(0xFF39BAE6),
-  mdH2: Color(0xFF5FD4A4),
-  mdH3: Color(0xFF7AA2F7),
-  mdBold: Color(0xFFFFB454),
-  mdItalic: Color(0xFF87D96C),
-  mdCode: Color(0xFFF07178),
-  mdLink: Color(0xFF39BAE6),
-  mdBlockquote: Color(0xFF39BAE6),
-  mdDel: Color(0xFF525A66),
-  mermaidPrimary: '#39BAE6',
-  mermaidBackground: '#21262D',
-  mermaidLine: '#39BAE6',
+const _mintLightTheme = AppTheme(
+  key: 'mint-light',
+  label: 'Mint Light',
+  description: 'Crisp and refreshing minty whites',
+  isDark: false,
+  bg: Color(0xFFF2FBF7),
+  surface: Color(0xFFE5F5ED),
+  card: Color(0xFFFFFFFF),
+  border: Color(0xFFBCE3CE),
+  text: Color(0xFF2C4336),
+  sub: Color(0xFF567C65),
+  dim: Color(0xFF86A391),
+  primary: Color(0xFF1E8F6A),
+  teal: Color(0xFF0C7A65),
+  red: Color(0xFFE05B5B),
+  green: Color(0xFF2C9C4E),
+  peach: Color(0xFFE88A4A),
+  blue: Color(0xFF2B7ABF),
+  gold: Color(0xFFD69A1C),
+  sky: Color(0xFF3899B5),
+  lavender: Color(0xFF8B6CBF),
+  gray: Color(0xFF7A9386),
+  mdH1: Color(0xFF1E8F6A),
+  mdH2: Color(0xFF0C7A65),
+  mdH3: Color(0xFF8B6CBF),
+  mdBold: Color(0xFFE88A4A),
+  mdItalic: Color(0xFF2C9C4E),
+  mdCode: Color(0xFFE05B5B),
+  mdLink: Color(0xFF2B7ABF),
+  mdBlockquote: Color(0xFF567C65),
+  mdDel: Color(0xFF86A391),
+  mermaidPrimary: '#1E8F6A',
+  mermaidBackground: '#E5F5ED',
+  mermaidLine: '#1E8F6A',
 );
 
-const _poimandresAccessibleTheme = AppTheme(
-  key: 'poimandres-accessible',
-  label: 'Poimandres Accessible',
-  description: 'High contrast variant',
-  isDark: true,
-  bg: Color(0xFF0D1117),
-  surface: Color(0xFF161B22),
-  card: Color(0xFF21262D),
-  border: Color(0xFF30363D),
-  text: Color(0xFFC9D1D9),
-  sub: Color(0xFF8B949E),
-  dim: Color(0xFF484F58),
-  primary: Color(0xFF79C0FF),
-  teal: Color(0xFF56D4DD),
-  red: Color(0xFFFF7B72),
-  green: Color(0xFF7EE787),
-  peach: Color(0xFFFFA657),
-  blue: Color(0xFF79C0FF),
-  gold: Color(0xFFFFA657),
-  sky: Color(0xFF56D4DD),
-  lavender: Color(0xFFA371F7),
-  gray: Color(0xFF8B949E),
-  mdH1: Color(0xFF79C0FF),
-  mdH2: Color(0xFF56D4DD),
-  mdH3: Color(0xFFA371F7),
-  mdBold: Color(0xFFFFA657),
-  mdItalic: Color(0xFF7EE787),
-  mdCode: Color(0xFFFF7B72),
-  mdLink: Color(0xFF79C0FF),
-  mdBlockquote: Color(0xFF79C0FF),
-  mdDel: Color(0xFF484F58),
-  mermaidPrimary: '#79C0FF',
-  mermaidBackground: '#21262D',
-  mermaidLine: '#79C0FF',
+const _oneLightTheme = AppTheme(
+  key: 'one-light',
+  label: 'One Light',
+  description: 'Atom inspired daylight',
+  isDark: false,
+  bg: Color(0xFFFAFAFA),
+  surface: Color(0xFFF0F0F1),
+  card: Color(0xFFFFFFFF),
+  border: Color(0xFFE5E5E6),
+  text: Color(0xFF383A42),
+  sub: Color(0xFF696C77),
+  dim: Color(0xFFA0A1A7),
+  primary: Color(0xFF4078F2),
+  teal: Color(0xFF0184BC),
+  red: Color(0xFFE45649),
+  green: Color(0xFF50A14F),
+  peach: Color(0xFFD19A66),
+  blue: Color(0xFF4078F2),
+  gold: Color(0xFFC18401),
+  sky: Color(0xFF0184BC),
+  lavender: Color(0xFFA626A4),
+  gray: Color(0xFF696C77),
+  mdH1: Color(0xFF4078F2),
+  mdH2: Color(0xFF0184BC),
+  mdH3: Color(0xFFA626A4),
+  mdBold: Color(0xFFD19A66),
+  mdItalic: Color(0xFF50A14F),
+  mdCode: Color(0xFFE45649),
+  mdLink: Color(0xFF4078F2),
+  mdBlockquote: Color(0xFF696C77),
+  mdDel: Color(0xFFA0A1A7),
+  mermaidPrimary: '#4078F2',
+  mermaidBackground: '#F0F0F1',
+  mermaidLine: '#4078F2',
 );
 
 const _githubDarkTheme = AppTheme(
@@ -500,13 +404,11 @@ const _rosePineDawnTheme = AppTheme(
 const appThemes = [
   _catppuccinLatteTheme,
   _rosePineDawnTheme,
+  _mintLightTheme,
+  _oneLightTheme,
   _orchidTheme,
-  _tokyonightTheme,
-  _catppuccinMochaTheme,
   _gruvboxTheme,
   _everforestTheme,
-  _ayuTheme,
-  _poimandresAccessibleTheme,
   _githubDarkTheme,
 ];
 
@@ -530,7 +432,6 @@ void _applySystemUiForTheme(AppTheme theme) {
       statusBarBrightness:
           usesLightIcons ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness:
           usesLightIcons ? Brightness.light : Brightness.dark,
       systemNavigationBarContrastEnforced: false,
@@ -643,7 +544,23 @@ Future<AppInitializationState> _initializeApp() async {
       unawaited(NotificationService.initialize());
     }
 
-    // Supabase initialization is now handled dynamically after authentication
+    try {
+      final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final url = data['url'] as String?;
+        final anonKey = data['anon_key'] as String?;
+        if (url != null && anonKey != null) {
+          await Supabase.initialize(url: url, anonKey: anonKey);
+        } else {
+          debugPrint('Supabase config missing url or anon_key');
+        }
+      } else {
+        debugPrint('Supabase config document not found');
+      }
+    } catch (e) {
+      debugPrint('Failed to initialize Supabase: $e');
+    }
 
     return const AppInitializationState(firebaseReady: true);
   } catch (e) {
@@ -687,8 +604,8 @@ void main() async {
   U.applyTheme(_initialAccentKey);
   await _loadAppToggleSettings();
   appInitialization = _initializeApp();
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   _applySystemUiForTheme(appThemeNotifier.value);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const UtopiaApp());
 }
 
@@ -761,28 +678,10 @@ class UtopiaApp extends StatelessWidget {
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
         final isDark = theme.isDark;
-        final overlayStyle = SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarDividerColor: Colors.transparent,
-          systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          systemNavigationBarContrastEnforced: false,
-        );
-
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: overlayStyle,
-          child: MaterialApp(
-            title: 'UTOPIA',
+        return MaterialApp(
+          title: 'UTOPIA',
           debugShowCheckedModeBanner: false,
           navigatorKey: navigatorKey,
-          builder: (context, child) {
-            return ColoredBox(
-              color: U.bg,
-              child: child ?? const SizedBox.shrink(),
-            );
-          },
           theme: ThemeData(
             useMaterial3: true,
             brightness: isDark ? Brightness.dark : Brightness.light,
@@ -951,11 +850,6 @@ class UtopiaApp extends StatelessWidget {
                     isDark ? Brightness.light : Brightness.dark,
                 statusBarBrightness:
                     isDark ? Brightness.dark : Brightness.light,
-                systemNavigationBarColor: Colors.transparent,
-                systemNavigationBarDividerColor: Colors.transparent,
-                systemNavigationBarIconBrightness:
-                    isDark ? Brightness.light : Brightness.dark,
-                systemNavigationBarContrastEnforced: false,
               ),
               titleTextStyle: GoogleFonts.outfit(
                 color: U.text,
@@ -967,7 +861,6 @@ class UtopiaApp extends StatelessWidget {
             dividerColor: U.border,
           ),
           home: const AppLoadingOverlay(child: AuthGate()),
-        ),
         );
       },
     );
@@ -997,7 +890,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
     _loadUpdateInfo();
     _initDeepLinks();
-    Future.delayed(cinematicSplashDuration, () {
+    Future.delayed(SplashScreen.minimumDisplayDuration, () {
       if (mounted) {
         setState(() => _greetingCyclePassed = true);
       }
@@ -1078,7 +971,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
       builder: (context, initSnapshot) {
         if (initSnapshot.connectionState != ConnectionState.done ||
             !_greetingCyclePassed) {
-          return const CinematicSplashScreen();
+          return const SplashScreen();
         }
         final initState =
             initSnapshot.data ??
@@ -1103,47 +996,39 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
           stream: FirebaseAuth.instance.authStateChanges(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CinematicSplashScreen();
+              return const SplashScreen();
             }
             if (snapshot.hasData) {
               unawaited(ChatService().touchPresence());
               if (PlatformSupport.supportsNotifications) {
 
               }
-              return FutureBuilder(
-                future: ensureSupabaseInitialized(),
-                builder: (context, supabaseSnapshot) {
-                  if (supabaseSnapshot.connectionState == ConnectionState.waiting) {
-                    return const CinematicSplashScreen();
+              return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(snapshot.data!.uid)
+                    .snapshots(),
+                builder: (context, userSnapshot) {
+                  final themeAccent =
+                      userSnapshot.data?.data()?['themeAccent'] as String?;
+                  if (themeAccent != null) {
+                    unawaited(
+                      CacheService().saveAppSetting(
+                        'theme_accent',
+                        themeAccent,
+                      ),
+                    );
                   }
-                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(snapshot.data!.uid)
-                        .snapshots(),
-                    builder: (context, userSnapshot) {
-                      final themeAccent =
-                          userSnapshot.data?.data()?['themeAccent'] as String?;
-                      if (themeAccent != null) {
-                        unawaited(
-                          CacheService().saveAppSetting(
-                            'theme_accent',
-                            themeAccent,
-                          ),
-                        );
-                      }
 
-                      final selectedUniversityId = 
-                          userSnapshot.data?.data()?['selectedUniversityId'] as String?;
+                  final selectedUniversityId = 
+                      userSnapshot.data?.data()?['selectedUniversityId'] as String?;
 
-                      if (userSnapshot.connectionState == ConnectionState.active && 
-                          selectedUniversityId == null) {
-                        return const UniversitySelectionScreen();
-                      }
+                  if (userSnapshot.connectionState == ConnectionState.active && 
+                      selectedUniversityId == null) {
+                    return const UniversitySelectionScreen();
+                  }
 
-                      return const AppShell();
-                    },
-                  );
+                  return const AppShell();
                 },
               );
             }
@@ -1156,8 +1041,123 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   }
 }
 
-// Old SplashScreen removed — replaced by CinematicSplashScreen in
-// lib/screens/splash_screen.dart
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+  static const greetings = ['Hello', 'నమస్కారం', 'नमस्ते', 'こんにちは', '안녕하세요'];
+  static const greetingStepDelay = Duration(milliseconds: 65);
+  static const greetingAnimDuration = Duration(milliseconds: 45);
+  static Duration get minimumDisplayDuration {
+    final transitions = greetings.length - 1;
+    final perTransition =
+        greetingStepDelay.inMilliseconds +
+        (greetingAnimDuration.inMilliseconds * 2);
+    return Duration(milliseconds: transitions * perTransition);
+  }
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  int _idx = 0;
+  late AnimationController _ac;
+  late Animation<double> _fade;
+  late Animation<double> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ac = AnimationController(
+      vsync: this,
+      duration: SplashScreen.greetingAnimDuration,
+    );
+    _fade = CurvedAnimation(parent: _ac, curve: Curves.easeInOut);
+    _slide = Tween<double>(
+      begin: 6,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
+    _ac.forward();
+    _cycle();
+  }
+
+  Future<void> _cycle() async {
+    for (int i = 1; i < SplashScreen.greetings.length; i++) {
+      await Future.delayed(SplashScreen.greetingStepDelay);
+      if (!mounted) return;
+      await _ac.reverse();
+      setState(() => _idx = i);
+      await _ac.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ac.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: U.bg,
+      body: Stack(
+        children: [
+          // ── Content ──
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedBuilder(
+                  animation: _ac,
+                  builder: (context, _) => Opacity(
+                    opacity: _fade.value,
+                    child: Transform.translate(
+                      offset: Offset(0, _slide.value),
+                      child: Text(
+                        SplashScreen.greetings[_idx],
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 42,
+                          fontWeight: FontWeight.w700,
+                          fontStyle: FontStyle.italic,
+                          color: U.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'UTOPIA',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: U.sub,
+                    letterSpacing: 8,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                AnimatedBuilder(
+                  animation: _ac,
+                  builder: (context, _) {
+                    return Container(
+                      width: 4 + (20 * _fade.value),
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.5 + (0.5 * _fade.value)),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

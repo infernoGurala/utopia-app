@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../main.dart';
 import 'attendance_screen.dart';
+import 'everyone_screen.dart';
 import 'friends_screen.dart';
 import 'map_screen.dart';
 
@@ -142,10 +143,18 @@ class _UniversityScreenState extends State<UniversityScreen> {
                     _UniversityCard(
                       title: 'Everyone',
                       icon: Icons.public_outlined,
-                      color: U.sub,
+                      color: U.blue,
                       delay: 300,
-                      isComingSoon: true,
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EveryoneScreen(
+                            universityId: _universityId.isNotEmpty
+                                ? _universityId
+                                : null,
+                          ),
+                        ),
+                      ),
                     ),
                     _UniversityCard(
                       title: 'Ask Community',

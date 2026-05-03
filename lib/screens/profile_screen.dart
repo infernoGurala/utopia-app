@@ -10,12 +10,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
+import '../services/follow_service.dart';
 import '../services/platform_support.dart';
 import '../widgets/game_champion_badge.dart';
 import '../services/role_service.dart';
 import '../services/game_champion_service.dart';
 import 'about_utopia_screen.dart';
 import 'developer_panel_screen.dart';
+import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
 import 'iaa_screen.dart';
 
@@ -29,6 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSuperUser = false;
   bool _updatingName = false;
   bool _updatingTheme = false;
+  bool _updatingBio = false;
+  final FollowService _followService = FollowService();
 
   Future<void> _signOut() async {
     RoleService().clearCache();
@@ -132,6 +136,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     RoleService().isSuperUser().then((v) {
       if (mounted) setState(() => _isSuperUser = v);
     });
+  }
+
+  Future<void> _editBio(String currentBio) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _updatingBio) return;
+
+    final nextBio = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) =>
+          _EditBioDialog(initialValue: currentBio),
+    );
+
+    if (nextBio == null || nextBio == currentBio) return;
+
+    setState(() => _updatingBio = true);
+    try {
+      await _followService.updateBio(nextBio);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: U.red,
+            content: Text(
+              'Could not update bio',
+              style: GoogleFonts.outfit(color: U.bg),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _updatingBio = false);
+    }
   }
 
   Future<void> _editDisplayName() async {
@@ -310,34 +346,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         fontSize: 12,
                                       ),
                                     ),
+                                    // Bio
+                                    Builder(builder: (context) {
+                                      final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
+                                      if (bio.isNotEmpty) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Text(
+                                            bio,
+                                            style: GoogleFonts.outfit(color: U.text, fontSize: 12, height: 1.4),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    }),
                                     const SizedBox(height: 8),
-                                    GestureDetector(
-                                      onTap: _editDisplayName,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            Icons.edit_outlined,
-                                            color: _updatingName
-                                                ? U.dim
-                                                : U.primary,
-                                            size: 14,
+                                    Row(
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _editDisplayName,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.edit_outlined,
+                                                color: _updatingName ? U.dim : U.primary,
+                                                size: 14,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                _updatingName ? 'Updating...' : 'Edit name',
+                                                style: GoogleFonts.outfit(
+                                                  color: _updatingName ? U.dim : U.primary,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            _updatingName
-                                                ? 'Updating...'
-                                                : 'Edit display name',
-                                            style: GoogleFonts.outfit(
-                                              color: _updatingName
-                                                  ? U.dim
-                                                  : U.primary,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                        ),
+                                        const SizedBox(width: 16),
+                                        GestureDetector(
+                                          onTap: () {
+                                            final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
+                                            _editBio(bio);
+                                          },
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.badge_outlined,
+                                                color: _updatingBio ? U.dim : U.teal,
+                                                size: 14,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                _updatingBio ? 'Saving...' : 'Edit bio',
+                                                style: GoogleFonts.outfit(
+                                                  color: _updatingBio ? U.dim : U.teal,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -378,6 +454,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: U.border.withValues(alpha: 0.5),
                         ),
                       ],
+                      _groupedTile(
+                        icon: Icons.person_add_outlined,
+                        label: 'Follow Requests',
+                        sub: 'View people who want to follow you',
+                        color: U.blue,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FollowRequestsScreen(
+                              currentUid: user?.uid ?? '',
+                            ),
+                          ),
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
                       _groupedTile(
                         icon: Icons.info_outline_rounded,
                         label: 'About UTOPIA',
@@ -596,6 +691,81 @@ class _EditDisplayNameDialogState extends State<_EditDisplayNameDialog> {
         style: GoogleFonts.outfit(color: U.text, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Display name',
+          hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: U.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: U.primary),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          style: FilledButton.styleFrom(
+            backgroundColor: U.primary,
+            foregroundColor: U.bg,
+          ),
+          child: Text(
+            'Save',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditBioDialog extends StatefulWidget {
+  const _EditBioDialog({required this.initialValue});
+  final String initialValue;
+
+  @override
+  State<_EditBioDialog> createState() => _EditBioDialogState();
+}
+
+class _EditBioDialogState extends State<_EditBioDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: U.card,
+      title: Text(
+        'Edit bio',
+        style: GoogleFonts.outfit(
+          color: U.text,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLines: 4,
+        maxLength: 150,
+        style: GoogleFonts.outfit(color: U.text, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'Tell people about yourself...',
           hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
