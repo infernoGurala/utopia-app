@@ -35,6 +35,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update: if isOwner(uid);
       allow delete: if false;
+
+      match /{document=**} {
+        allow read, write: if isOwner(uid);
+      }
     }
     
     match /users/{uid}/memberships/{membershipId} {
@@ -70,12 +74,12 @@ service cloud.firestore {
 
     match /config/{docId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow write: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superuser';
     }
 
     match /app_config/{docId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow write: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superuser';
     }
 
     match /sciwordle_daily/{docId} {
@@ -143,6 +147,27 @@ service cloud.firestore {
 
     match /universities/{docId} {
       allow read: if isSignedIn();
+    }
+
+    match /uni_chats/{universityId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.auth.uid == request.resource.data.senderId;
+        allow update, delete: if false;
+      }
+    }
+
+    // ── University Docs ───────────────────────────────────────────────────
+    match /university_docs/{docId} {
+      // Any signed-in user can read, add, edit, or delete docs
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
   }
 }

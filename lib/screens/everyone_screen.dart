@@ -148,7 +148,7 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
                             const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Everyone',
+                              'People',
                               style: GoogleFonts.outfit(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
@@ -171,15 +171,21 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
             ),
 
             if (!_isSearching)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                child: Text(
-                  widget.universityId != null && widget.universityId!.isNotEmpty
-                      ? 'People at your university'
-                      : 'Everyone on UTOPIA',
-                  style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
-                ),
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _buildStream(),
+                builder: (context, snap) {
+                  final count = snap.data?.docs.length ?? 0;
+                  final countStr = count > 0 ? ' • $count people' : '';
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Text(
+                      widget.universityId != null && widget.universityId!.isNotEmpty
+                          ? 'People at your university$countStr'
+                          : 'Everyone on UTOPIA$countStr',
+                      style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
+                    ),
+                  );
+                },
               ),
 
             const SizedBox(height: 8),
@@ -225,7 +231,15 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
                                 (u['email'] ?? '').toString().toLowerCase();
                             return name.contains(query) ||
                                 email.contains(query);
-                          }).toList();
+                          }).toList()
+                            ..sort((a, b) {
+                              final roleA = a['role'] == 'superuser' ? 0 : 1;
+                              final roleB = b['role'] == 'superuser' ? 0 : 1;
+                              if (roleA != roleB) return roleA.compareTo(roleB);
+                              final nameA = (a['displayName'] ?? '').toString().toLowerCase();
+                              final nameB = (b['displayName'] ?? '').toString().toLowerCase();
+                              return nameA.compareTo(nameB);
+                            });
 
                           if (users.isEmpty) {
                             return _Empty(

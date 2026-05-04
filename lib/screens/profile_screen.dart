@@ -15,7 +15,6 @@ import '../services/platform_support.dart';
 import '../widgets/game_champion_badge.dart';
 import '../services/role_service.dart';
 import '../services/game_champion_service.dart';
-import 'about_utopia_screen.dart';
 import 'developer_panel_screen.dart';
 import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
@@ -473,25 +472,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      _groupedTile(
-                        icon: Icons.info_outline_rounded,
-                        label: 'About UTOPIA',
-                        sub: 'Version 3.0.0 · Early Access Rollout',
-                        color: U.teal,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const AboutUtopiaScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
                       // Switch Theme
                       _groupedTile(
                         icon: Icons.palette_outlined,

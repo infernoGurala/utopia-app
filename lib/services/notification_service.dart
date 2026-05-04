@@ -15,6 +15,9 @@ import 'package:utopia_app/screens/chat_screen.dart';
 import 'package:utopia_app/screens/sciwordle_screen.dart';
 import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -56,6 +59,7 @@ class NotificationService {
       if (_initialized) {
         return;
       }
+      tz.initializeTimeZones();
 
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('ic_notification');
@@ -483,6 +487,58 @@ class NotificationService {
       message,
       platformChannelSpecifics,
     );
+  }
+
+  static Future<void> scheduleDailyTimetableNotification({
+    required int hour,
+    required int minute,
+  }) async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      await _localNotifications.cancel(100); // Unique ID for timetable notification
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('timetable_notif_hour', hour);
+      await prefs.setInt('timetable_notif_minute', minute);
+      await prefs.setBool('timetable_notif_enabled', true);
+
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      await _localNotifications.zonedSchedule(
+        100,
+        'Your Daily Timetable',
+        'Time to check your classes for today!',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'utopia_high_importance',
+            'UTOPIA Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  static Future<void> cancelTimetableNotification() async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('timetable_notif_enabled', false);
+      await _localNotifications.cancel(100);
+    } catch (e) {
+      // Ignored
+    }
   }
 
   static Future<bool> _isOnline() async {

@@ -88,6 +88,14 @@
         { "fieldPath": "selectedUniversityId", "order": "ASCENDING" },
         { "fieldPath": "displayName", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "university_docs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "universityId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

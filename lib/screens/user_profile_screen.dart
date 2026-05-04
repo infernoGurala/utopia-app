@@ -141,30 +141,52 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   // Avatar
-                                  ChampionAvatarBadge(
-                                    scoreRank: scoreRank,
-                                    streakRank: streakRank,
-                                    email: widget.email,
-                                    child: CircleAvatar(
-                                      radius: 44,
-                                      backgroundColor:
-                                          U.primary.withValues(alpha: 0.15),
-                                      backgroundImage:
-                                          photoUrl != null && photoUrl.isNotEmpty
-                                              ? NetworkImage(photoUrl)
-                                              : null,
-                                      child: photoUrl == null || photoUrl.isEmpty
-                                          ? Text(
-                                              displayName.isEmpty
-                                                  ? 'U'
-                                                  : displayName[0].toUpperCase(),
-                                              style: GoogleFonts.outfit(
-                                                color: U.primary,
-                                                fontSize: 32,
-                                                fontWeight: FontWeight.w700,
+                                  GestureDetector(
+                                    onTap: () {
+                                      if (photoUrl != null && photoUrl.isNotEmpty) {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => Scaffold(
+                                              backgroundColor: Colors.black,
+                                              appBar: AppBar(
+                                                backgroundColor: Colors.black,
+                                                iconTheme: const IconThemeData(color: Colors.white),
                                               ),
-                                            )
-                                          : null,
+                                              body: Center(
+                                                child: InteractiveViewer(
+                                                  child: Image.network(photoUrl),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: ChampionAvatarBadge(
+                                      scoreRank: scoreRank,
+                                      streakRank: streakRank,
+                                      email: widget.email,
+                                      child: CircleAvatar(
+                                        radius: 44,
+                                        backgroundColor:
+                                            U.primary.withValues(alpha: 0.15),
+                                        backgroundImage:
+                                            photoUrl != null && photoUrl.isNotEmpty
+                                                ? NetworkImage(photoUrl)
+                                                : null,
+                                        child: photoUrl == null || photoUrl.isEmpty
+                                            ? Text(
+                                                displayName.isEmpty
+                                                    ? 'U'
+                                                    : displayName[0].toUpperCase(),
+                                                style: GoogleFonts.outfit(
+                                                  color: U.primary,
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 24),

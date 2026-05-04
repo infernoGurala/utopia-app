@@ -401,41 +401,20 @@ class _FollowingList extends StatelessWidget {
                           chatMeta: chatMeta,
                           currentUid: currentUid,
                           followService: followService,
-                          onTap: () async {
-                            // Only allow chat if mutual follow
-                            final canChat = await followService.canChat(
-                                currentUid, uid);
-                            if (!context.mounted) return;
-                            if (canChat) {
-                              Navigator.of(context).push(
-                                buildForwardRoute(
-                                  ChatScreen(
-                                    otherUserId: uid,
-                                    displayName: (user['displayName'] ??
-                                            'Friend')
-                                        .toString(),
-                                    email:
-                                        (user['email'] ?? '').toString(),
-                                    photoUrl: user['photoUrl']?.toString(),
-                                  ),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              buildForwardRoute(
+                                ChatScreen(
+                                  otherUserId: uid,
+                                  displayName: (user['displayName'] ??
+                                          'Friend')
+                                      .toString(),
+                                  email:
+                                      (user['email'] ?? '').toString(),
+                                  photoUrl: user['photoUrl']?.toString(),
                                 ),
-                              );
-                            } else {
-                              // Navigate to profile instead
-                              Navigator.of(context).push(
-                                buildForwardRoute(
-                                  UserProfileScreen(
-                                    uid: uid,
-                                    displayName: (user['displayName'] ??
-                                            'Student')
-                                        .toString(),
-                                    email:
-                                        (user['email'] ?? '').toString(),
-                                    photoUrl: user['photoUrl']?.toString(),
-                                  ),
-                                ),
-                              );
-                            }
+                              ),
+                            );
                           },
                         );
                       },

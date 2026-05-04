@@ -64,6 +64,56 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     }
   }
 
+  Future<void> _triggerPopupEvent() async {
+    try {
+      final newEventId = DateTime.now().millisecondsSinceEpoch.toString();
+      final data = await WriterFirestoreService.fetchConfig('app_config');
+      final currentData = data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      currentData['popup_event_id'] = newEventId;
+      await WriterFirestoreService.updateConfig('app_config', currentData);
+      if (mounted) {
+        showUtopiaSnackBar(
+          context,
+          message: 'Pop-up event triggered',
+          tone: UtopiaSnackBarTone.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showUtopiaSnackBar(
+          context,
+          message: 'Could not trigger pop-up event',
+          tone: UtopiaSnackBarTone.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _triggerWebPopupEvent() async {
+    try {
+      final newEventId = DateTime.now().millisecondsSinceEpoch.toString();
+      final data = await WriterFirestoreService.fetchConfig('app_config');
+      final currentData = data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      currentData['web_popup_event_id'] = newEventId;
+      await WriterFirestoreService.updateConfig('app_config', currentData);
+      if (mounted) {
+        showUtopiaSnackBar(
+          context,
+          message: 'Web Pop-up event triggered',
+          tone: UtopiaSnackBarTone.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showUtopiaSnackBar(
+          context,
+          message: 'Could not trigger web pop-up event',
+          tone: UtopiaSnackBarTone.error,
+        );
+      }
+    }
+  }
+
   Future<void> _toggleHoliday(bool value) async {
     if (_savingHoliday) {
       return;
@@ -530,6 +580,20 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const BroadcastScreen()),
                 ),
+              ),
+              const SizedBox(height: 12),
+              _toolCard(
+                icon: Icons.celebration,
+                title: 'Trigger Share Pop-up',
+                subtitle: 'Show share pop-up to all users on next launch',
+                onTap: _triggerPopupEvent,
+              ),
+              const SizedBox(height: 12),
+              _toolCard(
+                icon: Icons.web_rounded,
+                title: 'Trigger Web Pop-up',
+                subtitle: 'Show web version pop-up to all users',
+                onTap: _triggerWebPopupEvent,
               ),
               const SizedBox(height: 12),
               _sectionHeader('📅 Timetable'),

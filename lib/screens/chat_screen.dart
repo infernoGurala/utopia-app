@@ -10,7 +10,9 @@ import '../services/chat_service.dart';
 import '../services/game_champion_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/game_champion_badge.dart';
+import '../widgets/app_motion.dart';
 import 'note_viewer_screen.dart';
+import 'user_profile_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -360,78 +362,92 @@ class _ChatScreenState extends State<ChatScreen> {
                                         fallback: widget.email,
                                       ));
 
-                          return Row(
-                            children: [
-                              ChampionAvatarBadge(
-                                scoreRank: scoreRank,
-                                streakRank: streakRank,
-                                email: widget.email,
-                                showGlow: false,
-                                child: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: U.primary.withValues(
-                                    alpha: 0.16,
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                buildForwardRoute(
+                                  UserProfileScreen(
+                                    uid: widget.otherUserId,
+                                    displayName: widget.displayName,
+                                    email: widget.email,
+                                    photoUrl: widget.photoUrl,
                                   ),
-                                  backgroundImage:
-                                      widget.photoUrl != null &&
-                                          widget.photoUrl!.isNotEmpty
-                                      ? NetworkImage(widget.photoUrl!)
-                                      : null,
-                                  child:
-                                      widget.photoUrl == null ||
-                                          widget.photoUrl!.isEmpty
-                                      ? Text(
-                                          widget.displayName.isEmpty
-                                              ? 'U'
-                                              : widget.displayName[0]
-                                                    .toUpperCase(),
-                                          style: GoogleFonts.outfit(
-                                            color: U.primary,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      : null,
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    ChampionNameText(
-                                      name: widget.displayName,
-                                      scoreRank: scoreRank,
-                                      streakRank: streakRank,
-                                      email: widget.email,
-                                      isSuperUser: userData?['role'] == 'superuser',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(
-                                        color: U.text,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                              );
+                            },
+                            child: Row(
+                              children: [
+                                ChampionAvatarBadge(
+                                  scoreRank: scoreRank,
+                                  streakRank: streakRank,
+                                  email: widget.email,
+                                  showGlow: false,
+                                  child: CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: U.primary.withValues(
+                                      alpha: 0.16,
                                     ),
-                                    Text(
-                                      subtitle,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.outfit(
-                                        color: isOtherTyping || isOnline
-                                            ? U.primary
-                                            : U.sub,
-                                        fontSize: 11,
-                                        fontWeight: isOtherTyping || isOnline
-                                            ? FontWeight.w500
-                                            : FontWeight.w400,
-                                      ),
-                                    ),
-                                  ],
+                                    backgroundImage:
+                                        widget.photoUrl != null &&
+                                            widget.photoUrl!.isNotEmpty
+                                        ? NetworkImage(widget.photoUrl!)
+                                        : null,
+                                    child:
+                                        widget.photoUrl == null ||
+                                            widget.photoUrl!.isEmpty
+                                        ? Text(
+                                            widget.displayName.isEmpty
+                                                ? 'U'
+                                                : widget.displayName[0]
+                                                      .toUpperCase(),
+                                            style: GoogleFonts.outfit(
+                                              color: U.primary,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ChampionNameText(
+                                        name: widget.displayName,
+                                        scoreRank: scoreRank,
+                                        streakRank: streakRank,
+                                        email: widget.email,
+                                        isSuperUser: userData?['role'] == 'superuser',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          color: U.text,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        subtitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.outfit(
+                                          color: isOtherTyping || isOnline
+                                              ? U.primary
+                                              : U.sub,
+                                          fontSize: 11,
+                                          fontWeight: isOtherTyping || isOnline
+                                              ? FontWeight.w500
+                                              : FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       );

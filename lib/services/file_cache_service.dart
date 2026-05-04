@@ -15,7 +15,19 @@ class FileCacheService {
   final Dio _dio = Dio();
 
   String _cacheKey(String url) {
-    return md5.convert(utf8.encode(url)).toString();
+    final hash = md5.convert(utf8.encode(url)).toString();
+    final uri = Uri.tryParse(url);
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      final last = uri.pathSegments.last;
+      final extIndex = last.lastIndexOf('.');
+      if (extIndex != -1) {
+        final ext = last.substring(extIndex);
+        if (ext.length <= 6) {
+          return '$hash$ext';
+        }
+      }
+    }
+    return hash;
   }
 
   String _driveDirectUrl(String url) {

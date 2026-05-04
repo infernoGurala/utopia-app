@@ -3,12 +3,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
 import 'attendance_screen.dart';
 import 'everyone_screen.dart';
 import 'friends_screen.dart';
 import 'map_screen.dart';
+import 'uni_chat_screen.dart';
+import 'docs_screen.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -20,6 +23,7 @@ class UniversityScreen extends StatefulWidget {
 class _UniversityScreenState extends State<UniversityScreen> {
   String _universityId = '';
   bool _isLoading = true;
+  int _lastSeenUniChatCount = 0;
 
   @override
   void initState() {
@@ -29,6 +33,9 @@ class _UniversityScreenState extends State<UniversityScreen> {
 
   Future<void> _loadData() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSeen = prefs.getInt('last_seen_unichat_count') ?? 0;
+
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         final userDoc = await FirebaseFirestore.instance
@@ -39,6 +46,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
         if (mounted) {
           setState(() {
             _universityId = uniId ?? '';
+            _lastSeenUniChatCount = lastSeen;
             _isLoading = false;
           });
         }
@@ -123,28 +131,20 @@ class _UniversityScreenState extends State<UniversityScreen> {
                       ),
                     ),
                     _UniversityCard(
-                      title: 'Map',
-                      icon: Icons.map_outlined,
-                      color: U.red,
+                      title: 'Docs',
+                      icon: Icons.description_outlined,
+                      color: const Color(0xFF7C6AF7),
                       delay: 200,
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const MapScreen()),
+                        MaterialPageRoute(builder: (_) => const DocsScreen()),
                       ),
                     ),
                     _UniversityCard(
-                      title: 'Events',
-                      icon: Icons.event_available_outlined,
-                      color: U.sub,
-                      delay: 250,
-                      isComingSoon: true,
-                      onTap: () {},
-                    ),
-                    _UniversityCard(
-                      title: 'Everyone',
+                      title: 'People',
                       icon: Icons.public_outlined,
                       color: U.blue,
-                      delay: 300,
+                      delay: 250,
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -157,12 +157,80 @@ class _UniversityScreenState extends State<UniversityScreen> {
                       ),
                     ),
                     _UniversityCard(
-                      title: 'Ask Community',
+                      title: 'Events',
+                      icon: Icons.event_available_outlined,
+                      color: U.sub,
+                      delay: 300,
+                      isComingSoon: true,
+                      onTap: () {},
+                    ),
+                    _UniversityCard(
+                      title: 'Uni Chat',
                       icon: Icons.forum_outlined,
                       color: U.teal,
                       delay: 350,
-                      isComingSoon: true,
-                      onTap: () {},
+                      subtitleWidget: _universityId.isEmpty ? null : StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('uni_chats')
+                            .doc(_universityId)
+                            .collection('messages')
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.docs.length ?? 0;
+                          final newCount = count - _lastSeenUniChatCount;
+                          if (newCount <= 0) return const SizedBox.shrink();
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: U.primary.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$newCount new',
+                              style: GoogleFonts.outfit(
+                                color: U.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      onTap: () async {
+                        if (_universityId.isNotEmpty) {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => UniChatScreen(universityId: _universityId),
+                            ),
+                          );
+                          final countSnap = await FirebaseFirestore.instance
+                              .collection('uni_chats')
+                              .doc(_universityId)
+                              .collection('messages')
+                              .count()
+                              .get();
+                          final count = countSnap.count ?? 0;
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setInt('last_seen_unichat_count', count);
+                          if (mounted) {
+                            setState(() {
+                              _lastSeenUniChatCount = count;
+                            });
+                          }
+                        }
+                      },
+                    ),
+                    _UniversityCard(
+                      title: 'Map',
+                      icon: Icons.map_outlined,
+                      color: U.red,
+                      delay: 400,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MapScreen()),
+                      ),
                     ),
                   ],
                 ),
@@ -181,6 +249,7 @@ class _UniversityCard extends StatelessWidget {
   final VoidCallback onTap;
   final int delay;
   final bool isComingSoon;
+  final Widget? subtitleWidget;
 
   const _UniversityCard({
     required this.title,
@@ -189,6 +258,7 @@ class _UniversityCard extends StatelessWidget {
     required this.onTap,
     required this.delay,
     this.isComingSoon = false,
+    this.subtitleWidget,
   });
 
   @override
@@ -238,6 +308,11 @@ class _UniversityCard extends StatelessWidget {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+              )
+            else if (subtitleWidget != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: subtitleWidget!,
               ),
           ],
         ),
