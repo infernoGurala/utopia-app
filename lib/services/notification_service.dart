@@ -486,9 +486,12 @@ class NotificationService {
     const platformChannelSpecifics = NotificationDetails(
       android: AndroidNotificationDetails(
         'utopia_high_importance',
-        'High Importance Notifications',
+        'UTOPIA Notifications',
+        channelDescription: 'Morning alerts and writer broadcasts from UTOPIA',
         importance: Importance.max,
         priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
       ),
     );
     await _localNotifications.show(
@@ -497,6 +500,7 @@ class NotificationService {
       message,
       platformChannelSpecifics,
     );
+    debugPrint("NOTIF: Test notification sent");
   }
 
   static Future<bool> scheduleDailyTimetableNotification({
@@ -538,18 +542,22 @@ class NotificationService {
 
       debugPrint("NOTIF: Scheduling timetable notification for $scheduledDate");
 
+      // Try exact scheduling first
       try {
         await _localNotifications.zonedSchedule(
           100,
           'Your Daily Timetable',
           'Time to check your classes for today!',
           scheduledDate,
-          const NotificationDetails(
+          NotificationDetails(
             android: AndroidNotificationDetails(
               'utopia_high_importance',
               'UTOPIA Notifications',
+              channelDescription: 'Daily timetable reminders',
               importance: Importance.max,
               priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.exact,
@@ -557,7 +565,9 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time,
         );
-        debugPrint("NOTIF: Timetable notification scheduled successfully");
+        debugPrint(
+          "NOTIF: Timetable notification scheduled successfully (exact)",
+        );
       } catch (e) {
         debugPrint("NOTIF: Exact scheduling failed ($e), trying inexact...");
         // Fallback to inexact scheduling (doesn't require special permission)
@@ -566,12 +576,15 @@ class NotificationService {
           'Your Daily Timetable',
           'Time to check your classes for today!',
           scheduledDate,
-          const NotificationDetails(
+          NotificationDetails(
             android: AndroidNotificationDetails(
               'utopia_high_importance',
               'UTOPIA Notifications',
+              channelDescription: 'Daily timetable reminders',
               importance: Importance.max,
               priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
             ),
           ),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -579,7 +592,9 @@ class NotificationService {
               UILocalNotificationDateInterpretation.absoluteTime,
           matchDateTimeComponents: DateTimeComponents.time,
         );
-        debugPrint("NOTIF: Timetable notification scheduled with fallback");
+        debugPrint(
+          "NOTIF: Timetable notification scheduled with fallback (inexact)",
+        );
       }
       return true;
     } catch (e) {
