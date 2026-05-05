@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -60,6 +61,7 @@ class NotificationService {
         return;
       }
       tz.initializeTimeZones();
+      tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
 
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('ic_notification');
@@ -193,6 +195,12 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin
           >()
           ?.requestNotificationsPermission();
+
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestExactAlarmsPermission();
 
       await _localNotifications
           .resolvePlatformSpecificImplementation<
@@ -472,7 +480,9 @@ class NotificationService {
     }
   }
 
-  static Future<void> sendPersonalTestNotification({required String message}) async {
+  static Future<void> sendPersonalTestNotification({
+    required String message,
+  }) async {
     const platformChannelSpecifics = NotificationDetails(
       android: AndroidNotificationDetails(
         'utopia_high_importance',
@@ -489,44 +499,111 @@ class NotificationService {
     );
   }
 
-  static Future<void> scheduleDailyTimetableNotification({
+  static Future<bool> scheduleDailyTimetableNotification({
     required int hour,
     required int minute,
   }) async {
-    if (!PlatformSupport.supportsNotifications) return;
+    if (!PlatformSupport.supportsNotifications) {
+      debugPrint("NOTIF: Notifications not supported on this platform");
+      return false;
+    }
     try {
-      await _localNotifications.cancel(100); // Unique ID for timetable notification
-      
+      // Ensure service is initialized
+      await initialize();
+
+      // Check if exact alarms are permitted (Android 12+)
+      if (PlatformSupport.isAndroid) {
+        try {
+          final canSchedule = await _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >()
+              ?.canScheduleExactNotifications();
+          if (canSchedule == false) {
+            debugPrint(
+              "NOTIF: Exact alarms not permitted. User needs to grant permission in settings.",
+            );
+            return false;
+          }
+        } catch (e) {
+          debugPrint("NOTIF: Error checking exact alarm permission: $e");
+        }
+      }
+
+      // Ensure timezone is initialized and set to IST
+      tz.initializeTimeZones();
+      final ist = tz.getLocation('Asia/Kolkata');
+      tz.setLocalLocation(ist);
+
+      await _localNotifications.cancel(100);
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('timetable_notif_hour', hour);
       await prefs.setInt('timetable_notif_minute', minute);
       await prefs.setBool('timetable_notif_enabled', true);
 
-      final now = tz.TZDateTime.now(tz.local);
-      var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+      final now = tz.TZDateTime.now(ist);
+      var scheduledDate = tz.TZDateTime(
+        ist,
+        now.year,
+        now.month,
+        now.day,
+        hour,
+        minute,
+      );
       if (scheduledDate.isBefore(now)) {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
       }
 
-      await _localNotifications.zonedSchedule(
-        100,
-        'Your Daily Timetable',
-        'Time to check your classes for today!',
-        scheduledDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'utopia_high_importance',
-            'UTOPIA Notifications',
-            importance: Importance.max,
-            priority: Priority.high,
+      debugPrint("NOTIF: Scheduling timetable notification for $scheduledDate");
+
+      try {
+        await _localNotifications.zonedSchedule(
+          100,
+          'Your Daily Timetable',
+          'Time to check your classes for today!',
+          scheduledDate,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'utopia_high_importance',
+              'UTOPIA Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
           ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
+          androidScheduleMode: AndroidScheduleMode.exact,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+        debugPrint("NOTIF: Timetable notification scheduled successfully");
+      } catch (e) {
+        debugPrint("NOTIF: Exact scheduling failed ($e), trying inexact...");
+        // Fallback to inexact scheduling (doesn't require special permission)
+        await _localNotifications.zonedSchedule(
+          100,
+          'Your Daily Timetable',
+          'Time to check your classes for today!',
+          scheduledDate,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'utopia_high_importance',
+              'UTOPIA Notifications',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+        debugPrint("NOTIF: Timetable notification scheduled with fallback");
+      }
+      return true;
     } catch (e) {
-      // Ignored
+      debugPrint("NOTIF: Failed to schedule timetable notification: $e");
+      return false;
     }
   }
 
@@ -544,6 +621,36 @@ class NotificationService {
   static Future<bool> _isOnline() async {
     final results = await Connectivity().checkConnectivity();
     return results.any((result) => result != ConnectivityResult.none);
+  }
+
+  /// Check if exact alarms are permitted (Android 12+)
+  static Future<bool> canScheduleExactNotifications() async {
+    if (!PlatformSupport.isAndroid) return true;
+    try {
+      final result = await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.canScheduleExactNotifications();
+      return result ?? true;
+    } catch (e) {
+      debugPrint("NOTIF: Error checking exact alarm permission: $e");
+      return false;
+    }
+  }
+
+  /// Open system settings for exact alarm permission (Android 12+)
+  static Future<void> openExactAlarmSettings() async {
+    if (!PlatformSupport.isAndroid) return;
+    try {
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint("NOTIF: Error opening exact alarm settings: $e");
+    }
   }
 
   static Future<void> _saveTokenToFirestore(String token) async {

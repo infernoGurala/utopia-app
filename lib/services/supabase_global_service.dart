@@ -1,10 +1,11 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SupabaseGlobalService {
   static final SupabaseGlobalService instance = SupabaseGlobalService._();
   SupabaseGlobalService._();
 
-  final _supabase = Supabase.instance.client;
+  SupabaseClient get _supabase => Supabase.instance.client;
 
   String _formatName(String name) {
     return name.replaceAll(' ', '-');
@@ -17,9 +18,9 @@ class SupabaseGlobalService {
           .select('path')
           .eq('scope', 'university');
 
-      return List<Map<String, dynamic>>.from(response)
-          .map((row) => row['path'] as String)
-          .toList();
+      return List<Map<String, dynamic>>.from(
+        response,
+      ).map((row) => row['path'] as String).toList();
     } catch (e) {
       throw Exception('Failed to get universities: $e');
     }
@@ -27,27 +28,37 @@ class SupabaseGlobalService {
 
   Future<List<Map<String, dynamic>>> getDirectoryContents(String path) async {
     try {
-      final cleanPath = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+      final cleanPath = path.endsWith('/')
+          ? path.substring(0, path.length - 1)
+          : path;
 
-      final folderResponse = await _supabase
+      var folderQuery = _supabase
           .from('folders')
           .select('name, path, is_hidden, created_at, updated_at, sort_index')
-          .eq('parent_path', cleanPath);
+          .eq('is_hidden', false);
 
-      final notesResponse = await _supabase
+      var notesQuery = _supabase
           .from('notes')
-          .select('name, path, created_at, updated_at, sort_index')
-          .eq('folder_path', cleanPath);
+          .select('name, path, created_at, updated_at, sort_index');
 
-      final folders = List<Map<String, dynamic>>.from(folderResponse).map((f) => {
-        ...f,
-        'type': 'dir',
-      }).toList();
+      if (cleanPath.isEmpty) {
+        folderQuery = folderQuery.filter('parent_path', 'is', null);
+        notesQuery = notesQuery.filter('folder_path', 'is', null);
+      } else {
+        folderQuery = folderQuery.eq('parent_path', cleanPath);
+        notesQuery = notesQuery.eq('folder_path', cleanPath);
+      }
 
-      final notes = List<Map<String, dynamic>>.from(notesResponse).map((n) => {
-        ...n,
-        'type': 'file',
-      }).toList();
+      final folderResponse = await folderQuery;
+      final notesResponse = await notesQuery;
+
+      final folders = List<Map<String, dynamic>>.from(
+        folderResponse,
+      ).map((f) => {...f, 'type': 'dir'}).toList();
+
+      final notes = List<Map<String, dynamic>>.from(
+        notesResponse,
+      ).map((n) => {...n, 'type': 'file'}).toList();
 
       return [...folders, ...notes];
     } catch (e) {
@@ -70,10 +81,19 @@ class SupabaseGlobalService {
     }
   }
 
-  Future<void> createFolder(String parentPath, String name, String scope, String? universityId, String? classId, String createdByUid) async {
+  Future<void> createFolder(
+    String parentPath,
+    String name,
+    String scope,
+    String? universityId,
+    String? classId,
+    String createdByUid,
+  ) async {
     try {
       final formattedName = _formatName(name);
-      final path = parentPath.isEmpty ? formattedName : '$parentPath/$formattedName';
+      final path = parentPath.isEmpty
+          ? formattedName
+          : '$parentPath/$formattedName';
 
       await _supabase.from('folders').insert({
         'path': path,
@@ -90,7 +110,15 @@ class SupabaseGlobalService {
     }
   }
 
-  Future<void> createNote(String folderPath, String name, String content, String scope, String? universityId, String? classId, String createdByUid) async {
+  Future<void> createNote(
+    String folderPath,
+    String name,
+    String content,
+    String scope,
+    String? universityId,
+    String? classId,
+    String createdByUid,
+  ) async {
     try {
       final formattedName = _formatName(name);
       final path = '$folderPath/$formattedName.md';
@@ -110,7 +138,12 @@ class SupabaseGlobalService {
     }
   }
 
-  Future<void> updateNote(String notePath, String content, String updatedByUid, String updatedByName) async {
+  Future<void> updateNote(
+    String notePath,
+    String content,
+    String updatedByUid,
+    String updatedByName,
+  ) async {
     try {
       final currentNote = await _supabase
           .from('notes')
@@ -136,7 +169,10 @@ class SupabaseGlobalService {
 
           final versionList = List<Map<String, dynamic>>.from(versions);
           if (versionList.length > 20) {
-            final idsToDelete = versionList.skip(20).map((v) => v['id'] as String).toList();
+            final idsToDelete = versionList
+                .skip(20)
+                .map((v) => v['id'] as String)
+                .toList();
             for (final id in idsToDelete) {
               await _supabase.from('note_versions').delete().eq('id', id);
             }
@@ -144,11 +180,13 @@ class SupabaseGlobalService {
         }
       }
 
-      await _supabase.from('notes').update({
-        'content': content,
-        'updated_by': updatedByUid,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('path', notePath);
+      await _supabase
+          .from('notes')
+          .update({
+            'content': content,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('path', notePath);
     } catch (e) {
       throw Exception('Failed to update note $notePath: $e');
     }
@@ -181,7 +219,9 @@ class SupabaseGlobalService {
       parts.removeLast();
       final parentPath = parts.join('/');
       final formattedName = _formatName(newName);
-      final newPath = parentPath.isEmpty ? formattedName : '$parentPath/$formattedName';
+      final newPath = parentPath.isEmpty
+          ? formattedName
+          : '$parentPath/$formattedName';
 
       String replacePrefix(String path, String oldPrefix, String newPrefix) {
         if (path.startsWith(oldPrefix)) {
@@ -201,10 +241,10 @@ class SupabaseGlobalService {
           .like('path', '$oldPath/%');
 
       // Update the parent folder first
-      await _supabase.from('folders').update({
-        'name': newName,
-        'path': newPath,
-      }).eq('path', oldPath);
+      await _supabase
+          .from('folders')
+          .update({'name': newName, 'path': newPath})
+          .eq('path', oldPath);
 
       // Update paths of all child folders
       for (final folder in List<Map<String, dynamic>>.from(childFolders)) {
@@ -212,12 +252,14 @@ class SupabaseGlobalService {
         final currentParent = folder['parent_path'] as String?;
 
         final updatedPath = replacePrefix(currentPath, oldPath, newPath);
-        final updatedParent = currentParent != null ? replacePrefix(currentParent, oldPath, newPath) : null;
+        final updatedParent = currentParent != null
+            ? replacePrefix(currentParent, oldPath, newPath)
+            : null;
 
-        await _supabase.from('folders').update({
-          'path': updatedPath,
-          'parent_path': updatedParent,
-        }).eq('path', currentPath);
+        await _supabase
+            .from('folders')
+            .update({'path': updatedPath, 'parent_path': updatedParent})
+            .eq('path', currentPath);
       }
 
       // Update paths of all child notes
@@ -228,10 +270,10 @@ class SupabaseGlobalService {
         final updatedPath = replacePrefix(currentPath, oldPath, newPath);
         final updatedFolder = replacePrefix(currentFolder, oldPath, newPath);
 
-        await _supabase.from('notes').update({
-          'path': updatedPath,
-          'folder_path': updatedFolder,
-        }).eq('path', currentPath);
+        await _supabase
+            .from('notes')
+            .update({'path': updatedPath, 'folder_path': updatedFolder})
+            .eq('path', currentPath);
       }
     } catch (e) {
       throw Exception('Failed to rename folder $oldPath: $e');
@@ -244,12 +286,14 @@ class SupabaseGlobalService {
       parts.removeLast();
       final folderPath = parts.join('/');
       final formattedName = _formatName(newName);
-      final newPath = folderPath.isEmpty ? '$formattedName.md' : '$folderPath/$formattedName.md';
+      final newPath = folderPath.isEmpty
+          ? '$formattedName.md'
+          : '$folderPath/$formattedName.md';
 
-      await _supabase.from('notes').update({
-        'path': newPath,
-        'name': newName,
-      }).eq('path', oldPath);
+      await _supabase
+          .from('notes')
+          .update({'path': newPath, 'name': newName})
+          .eq('path', oldPath);
     } catch (e) {
       throw Exception('Failed to rename note $oldPath: $e');
     }
@@ -308,13 +352,58 @@ class SupabaseGlobalService {
         final path = item['path'] as String;
         final isFolder = item['type'] == 'dir';
         final table = isFolder ? 'folders' : 'notes';
-        
-        await _supabase.from(table).update({
-          'sort_index': i,
-        }).eq('path', path);
+
+        await _supabase.from(table).update({'sort_index': i}).eq('path', path);
       }
     } catch (e) {
       throw Exception('Failed to update sort order: $e');
+    }
+  }
+
+  /// Hide a note (soft delete - move to trash)
+  Future<void> hideNote(String notePath) async {
+    // Note: 'notes' table doesn't have is_hidden. 
+    // Hiding is handled via TrashService (Firestore).
+  }
+
+  /// Hide a folder (soft delete - move to trash)
+  Future<void> hideFolder(String folderPath) async {
+    try {
+      // Hide the folder itself
+      await _supabase
+          .from('folders')
+          .update({'is_hidden': true})
+          .eq('path', folderPath);
+      // Hide all subfolders
+      await _supabase
+          .from('folders')
+          .update({'is_hidden': true})
+          .like('path', '$folderPath/%');
+    } catch (e) {
+      throw Exception('Failed to hide folder $folderPath: $e');
+    }
+  }
+
+  /// Unhide a note (restore from trash)
+  Future<void> unhideNote(String notePath) async {
+    // Hiding is handled via TrashService (Firestore).
+  }
+
+  /// Unhide a folder (restore from trash)
+  Future<void> unhideFolder(String folderPath) async {
+    try {
+      // Unhide the folder itself
+      await _supabase
+          .from('folders')
+          .update({'is_hidden': false})
+          .eq('path', folderPath);
+      // Unhide all subfolders
+      await _supabase
+          .from('folders')
+          .update({'is_hidden': false})
+          .like('path', '$folderPath/%');
+    } catch (e) {
+      throw Exception('Failed to unhide folder $folderPath: $e');
     }
   }
 }

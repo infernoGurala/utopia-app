@@ -19,7 +19,8 @@ class TimetableScreen extends StatefulWidget {
   State<TimetableScreen> createState() => _TimetableScreenState();
 }
 
-class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProviderStateMixin {
+class _TimetableScreenState extends State<TimetableScreen>
+    with SingleTickerProviderStateMixin {
   static const _dayKeys = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   static const _dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -27,7 +28,7 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
   UserTimetable? _userTimetable;
   bool _loading = true;
   bool _refreshing = false;
-  
+
   bool _notifEnabled = false;
   TimeOfDay _notifTime = const TimeOfDay(hour: 7, minute: 0);
 
@@ -63,7 +64,7 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
 
     try {
       _userTimetable = await UserTimetableService.getTimetable();
-      
+
       final prefs = await SharedPreferences.getInstance();
       _notifEnabled = prefs.getBool('timetable_notif_enabled') ?? false;
       final h = prefs.getInt('timetable_notif_hour') ?? 7;
@@ -73,7 +74,11 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
       if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() => _loading = false);
-      showUtopiaSnackBar(context, message: 'Could not load timetable', tone: UtopiaSnackBarTone.error);
+      showUtopiaSnackBar(
+        context,
+        message: 'Could not load timetable',
+        tone: UtopiaSnackBarTone.error,
+      );
     } finally {
       if (mounted && refresh) setState(() => _refreshing = false);
     }
@@ -84,7 +89,11 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
     try {
       final creds = await SecureStorageService.getCredentials();
       if (creds == null) {
-        showUtopiaSnackBar(context, message: 'Please login to attendance first to fetch timetable.', tone: UtopiaSnackBarTone.error);
+        showUtopiaSnackBar(
+          context,
+          message: 'Please login to attendance first to fetch timetable.',
+          tone: UtopiaSnackBarTone.error,
+        );
         setState(() => _loading = false);
         return;
       }
@@ -95,21 +104,39 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
       );
       final newTimetable = UserTimetable.fromJson(rawData);
       await UserTimetableService.saveTimetable(newTimetable);
-      
-      showUtopiaSnackBar(context, message: 'Timetable fetched successfully!', tone: UtopiaSnackBarTone.success);
+
+      showUtopiaSnackBar(
+        context,
+        message: 'Timetable fetched successfully!',
+        tone: UtopiaSnackBarTone.success,
+      );
       _loadData();
     } catch (e) {
       setState(() => _loading = false);
-      showUtopiaSnackBar(context, message: 'Failed to fetch timetable: $e', tone: UtopiaSnackBarTone.error);
+      showUtopiaSnackBar(
+        context,
+        message: 'Failed to fetch timetable: $e',
+        tone: UtopiaSnackBarTone.error,
+      );
     }
   }
 
   Future<void> _toggleNotif(bool val) async {
     if (val) {
-      await NotificationService.scheduleDailyTimetableNotification(
-        hour: _notifTime.hour,
-        minute: _notifTime.minute,
-      );
+      final success =
+          await NotificationService.scheduleDailyTimetableNotification(
+            hour: _notifTime.hour,
+            minute: _notifTime.minute,
+          );
+      if (!success && mounted) {
+        showUtopiaSnackBar(
+          context,
+          message:
+              'Failed to schedule notification. Check exact alarm permission in settings.',
+          tone: UtopiaSnackBarTone.error,
+        );
+        return;
+      }
     } else {
       await NotificationService.cancelTimetableNotification();
     }
@@ -117,17 +144,24 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
   }
 
   Future<void> _pickNotifTime() async {
-    final t = await showTimePicker(
-      context: context,
-      initialTime: _notifTime,
-    );
+    final t = await showTimePicker(context: context, initialTime: _notifTime);
     if (t != null && mounted) {
       setState(() => _notifTime = t);
       if (_notifEnabled) {
-        await NotificationService.scheduleDailyTimetableNotification(
-          hour: t.hour,
-          minute: t.minute,
-        );
+        final success =
+            await NotificationService.scheduleDailyTimetableNotification(
+              hour: t.hour,
+              minute: t.minute,
+            );
+        if (!success && mounted) {
+          showUtopiaSnackBar(
+            context,
+            message:
+                'Failed to schedule notification. Check exact alarm permission in settings.',
+            tone: UtopiaSnackBarTone.error,
+          );
+          return;
+        }
       }
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('timetable_notif_hour', t.hour);
@@ -139,79 +173,116 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: U.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.edit_calendar_rounded, size: 48, color: U.primary),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Timetable Found',
-              style: GoogleFonts.playfairDisplay(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: U.text,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You can fetch your personal timetable directly from your college portal, or create a custom one.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 15, color: U.sub, height: 1.4),
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: U.primary,
-                  foregroundColor: U.bg,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                onPressed: _fetchFromCollege,
-                icon: const Icon(Icons.cloud_download_outlined),
-                label: Text('Fetch from College', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: U.primary,
-                  side: BorderSide(color: U.primary.withValues(alpha: 0.5)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CustomTimetableScreen()),
-                  );
-                  if (result == true) {
-                    _loadData();
-                  }
-                },
-                icon: const Icon(Icons.dashboard_customize_outlined),
-                label: Text('Create Custom', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, duration: 400.ms, curve: Curves.easeOut),
+        child:
+            Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.edit_calendar_rounded,
+                        size: 48,
+                        color: U.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'No Timetable Found',
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: U.text,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'You can fetch your personal timetable directly from your college portal, or create a custom one.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        color: U.sub,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: U.primary,
+                          foregroundColor: U.bg,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: _fetchFromCollege,
+                        icon: const Icon(Icons.cloud_download_outlined),
+                        label: Text(
+                          'Fetch from College',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: U.primary,
+                          side: BorderSide(
+                            color: U.primary.withValues(alpha: 0.5),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CustomTimetableScreen(),
+                            ),
+                          );
+                          if (result == true) {
+                            _loadData();
+                          }
+                        },
+                        icon: const Icon(Icons.dashboard_customize_outlined),
+                        label: Text(
+                          'Create Custom',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: 0.1, duration: 400.ms, curve: Curves.easeOut),
       ),
     );
   }
 
   Widget _buildSettingsSheet() {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).padding.bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.of(context).padding.bottom + 20,
+      ),
       decoration: BoxDecoration(
         color: U.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -222,14 +293,31 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
         children: [
           Text(
             'Timetable Settings',
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: U.text),
+            style: GoogleFonts.outfit(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: U.text,
+            ),
           ),
           const SizedBox(height: 24),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.notifications_active_outlined, color: U.primary),
-            title: Text('Daily Notification', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500, color: U.text)),
-            subtitle: Text('Get alerted about your classes', style: GoogleFonts.outfit(fontSize: 13, color: U.sub)),
+            leading: Icon(
+              Icons.notifications_active_outlined,
+              color: U.primary,
+            ),
+            title: Text(
+              'Daily Notification',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: U.text,
+              ),
+            ),
+            subtitle: Text(
+              'Get alerted about your classes',
+              style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+            ),
             trailing: Switch(
               value: _notifEnabled,
               activeColor: U.primary,
@@ -241,9 +329,22 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.access_time_rounded, color: _notifEnabled ? U.primary : U.dim),
-            title: Text('Notification Time', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500, color: _notifEnabled ? U.text : U.dim)),
-            subtitle: Text(_notifTime.format(context), style: GoogleFonts.outfit(fontSize: 13, color: U.sub)),
+            leading: Icon(
+              Icons.access_time_rounded,
+              color: _notifEnabled ? U.primary : U.dim,
+            ),
+            title: Text(
+              'Notification Time',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: _notifEnabled ? U.text : U.dim,
+              ),
+            ),
+            subtitle: Text(
+              _notifTime.format(context),
+              style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+            ),
             trailing: const Icon(Icons.chevron_right_rounded),
             enabled: _notifEnabled,
             onTap: () async {
@@ -255,8 +356,18 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.delete_outline, color: U.red),
-            title: Text('Delete Timetable', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500, color: U.text)),
-            subtitle: Text('Remove your saved timetable', style: GoogleFonts.outfit(fontSize: 13, color: U.sub)),
+            title: Text(
+              'Delete Timetable',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: U.text,
+              ),
+            ),
+            subtitle: Text(
+              'Remove your saved timetable',
+              style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+            ),
             onTap: () async {
               Navigator.pop(context);
               await UserTimetableService.deleteTimetable();
@@ -280,7 +391,11 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
       return Center(
         child: Text(
           'No classes today!',
-          style: GoogleFonts.outfit(fontSize: 18, color: U.sub, fontWeight: FontWeight.w500),
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            color: U.sub,
+            fontWeight: FontWeight.w500,
+          ),
         ),
       );
     }
@@ -292,7 +407,8 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
       itemCount: dayData.slots.length,
       itemBuilder: (context, index) {
         final subject = dayData.slots[index].trim();
-        if (subject.isEmpty) return const SizedBox.shrink(); // skip free periods
+        if (subject.isEmpty)
+          return const SizedBox.shrink(); // skip free periods
 
         TimetablePeriod? period;
         if (index < _userTimetable!.periods.length) {
@@ -300,56 +416,78 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
         }
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? U.card : U.surface,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: U.border.withValues(alpha: 0.9)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? U.card : U.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: U.border.withValues(alpha: 0.9)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                constraints: const BoxConstraints(minWidth: 70),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                decoration: BoxDecoration(
-                  color: U.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: U.primary.withValues(alpha: 0.2)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'P${period?.period ?? index + 1}',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: U.primary),
+              child: Row(
+                children: [
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 70),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 12,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      period != null ? '${period.start.split(' ').first}\n${period.end.split(' ').first}' : '--',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: U.primary.withValues(alpha: 0.8)),
+                    decoration: BoxDecoration(
+                      color: U.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: U.primary.withValues(alpha: 0.2),
+                      ),
                     ),
-                  ],
-                ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'P${period?.period ?? index + 1}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: U.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          period != null
+                              ? '${period.start.split(' ').first}\n${period.end.split(' ').first}'
+                              : '--',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: U.primary.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      subject,
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: U.text,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  subject,
-                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
-                ),
-              ),
-            ],
-          ),
-        ).animate().fadeIn(delay: (index * 50).ms, duration: 400.ms).slideX(begin: 0.05, duration: 400.ms, curve: Curves.easeOut);
+            )
+            .animate()
+            .fadeIn(delay: (index * 50).ms, duration: 400.ms)
+            .slideX(begin: 0.05, duration: 400.ms, curve: Curves.easeOut);
       },
     );
   }
@@ -376,48 +514,58 @@ class _TimetableScreenState extends State<TimetableScreen> with SingleTickerProv
               },
             ),
         ],
-        bottom: _userTimetable == null ? null : PreferredSize(
-          preferredSize: const Size.fromHeight(58),
-          child: Container(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: U.surface.withValues(alpha: 0.78),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: U.border),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                labelColor: U.bg,
-                unselectedLabelColor: U.sub,
-                indicator: BoxDecoration(
-                  color: U.primary,
-                  borderRadius: BorderRadius.circular(999),
+        bottom: _userTimetable == null
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(58),
+                child: Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: U.surface.withValues(alpha: 0.78),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: U.border),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      labelColor: U.bg,
+                      unselectedLabelColor: U.sub,
+                      indicator: BoxDecoration(
+                        color: U.primary,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      splashBorderRadius: BorderRadius.circular(999),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                      labelStyle: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      tabs: _dayLabels
+                          .map((label) => Tab(text: label))
+                          .toList(),
+                    ),
+                  ),
                 ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                splashBorderRadius: BorderRadius.circular(999),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                labelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
-                unselectedLabelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
-                tabs: _dayLabels.map((label) => Tab(text: label)).toList(),
               ),
-            ),
-          ),
-        ),
       ),
       body: _loading
           ? Center(child: CircularProgressIndicator(color: U.primary))
           : _userTimetable == null
-              ? _buildEmptyState()
-              : TabBarView(
-                  controller: _tabController,
-                  children: _dayLabels.map(_buildDayView).toList(),
-                ),
+          ? _buildEmptyState()
+          : TabBarView(
+              controller: _tabController,
+              children: _dayLabels.map(_buildDayView).toList(),
+            ),
     );
   }
 }

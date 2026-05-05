@@ -12,6 +12,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'note_viewer_screen.dart';
 import '../widgets/genz_loading_overlay.dart';
+import '../services/trash_service.dart';
+import 'trash_screen.dart';
 
 /// Dynamic approvals: Root items need 10, sub items need 3.
 int _getRequiredApprovals(String path) {
@@ -117,87 +119,111 @@ const Map<String, (IconData, String)> kFolderIconCatalogue = {
 
 /// Categorized icon sections for the picker UI.
 const List<(String, List<(String, IconData)>)> kIconCategories = [
-  ('Mechanical', [
-    ('speed', Icons.speed_outlined),
-    ('thermostat', Icons.thermostat_outlined),
-    ('compress', Icons.compress_outlined),
-    ('precision_mfg', Icons.precision_manufacturing_outlined),
-    ('build', Icons.build_outlined),
-    ('hardware', Icons.hardware_outlined),
-    ('handyman', Icons.handyman_outlined),
-    ('settings', Icons.settings_outlined),
-    ('straighten', Icons.straighten_outlined),
-    ('local_fire', Icons.local_fire_department_outlined),
-  ]),
-  ('Electrical & Electronics', [
-    ('electrical', Icons.electrical_services_outlined),
-    ('bolt', Icons.bolt_outlined),
-    ('memory', Icons.memory_outlined),
-    ('developer_board', Icons.developer_board_outlined),
-    ('cable', Icons.cable_outlined),
-    ('battery', Icons.battery_charging_full_outlined),
-    ('sensors', Icons.sensors_outlined),
-    ('cell_tower', Icons.cell_tower_outlined),
-    ('waves', Icons.waves_outlined),
-  ]),
-  ('Computer Science', [
-    ('code', Icons.code_outlined),
-    ('terminal', Icons.terminal_outlined),
-    ('storage', Icons.storage_outlined),
-    ('cloud', Icons.cloud_outlined),
-    ('lan', Icons.lan_outlined),
-    ('security', Icons.security_outlined),
-    ('bug', Icons.bug_report_outlined),
-  ]),
-  ('Civil & Architecture', [
-    ('architecture', Icons.architecture_outlined),
-    ('foundation', Icons.foundation_outlined),
-    ('construction', Icons.construction_outlined),
-    ('engineering', Icons.engineering_outlined),
-    ('terrain', Icons.terrain_outlined),
-    ('location_city', Icons.location_city_outlined),
-  ]),
-  ('Science & Chemistry', [
-    ('science', Icons.science_outlined),
-    ('biotech', Icons.biotech_outlined),
-    ('water_drop', Icons.water_drop_outlined),
-    ('eco', Icons.eco_outlined),
-    ('opacity', Icons.opacity_outlined),
-    ('rocket', Icons.rocket_launch_outlined),
-  ]),
-  ('Mathematics & Stats', [
-    ('math', Icons.functions_outlined),
-    ('calculate', Icons.calculate_outlined),
-    ('analytics', Icons.analytics_outlined),
-    ('bar_chart', Icons.bar_chart_outlined),
-  ]),
-  ('Academic', [
-    ('school', Icons.school_outlined),
-    ('book', Icons.menu_book_outlined),
-    ('library', Icons.local_library_outlined),
-    ('assignment', Icons.assignment_outlined),
-    ('quiz', Icons.quiz_outlined),
-    ('article', Icons.article_outlined),
-    ('bookmark', Icons.collections_bookmark_outlined),
-    ('topic', Icons.topic_outlined),
-    ('folder', Icons.folder_outlined),
-  ]),
-  ('Others', [
-    ('language', Icons.language_outlined),
-    ('psychology', Icons.psychology_outlined),
-    ('business', Icons.business_center_outlined),
-    ('economics', Icons.trending_up_outlined),
-    ('groups', Icons.groups_outlined),
-    ('fact_check', Icons.fact_check_outlined),
-    ('exam', Icons.edit_note_outlined),
-    ('checklist', Icons.checklist_outlined),
-    ('category', Icons.category_outlined),
-    ('archive', Icons.archive_outlined),
-    ('lightbulb', Icons.lightbulb_outlined),
-    ('draw', Icons.draw_outlined),
-    ('palette', Icons.palette_outlined),
-    ('explore', Icons.explore_outlined),
-  ]),
+  (
+    'Mechanical',
+    [
+      ('speed', Icons.speed_outlined),
+      ('thermostat', Icons.thermostat_outlined),
+      ('compress', Icons.compress_outlined),
+      ('precision_mfg', Icons.precision_manufacturing_outlined),
+      ('build', Icons.build_outlined),
+      ('hardware', Icons.hardware_outlined),
+      ('handyman', Icons.handyman_outlined),
+      ('settings', Icons.settings_outlined),
+      ('straighten', Icons.straighten_outlined),
+      ('local_fire', Icons.local_fire_department_outlined),
+    ],
+  ),
+  (
+    'Electrical & Electronics',
+    [
+      ('electrical', Icons.electrical_services_outlined),
+      ('bolt', Icons.bolt_outlined),
+      ('memory', Icons.memory_outlined),
+      ('developer_board', Icons.developer_board_outlined),
+      ('cable', Icons.cable_outlined),
+      ('battery', Icons.battery_charging_full_outlined),
+      ('sensors', Icons.sensors_outlined),
+      ('cell_tower', Icons.cell_tower_outlined),
+      ('waves', Icons.waves_outlined),
+    ],
+  ),
+  (
+    'Computer Science',
+    [
+      ('code', Icons.code_outlined),
+      ('terminal', Icons.terminal_outlined),
+      ('storage', Icons.storage_outlined),
+      ('cloud', Icons.cloud_outlined),
+      ('lan', Icons.lan_outlined),
+      ('security', Icons.security_outlined),
+      ('bug', Icons.bug_report_outlined),
+    ],
+  ),
+  (
+    'Civil & Architecture',
+    [
+      ('architecture', Icons.architecture_outlined),
+      ('foundation', Icons.foundation_outlined),
+      ('construction', Icons.construction_outlined),
+      ('engineering', Icons.engineering_outlined),
+      ('terrain', Icons.terrain_outlined),
+      ('location_city', Icons.location_city_outlined),
+    ],
+  ),
+  (
+    'Science & Chemistry',
+    [
+      ('science', Icons.science_outlined),
+      ('biotech', Icons.biotech_outlined),
+      ('water_drop', Icons.water_drop_outlined),
+      ('eco', Icons.eco_outlined),
+      ('opacity', Icons.opacity_outlined),
+      ('rocket', Icons.rocket_launch_outlined),
+    ],
+  ),
+  (
+    'Mathematics & Stats',
+    [
+      ('math', Icons.functions_outlined),
+      ('calculate', Icons.calculate_outlined),
+      ('analytics', Icons.analytics_outlined),
+      ('bar_chart', Icons.bar_chart_outlined),
+    ],
+  ),
+  (
+    'Academic',
+    [
+      ('school', Icons.school_outlined),
+      ('book', Icons.menu_book_outlined),
+      ('library', Icons.local_library_outlined),
+      ('assignment', Icons.assignment_outlined),
+      ('quiz', Icons.quiz_outlined),
+      ('article', Icons.article_outlined),
+      ('bookmark', Icons.collections_bookmark_outlined),
+      ('topic', Icons.topic_outlined),
+      ('folder', Icons.folder_outlined),
+    ],
+  ),
+  (
+    'Others',
+    [
+      ('language', Icons.language_outlined),
+      ('psychology', Icons.psychology_outlined),
+      ('business', Icons.business_center_outlined),
+      ('economics', Icons.trending_up_outlined),
+      ('groups', Icons.groups_outlined),
+      ('fact_check', Icons.fact_check_outlined),
+      ('exam', Icons.edit_note_outlined),
+      ('checklist', Icons.checklist_outlined),
+      ('category', Icons.category_outlined),
+      ('archive', Icons.archive_outlined),
+      ('lightbulb', Icons.lightbulb_outlined),
+      ('draw', Icons.draw_outlined),
+      ('palette', Icons.palette_outlined),
+      ('explore', Icons.explore_outlined),
+    ],
+  ),
 ];
 
 class CommunityNotesScreen extends StatefulWidget {
@@ -220,6 +246,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   bool _editModeEnabled = false;
   final ScrollController _breadcrumbController = ScrollController();
 
+  late final TrashService _trashService;
+  Set<String> _trashedPaths = {};
+
   /// Cached folder-icon overrides: folderPath → iconKey from kFolderIconCatalogue.
   final Map<String, String> _folderIcons = {};
 
@@ -235,6 +264,17 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   /// How deep we are inside the community tree.
   /// 0 = root (programs), 1 = inside a program (semesters), 2+ = courses / files.
   int get _depth => _pathHistory.length - 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _trashService = TrashService(universityId: widget.universityFolderName);
+    _load();
+    _fetchUniversityName();
+    _loadFolderIcons();
+    _loadPinnedPrograms();
+    _loadIconColors();
+  }
 
   /// Strip the `__xxxx` uniqueness suffix from a GitHub folder name for display.
   /// Files (.md etc) are returned as-is.
@@ -282,10 +322,16 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     if (overrideKey != null) {
       // Number icon — caller renders a badge; return placeholder
       if (overrideKey.startsWith('num_')) {
-        return (Icons.tag_outlined, customColorInt != null ? Color(customColorInt) : U.teal);
+        return (
+          Icons.tag_outlined,
+          customColorInt != null ? Color(customColorInt) : U.teal,
+        );
       }
       if (kFolderIconCatalogue.containsKey(overrideKey)) {
-        return (kFolderIconCatalogue[overrideKey]!.$1, customColorInt != null ? Color(customColorInt) : U.primary);
+        return (
+          kFolderIconCatalogue[overrideKey]!.$1,
+          customColorInt != null ? Color(customColorInt) : U.primary,
+        );
       }
     }
 
@@ -295,44 +341,78 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
     // 2. Name-based heuristics (from old library)
     final key = name.toLowerCase();
-    if (key.contains('thermo'))        return (Icons.local_fire_department_outlined, resolveColor(U.peach));
-    if (key.contains('math') || key.contains('calculus') || key.contains('algebra'))
-                                       return (Icons.functions_outlined, resolveColor(U.primary));
-    if (key.contains('electric') || key.contains('beee') || key.contains('circuit'))
-                                       return (Icons.electrical_services_outlined, resolveColor(U.peach));
+    if (key.contains('thermo'))
+      return (Icons.local_fire_department_outlined, resolveColor(U.peach));
+    if (key.contains('math') ||
+        key.contains('calculus') ||
+        key.contains('algebra'))
+      return (Icons.functions_outlined, resolveColor(U.primary));
+    if (key.contains('electric') ||
+        key.contains('beee') ||
+        key.contains('circuit'))
+      return (Icons.electrical_services_outlined, resolveColor(U.peach));
     if (key.contains('chemistry') || key.contains('chem'))
-                                       return (Icons.science_outlined, resolveColor(U.teal));
-    if (key.contains('economics') || key.contains('econ') || key.contains('manage'))
-                                       return (Icons.bar_chart_outlined, resolveColor(U.green));
-    if (key.contains('code') || key.contains('programming') || key.contains('pps') || key.contains('dsa') || key.contains('algorithm'))
-                                       return (Icons.code_outlined, resolveColor(U.primary));
-    if (key.contains('iot') || key.contains('sensor') || key.contains('embedded'))
-                                       return (Icons.sensors_outlined, resolveColor(U.blue));
-    if (key.contains('physics') || key.contains('mechanics') || key.contains('dynamics'))
-                                       return (Icons.speed_outlined, resolveColor(U.lavender));
-    if (key.contains('civil') || key.contains('structure') || key.contains('concrete'))
-                                       return (Icons.architecture_outlined, resolveColor(U.gold));
-    if (key.contains('lab'))           return (Icons.biotech_outlined, resolveColor(U.teal));
-    if (key.contains('design') || key.contains('drawing') || key.contains('cad'))
-                                       return (Icons.draw_outlined, resolveColor(U.sky));
+      return (Icons.science_outlined, resolveColor(U.teal));
+    if (key.contains('economics') ||
+        key.contains('econ') ||
+        key.contains('manage'))
+      return (Icons.bar_chart_outlined, resolveColor(U.green));
+    if (key.contains('code') ||
+        key.contains('programming') ||
+        key.contains('pps') ||
+        key.contains('dsa') ||
+        key.contains('algorithm'))
+      return (Icons.code_outlined, resolveColor(U.primary));
+    if (key.contains('iot') ||
+        key.contains('sensor') ||
+        key.contains('embedded'))
+      return (Icons.sensors_outlined, resolveColor(U.blue));
+    if (key.contains('physics') ||
+        key.contains('mechanics') ||
+        key.contains('dynamics'))
+      return (Icons.speed_outlined, resolveColor(U.lavender));
+    if (key.contains('civil') ||
+        key.contains('structure') ||
+        key.contains('concrete'))
+      return (Icons.architecture_outlined, resolveColor(U.gold));
+    if (key.contains('lab'))
+      return (Icons.biotech_outlined, resolveColor(U.teal));
+    if (key.contains('design') ||
+        key.contains('drawing') ||
+        key.contains('cad'))
+      return (Icons.draw_outlined, resolveColor(U.sky));
     if (key.contains('network') || key.contains('computer network'))
-                                       return (Icons.lan_outlined, resolveColor(U.blue));
+      return (Icons.lan_outlined, resolveColor(U.blue));
     if (key.contains('database') || key.contains('dbms') || key.contains('sql'))
-                                       return (Icons.storage_outlined, resolveColor(U.teal));
+      return (Icons.storage_outlined, resolveColor(U.teal));
     if (key.contains('operating') || key.contains('os'))
-                                       return (Icons.developer_board_outlined, resolveColor(U.peach));
-    if (key.contains('machine') || key.contains('manufacturing') || key.contains('workshop'))
-                                       return (Icons.precision_manufacturing_outlined, resolveColor(U.gold));
-    if (key.contains('english') || key.contains('communication') || key.contains('language'))
-                                       return (Icons.language_outlined, resolveColor(U.sky));
-    if (key.contains('exam') || key.contains('prep') || key.contains('question') || key.contains('bank'))
-                                       return (Icons.quiz_outlined, resolveColor(U.peach));
-    if (key.contains('archive'))       return (Icons.archive_outlined, resolveColor(U.sub));
-    if (key.contains('doc'))           return (Icons.school_outlined, resolveColor(U.primary));
-    if (key.contains('sem'))           return (Icons.collections_bookmark_outlined, resolveColor(U.lavender));
-    if (key.contains('unit'))          return (Icons.topic_outlined, resolveColor(U.teal));
+      return (Icons.developer_board_outlined, resolveColor(U.peach));
+    if (key.contains('machine') ||
+        key.contains('manufacturing') ||
+        key.contains('workshop'))
+      return (Icons.precision_manufacturing_outlined, resolveColor(U.gold));
+    if (key.contains('english') ||
+        key.contains('communication') ||
+        key.contains('language'))
+      return (Icons.language_outlined, resolveColor(U.sky));
+    if (key.contains('exam') ||
+        key.contains('prep') ||
+        key.contains('question') ||
+        key.contains('bank'))
+      return (Icons.quiz_outlined, resolveColor(U.peach));
+    if (key.contains('archive'))
+      return (Icons.archive_outlined, resolveColor(U.sub));
+    if (key.contains('doc'))
+      return (Icons.school_outlined, resolveColor(U.primary));
+    if (key.contains('sem'))
+      return (Icons.collections_bookmark_outlined, resolveColor(U.lavender));
+    if (key.contains('unit'))
+      return (Icons.topic_outlined, resolveColor(U.teal));
     // fallback — use auto palette so adjacent folders get different colors
-    return (Icons.folder_outlined, customColorInt != null ? Color(customColorInt) : _colorForIndex(index));
+    return (
+      Icons.folder_outlined,
+      customColorInt != null ? Color(customColorInt) : _colorForIndex(index),
+    );
   }
 
   String get _fullPath =>
@@ -373,11 +453,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       final path = item['path'] as String? ?? '';
       if (path.isEmpty) continue;
       // Fire and forget — each call is independent
-      _github.getLastModified(path).then((dt) {
-        if (dt != null && mounted) {
-          setState(() => _lastModifiedDates[path] = dt);
-        }
-      }).catchError((_) {});
+      _github
+          .getLastModified(path)
+          .then((dt) {
+            if (dt != null && mounted) {
+              setState(() => _lastModifiedDates[path] = dt);
+            }
+          })
+          .catchError((_) {});
     }
   }
 
@@ -387,7 +470,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   Future<void> _loadPinnedPrograms() async {
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_pinPrefsKey) ?? [];
-    if (mounted) setState(() => _pinnedPaths..clear()..addAll(list));
+    if (mounted)
+      setState(
+        () => _pinnedPaths
+          ..clear()
+          ..addAll(list),
+      );
   }
 
   Future<void> _savePinnedPrograms() async {
@@ -437,16 +525,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     _saveIconColors();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-    _fetchUniversityName();
-    _loadFolderIcons();
-    _loadPinnedPrograms();
-    _loadIconColors();
-  }
-
   String _universityName = '';
 
   Future<void> _fetchUniversityName() async {
@@ -455,10 +533,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           .collection('universities')
           .doc(widget.universityFolderName)
           .get();
-      debugPrint('COMMUNITY: University doc exists=${doc.exists}, id=${widget.universityFolderName}, data=${doc.data()}');
+      debugPrint(
+        'COMMUNITY: University doc exists=${doc.exists}, id=${widget.universityFolderName}, data=${doc.data()}',
+      );
       if (doc.exists && mounted) {
         setState(() {
-          _universityName = doc.data()?['name'] as String? ?? widget.universityFolderName;
+          _universityName =
+              doc.data()?['name'] as String? ?? widget.universityFolderName;
         });
       } else if (mounted) {
         // Fallback: use the folder name itself as display
@@ -483,7 +564,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   /// Load icon overrides from GitHub .icons.json for this university.
   Future<void> _loadFolderIcons() async {
     try {
-      final icons = await _github.getFolderIcons('${widget.universityFolderName}/Community/');
+      final icons = await _github.getFolderIcons(
+        '${widget.universityFolderName}/Community/',
+      );
       if (mounted) {
         setState(() {
           _folderIcons.clear();
@@ -523,7 +606,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   /// Write the current _folderIcons map to GitHub as .icons.json.
 
-
   /// Show the icon picker bottom sheet — minimal, categorized, with number input.
   void _showIconPicker(String folderPath) {
     final numController = TextEditingController();
@@ -549,7 +631,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           children: [
             const SizedBox(height: 12),
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                 color: U.border,
                 borderRadius: BorderRadius.circular(2),
@@ -561,7 +644,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
-                  Text('Number', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
+                  Text(
+                    'Number',
+                    style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                  ),
                   const SizedBox(width: 12),
                   SizedBox(
                     width: 60,
@@ -570,11 +656,21 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       controller: numController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(color: U.teal, fontSize: 14, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.outfit(
+                        color: U.teal,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                       decoration: InputDecoration(
                         hintText: '1',
-                        hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 14),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        hintStyle: GoogleFonts.outfit(
+                          color: U.dim,
+                          fontSize: 14,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
                         filled: true,
                         fillColor: U.bg,
                         border: OutlineInputBorder(
@@ -602,12 +698,22 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: U.teal.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text('Set', style: GoogleFonts.outfit(color: U.teal, fontSize: 13, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Set',
+                        style: GoogleFonts.outfit(
+                          color: U.teal,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -618,12 +724,22 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         Navigator.pop(ctx);
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
                         decoration: BoxDecoration(
                           color: U.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text('Reset', style: GoogleFonts.outfit(color: U.red, fontSize: 12, fontWeight: FontWeight.w500)),
+                        child: Text(
+                          'Reset',
+                          style: GoogleFonts.outfit(
+                            color: U.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -704,8 +820,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     );
   }
 
-
-
   void _sortItems() {
     _items.sort((a, b) {
       final aPath = a['path'] as String? ?? '';
@@ -730,8 +844,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (!aIsFolder && bIsFolder) return 1;
 
       return (a['name'] as String? ?? '').toLowerCase().compareTo(
-            (b['name'] as String? ?? '').toLowerCase(),
-          );
+        (b['name'] as String? ?? '').toLowerCase(),
+      );
     });
   }
 
@@ -756,7 +870,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           children: [
             Icon(Icons.warning_amber_rounded, color: U.peach, size: 28),
             const SizedBox(width: 10),
-            Text('Edit Mode', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+            Text(
+              'Edit Mode',
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
         content: Text(
@@ -780,9 +900,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             },
             style: FilledButton.styleFrom(
               backgroundColor: U.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: Text('I Understand', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            child: Text(
+              'I Understand',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -803,21 +928,54 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     // Capture the path at call time to guard against navigation race conditions
     final requestedPath = _fullPath;
 
-    final items = await _github.getDirectoryContents(requestedPath);
-    if (!mounted || _fullPath != requestedPath) return;
-    setState(() {
-      _items = items
-          .where((item) => !(item['name'] as String).startsWith('.'))
-          .toList();
-      _sortItems();
-      _syncing = false;
-      _loading = false;
-    });
-    // Fetch last-modified dates in the background after items are available
-    _fetchLastModifiedDates();
-    if (_depth >= 1) {
-      _prefetchSubfolders();
+    try {
+      final itemsFuture = _github.getDirectoryContents(requestedPath);
+      final trashFuture = _trashService.getTrashedPaths().catchError((e) {
+        debugPrint("COMMUNITY: Trash fetch failed: $e");
+        return <String>{};
+      });
+
+      final results = await Future.wait([itemsFuture, trashFuture]);
+
+      if (!mounted || _fullPath != requestedPath) return;
+
+      final fetchedItems = results[0] as List<Map<String, dynamic>>;
+      final fetchedTrash = results[1] as Set<String>;
+
+      debugPrint(
+        "COMMUNITY: Loaded ${fetchedItems.length} items from GitHub/Supabase",
+      );
+      debugPrint("COMMUNITY: Loaded ${fetchedTrash.length} trashed paths");
+
+      setState(() {
+        _items = fetchedItems
+            .where((item) => !(item['name'] as String).startsWith('.'))
+            .toList();
+        _trashedPaths = fetchedTrash;
+        _sortItems();
+        _syncing = false;
+        _loading = false;
+      });
+      // Fetch last-modified dates in the background after items are available
+      _fetchLastModifiedDates();
+      if (_depth >= 1) {
+        _prefetchSubfolders();
+      }
+    } catch (e) {
+      debugPrint("COMMUNITY: Load failed: $e");
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _openTrash() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TrashScreen(universityId: widget.universityFolderName),
+      ),
+    );
+    // Reload when coming back from trash
+    _load(forceRefresh: true);
   }
 
   /// Automatically fetch contents of subfolders in the background to warm the cache.
@@ -826,7 +984,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (item['type'] == 'dir') {
         final path = item['path'] as String? ?? '';
         if (path.isNotEmpty) {
-          _github.getDirectoryContents(path).catchError((_) => <Map<String, dynamic>>[]);
+          _github
+              .getDirectoryContents(path)
+              .catchError((_) => <Map<String, dynamic>>[]);
         }
       }
     }
@@ -847,7 +1007,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   List<Map<String, dynamic>> get _displayItems {
     return _items.where((item) {
       final name = item['name'] as String?;
-      return name != null && !name.startsWith('.');
+      final path = item['path'] as String?;
+      if (name == null || name.startsWith('.')) return false;
+      if (path != null && _trashedPaths.contains(path)) return false;
+      return true;
     }).toList();
   }
 
@@ -882,7 +1045,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     _github.updateSortOrder(_items).catchError((_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save order'), backgroundColor: U.red),
+          SnackBar(
+            content: Text('Failed to save order'),
+            backgroundColor: U.red,
+          ),
         );
       }
     });
@@ -907,7 +1073,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   /// Jump to a specific depth in the navigation hierarchy.
   /// depth 0 = root (programs), depth 1 = inside a program (semesters), etc.
   void _navigateToDepth(int targetDepth) {
-    if (targetDepth < 0 || targetDepth >= _depth) return; // no-op if already there or invalid
+    if (targetDepth < 0 || targetDepth >= _depth)
+      return; // no-op if already there or invalid
     setState(() {
       // Trim the history to the target depth + 1 (keeping entries 0..targetDepth)
       _pathHistory = _pathHistory.sublist(0, targetDepth + 1);
@@ -991,8 +1158,16 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       setState(() => _isPushing = true);
                       bool success = false;
                       try {
-                        final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-                        await _github.createFolder('${widget.universityFolderName}/Community', ghName, 'community', widget.universityFolderName, null, uid);
+                        final uid =
+                            FirebaseAuth.instance.currentUser?.uid ?? '';
+                        await _github.createFolder(
+                          '${widget.universityFolderName}/Community',
+                          ghName,
+                          'community',
+                          widget.universityFolderName,
+                          null,
+                          uid,
+                        );
                         success = true;
                       } catch (e) {
                         debugPrint("Create branch failed: $e");
@@ -1131,16 +1306,33 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           : '$_fullPath$ghName/.keep';
 
                       setState(() => _isPushing = true);
-                      final parentPathStr = _fullPath.endsWith('/') ? _fullPath.substring(0, _fullPath.length - 1) : _fullPath;
+                      final parentPathStr = _fullPath.endsWith('/')
+                          ? _fullPath.substring(0, _fullPath.length - 1)
+                          : _fullPath;
                       final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
                       bool success = false;
                       try {
                         if (isFile) {
                           final displayName = name.replaceAll('.md', '');
-                          await _github.createNote(parentPathStr, displayName, '# $displayName\n\n', 'community', widget.universityFolderName, null, uid);
+                          await _github.createNote(
+                            parentPathStr,
+                            displayName,
+                            '# $displayName\n\n',
+                            'community',
+                            widget.universityFolderName,
+                            null,
+                            uid,
+                          );
                         } else {
-                          await _github.createFolder(parentPathStr, ghName, 'community', widget.universityFolderName, null, uid);
+                          await _github.createFolder(
+                            parentPathStr,
+                            ghName,
+                            'community',
+                            widget.universityFolderName,
+                            null,
+                            uid,
+                          );
                         }
                         success = true;
                       } catch (e) {
@@ -1152,7 +1344,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       if (mounted) setState(() => _isPushing = false);
 
                       if (mounted) {
-
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -1197,7 +1388,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       decoration: BoxDecoration(
         color: U.surface,
         border: Border(
-          bottom: BorderSide(color: U.border.withValues(alpha: 0.5), width: 0.5),
+          bottom: BorderSide(
+            color: U.border.withValues(alpha: 0.5),
+            width: 0.5,
+          ),
         ),
       ),
       child: SingleChildScrollView(
@@ -1221,7 +1415,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               // Last segment = current location (not clickable, highlighted)
               if (i == segments.length - 1)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: U.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -1238,9 +1435,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               else
                 // Clickable ancestor segment
                 GestureDetector(
-                  onTap: () => _navigateToDepth(i + 1), // +1 because depth 0 = root ('')
+                  onTap: () =>
+                      _navigateToDepth(i + 1), // +1 because depth 0 = root ('')
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1332,11 +1533,21 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           ),
           actions: [
             // + button only visible in edit mode (Placed first)
-            if (_isEditMode)
+            if (_isEditMode) ...[
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: U.dim,
+                  size: 22,
+                ),
+                tooltip: 'View Trash',
+                onPressed: _openTrash,
+              ),
               IconButton(
                 icon: Icon(Icons.add_rounded, color: U.primary, size: 24),
                 onPressed: isAtRoot ? _showAddBranchDialog : _showAddItemDialog,
               ),
+            ],
             // Edit mode toggle — Premium Chip
             Padding(
               padding: const EdgeInsets.only(right: 12.0),
@@ -1348,7 +1559,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                     color: _isEditMode ? U.primary : U.surface,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: _isEditMode ? U.primary : U.border.withValues(alpha: 0.5),
+                      color: _isEditMode
+                          ? U.primary
+                          : U.border.withValues(alpha: 0.5),
                       width: 1,
                     ),
                     boxShadow: _isEditMode
@@ -1358,7 +1571,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               blurRadius: 10,
                               spreadRadius: 1,
                               offset: const Offset(0, 2),
-                            )
+                            ),
                           ]
                         : [],
                   ),
@@ -1370,21 +1583,35 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         _enterEditMode();
                       },
                       borderRadius: BorderRadius.circular(20),
-                      splashColor: _isEditMode ? U.bg.withValues(alpha: 0.2) : U.primary.withValues(alpha: 0.1),
+                      splashColor: _isEditMode
+                          ? U.bg.withValues(alpha: 0.2)
+                          : U.primary.withValues(alpha: 0.1),
                       highlightColor: Colors.transparent,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 300),
-                              transitionBuilder: (child, animation) => RotationTransition(
-                                turns: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
-                                child: FadeTransition(opacity: animation, child: child),
-                              ),
+                              transitionBuilder: (child, animation) =>
+                                  RotationTransition(
+                                    turns: Tween<double>(
+                                      begin: 0.8,
+                                      end: 1.0,
+                                    ).animate(animation),
+                                    child: FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
+                                  ),
                               child: Icon(
-                                _isEditMode ? Icons.check_circle_rounded : Icons.edit_note_rounded,
+                                _isEditMode
+                                    ? Icons.check_circle_rounded
+                                    : Icons.edit_note_rounded,
                                 key: ValueKey(_isEditMode),
                                 size: 18,
                                 color: _isEditMode ? U.bg : U.primary,
@@ -1396,13 +1623,19 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               curve: Curves.fastOutSlowIn,
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 300),
-                                transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                                transitionBuilder: (child, animation) =>
+                                    FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
                                 child: Text(
                                   _isEditMode ? 'Done' : 'Edit Mode',
                                   key: ValueKey(_isEditMode),
                                   style: GoogleFonts.outfit(
                                     fontSize: 14,
-                                    fontWeight: _isEditMode ? FontWeight.w700 : FontWeight.w600,
+                                    fontWeight: _isEditMode
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
                                     color: _isEditMode ? U.bg : U.text,
                                     letterSpacing: 0.2,
                                   ),
@@ -1426,339 +1659,498 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 // ── Breadcrumb bar (visible from semester level onwards) ──
                 if (showBreadcrumbs) _buildBreadcrumbBar(),
                 // ── Main content ──
-            Expanded(
-              child: _loading
-            ? ProfessionalLoading(
-                message: _kLoadingMessages[Random().nextInt(_kLoadingMessages.length)],
-              )
-            : displayItems.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'No notes yet.',
-                      style: GoogleFonts.outfit(color: U.sub),
-                    ),
-                    if (isAtRoot) ...[
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _showAddBranchDialog,
-                        icon: Icon(Icons.add, color: U.bg),
-                        label: Text(
-                          'Add Branch',
-                          style: GoogleFonts.outfit(color: U.bg),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: U.primary,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              )
-            : RefreshIndicator(
-                color: U.primary,
-                backgroundColor: U.surface,
-                onRefresh: () => _load(forceRefresh: true),
-                child: (isAtRoot && !_isEditMode)
-                    ? GridView.builder(
-                        padding: const EdgeInsets.all(24),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 0.95,
-                            ),
-                        itemCount: displayItems.length,
-                        itemBuilder: (context, index) {
-                          final item = displayItems[index];
-                          final name = item['name'] as String;
-                          final path = item['path'] as String;
-
-                          return _buildProgramCard(
-                            title: _displayName(name),
-                            folderPath: path,
-                            onTap: () => _navigateToFolder(name),
-                            isEditMode: _isEditMode,
-                            lastModified: _lastModifiedDates[path],
-                            onEditTap: _isEditMode
-                                    ? () => _showRootFolderEditOptions(item)
-                                    : null,
-                          );
-                        },
-                      )
-                    : ReorderableListView.builder(
-                        padding: const EdgeInsets.only(bottom: 116),
-                        itemCount: displayItems.length,
-                        onReorder: _onReorder,
-                        buildDefaultDragHandles: _isEditMode,
-                        itemBuilder: (context, index) {
-                          final item = displayItems[index];
-                          final name = item['name'] as String;
-                          final type = item['type'] as String;
-                          final isFolder = type == 'dir';
-                          final path = item['path'] as String;
-
-                          // ── Resolve icon & color ──
-                          final iconInfo = _iconFor(name, path, index: index);
-                          final IconData itemIcon;
-                          final Color itemColor;
-                          // Check if user has an icon override for this path
-                          final hasIconOverride = _folderIcons.containsKey(path);
-                          final hasColorOverride = _iconColors.containsKey(path);
-                          if (isFolder) {
-                            itemIcon = iconInfo.$1;
-                            itemColor = iconInfo.$2;
-                          } else if (hasIconOverride || hasColorOverride) {
-                            // Use user-overridden icon/color for files too
-                            itemIcon = hasIconOverride ? iconInfo.$1 : Icons.article_outlined;
-                            itemColor = iconInfo.$2;
-                          } else {
-                            // Files — use article icon with auto-palette color
-                            itemIcon = Icons.article_outlined;
-                            itemColor = _colorForIndex(index);
-                          }
-
-                          // ── Staggered entrance animation (old library style) ──
-                          return Column(
-                            key: ValueKey(path),
+                Expanded(
+                  child: _loading
+                      ? ProfessionalLoading(
+                          message:
+                              _kLoadingMessages[Random().nextInt(
+                                _kLoadingMessages.length,
+                              )],
+                        )
+                      : displayItems.isEmpty
+                      ? Center(
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (index > 0)
-                                Divider(
-                                  color: U.border,
-                                  height: 1,
-                                  thickness: 0.5,
-                                  indent: 56,
-                                ),
-                              TweenAnimationBuilder<double>(
-                                tween: Tween(begin: 0, end: 1),
-                                duration: Duration(milliseconds: 250 + index * 45),
-                                curve: Curves.easeOut,
-                                builder: (context, v, child) => Opacity(
-                                  opacity: v,
-                                  child: Transform.translate(
-                                    offset: Offset(0, 16 * (1 - v)),
-                                    child: child,
+                              Text(
+                                'No notes yet.',
+                                style: GoogleFonts.outfit(color: U.sub),
+                              ),
+                              if (isAtRoot) ...[
+                                const SizedBox(height: 16),
+                                FilledButton.icon(
+                                  onPressed: _showAddBranchDialog,
+                                  icon: Icon(Icons.add, color: U.bg),
+                                  label: Text(
+                                    'Add Branch',
+                                    style: GoogleFonts.outfit(color: U.bg),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: U.primary,
                                   ),
                                 ),
-                                child: InkWell(
-                              onTap: () async {
-                                if (isFolder) {
-                                  _navigateToFolder(name);
-                                } else {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => NoteViewerScreen(
-                                        title: _displayName(name).replaceAll('.md', ''),
-                                        filePath: path,
-                                        isEditable: _isEditMode,
-                                        useGlobalRepo: true,
+                              ],
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          color: U.primary,
+                          backgroundColor: U.surface,
+                          onRefresh: () => _load(forceRefresh: true),
+                          child: (isAtRoot && !_isEditMode)
+                              ? GridView.builder(
+                                  padding: const EdgeInsets.all(24),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        crossAxisSpacing: 16,
+                                        mainAxisSpacing: 16,
+                                        childAspectRatio: 0.95,
                                       ),
-                                    ),
-                                  );
-                                  if (result is String) {
-                                    // silent reload handled by NoteViewerScreen
-                                  }
-                                }
-                              },
-                              splashColor: itemColor.withValues(alpha: 0.06),
-                              highlightColor: itemColor.withValues(alpha: 0.04),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                                child: Row(
-                                  children: [
-                                    // ── Leading icon / number badge ──
-                                    if (!isFolder) ...[
-                                      () {
-                                        final numBadge = RegExp(r'^(\d+)').firstMatch(name)?.group(1);
-                                        if (numBadge != null) {
-                                          return Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: U.teal.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                numBadge,
-                                                style: GoogleFonts.outfit(
-                                                  color: U.teal,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          );
-                                        }
-                                        return Icon(itemIcon, color: itemColor, size: 22);
-                                      }(),
-                                    ] else ...[
-                                      // Folder — check for number override
-                                      () {
-                                        final iconKey = _folderIcons[path];
-                                        if (iconKey != null && iconKey.startsWith('num_')) {
-                                          final numText = iconKey.replaceFirst('num_', '');
-                                          return Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: U.teal.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                numText,
-                                                style: GoogleFonts.outfit(
-                                                  color: U.teal,
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              ),
-                                            ),
-                                          ) as Widget;
-                                        }
-                                        return Icon(itemIcon, color: itemColor, size: 22) as Widget;
-                                      }(),
-                                    ],
-                                    const SizedBox(width: 16),
-                                    // ── Title + subtitle ──
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            _displayName(name)
-                                                .replaceAll('.md', '')
-                                                .replaceAll(RegExp(r'^\d+\s*'), '')
-                                                .trim(),
-                                            style: GoogleFonts.outfit(
-                                              fontSize: isFolder ? 16 : 15,
-                                              fontWeight: isFolder ? FontWeight.w600 : FontWeight.w500,
-                                              color: U.text,
-                                            ),
+                                  itemCount: displayItems.length,
+                                  itemBuilder: (context, index) {
+                                    final item = displayItems[index];
+                                    final name = item['name'] as String;
+                                    final path = item['path'] as String;
+
+                                    return _buildProgramCard(
+                                      index: index,
+                                      title: _displayName(name),
+                                      folderPath: path,
+                                      onTap: () => _navigateToFolder(name),
+                                      isEditMode: _isEditMode,
+                                      lastModified: _lastModifiedDates[path],
+                                      onEditTap: _isEditMode
+                                          ? () =>
+                                                _showRootFolderEditOptions(item)
+                                          : null,
+                                    );
+                                  },
+                                )
+                              : ReorderableListView.builder(
+                                  padding: const EdgeInsets.only(bottom: 116),
+                                  itemCount: displayItems.length,
+                                  onReorder: _onReorder,
+                                  buildDefaultDragHandles: _isEditMode,
+                                  itemBuilder: (context, index) {
+                                    final item = displayItems[index];
+                                    final name = item['name'] as String;
+                                    final type = item['type'] as String;
+                                    final isFolder = type == 'dir';
+                                    final path = item['path'] as String;
+
+                                    // ── Resolve icon & color ──
+                                    final iconInfo = _iconFor(
+                                      name,
+                                      path,
+                                      index: index,
+                                    );
+                                    final IconData itemIcon;
+                                    final Color itemColor;
+                                    // Check if user has an icon override for this path
+                                    final hasIconOverride = _folderIcons
+                                        .containsKey(path);
+                                    final hasColorOverride = _iconColors
+                                        .containsKey(path);
+                                    if (isFolder) {
+                                      itemIcon = iconInfo.$1;
+                                      itemColor = iconInfo.$2;
+                                    } else if (hasIconOverride ||
+                                        hasColorOverride) {
+                                      // Use user-overridden icon/color for files too
+                                      itemIcon = hasIconOverride
+                                          ? iconInfo.$1
+                                          : Icons.article_outlined;
+                                      itemColor = iconInfo.$2;
+                                    } else {
+                                      // Files — use article icon with auto-palette color
+                                      itemIcon = Icons.article_outlined;
+                                      itemColor = _colorForIndex(index);
+                                    }
+
+                                    // ── Staggered entrance animation (old library style) ──
+                                    return Column(
+                                      key: ValueKey(path),
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (index > 0)
+                                          Divider(
+                                            color: U.border,
+                                            height: 1,
+                                            thickness: 0.5,
+                                            indent: 56,
                                           ),
-                                          if (!isFolder &&
-                                              item['size'] != null &&
-                                              !name.toLowerCase().endsWith('.md'))
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 2),
-                                              child: Text(
-                                                _formatFileSize(item['size'] as int),
-                                                style: GoogleFonts.outfit(
-                                                  color: U.sub,
-                                                  fontSize: 12,
+                                        TweenAnimationBuilder<double>(
+                                          tween: Tween(begin: 0, end: 1),
+                                          duration: Duration(
+                                            milliseconds: 250 + index * 45,
+                                          ),
+                                          curve: Curves.easeOut,
+                                          builder: (context, v, child) =>
+                                              Opacity(
+                                                opacity: v,
+                                                child: Transform.translate(
+                                                  offset: Offset(
+                                                    0,
+                                                    16 * (1 - v),
+                                                  ),
+                                                  child: child,
                                                 ),
                                               ),
+                                          child: InkWell(
+                                            onTap: () async {
+                                              if (isFolder) {
+                                                _navigateToFolder(name);
+                                              } else {
+                                                final result =
+                                                    await Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (_) =>
+                                                            NoteViewerScreen(
+                                                              title:
+                                                                  _displayName(
+                                                                    name,
+                                                                  ).replaceAll(
+                                                                    '.md',
+                                                                    '',
+                                                                  ),
+                                                              filePath: path,
+                                                              isEditable:
+                                                                  _isEditMode,
+                                                              useGlobalRepo:
+                                                                  true,
+                                                            ),
+                                                      ),
+                                                    );
+                                                if (result is String) {
+                                                  // silent reload handled by NoteViewerScreen
+                                                }
+                                              }
+                                            },
+                                            splashColor: itemColor.withValues(
+                                              alpha: 0.06,
                                             ),
-                                          // Show last updated in edit mode for all items
-                                          if (_isEditMode &&
-                                              (item['updated_at'] != null || item['created_at'] != null))
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 3),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    Icons.schedule_rounded,
-                                                    size: 11,
-                                                    color: U.dim,
+                                            highlightColor: itemColor
+                                                .withValues(alpha: 0.04),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 20,
+                                                    vertical: 16,
                                                   ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    _formatRelativeTime(DateTime.parse((item['updated_at'] ?? item['created_at']) as String)),
-                                                    style: GoogleFonts.outfit(
-                                                      color: U.dim,
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w400,
+                                              child: Row(
+                                                children: [
+                                                  // ── Leading icon / number badge ──
+                                                  if (!isFolder) ...[
+                                                    () {
+                                                      final numBadge =
+                                                          RegExp(r'^(\d+)')
+                                                              .firstMatch(name)
+                                                              ?.group(1);
+                                                      if (numBadge != null) {
+                                                        return Container(
+                                                          width: 32,
+                                                          height: 32,
+                                                          decoration: BoxDecoration(
+                                                            color: U.teal
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
+                                                          child: Center(
+                                                            child: Text(
+                                                              numBadge,
+                                                              style: GoogleFonts.outfit(
+                                                                color: U.teal,
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w700,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return Icon(
+                                                        itemIcon,
+                                                        color: itemColor,
+                                                        size: 22,
+                                                      );
+                                                    }(),
+                                                  ] else ...[
+                                                    // Folder — check for number override
+                                                    () {
+                                                      final iconKey =
+                                                          _folderIcons[path];
+                                                      if (iconKey != null &&
+                                                          iconKey.startsWith(
+                                                            'num_',
+                                                          )) {
+                                                        final numText = iconKey
+                                                            .replaceFirst(
+                                                              'num_',
+                                                              '',
+                                                            );
+                                                        return Container(
+                                                              width: 32,
+                                                              height: 32,
+                                                              decoration: BoxDecoration(
+                                                                color: U.teal
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          0.1,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      8,
+                                                                    ),
+                                                              ),
+                                                              child: Center(
+                                                                child: Text(
+                                                                  numText,
+                                                                  style: GoogleFonts.outfit(
+                                                                    color:
+                                                                        U.teal,
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w700,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            )
+                                                            as Widget;
+                                                      }
+                                                      return Icon(
+                                                            itemIcon,
+                                                            color: itemColor,
+                                                            size: 22,
+                                                          )
+                                                          as Widget;
+                                                    }(),
+                                                  ],
+                                                  const SizedBox(width: 16),
+                                                  // ── Title + subtitle ──
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          _displayName(name)
+                                                              .replaceAll(
+                                                                '.md',
+                                                                '',
+                                                              )
+                                                              .replaceAll(
+                                                                RegExp(
+                                                                  r'^\d+\s*',
+                                                                ),
+                                                                '',
+                                                              )
+                                                              .trim(),
+                                                          style:
+                                                              GoogleFonts.outfit(
+                                                                fontSize:
+                                                                    isFolder
+                                                                    ? 16
+                                                                    : 15,
+                                                                fontWeight:
+                                                                    isFolder
+                                                                    ? FontWeight
+                                                                          .w600
+                                                                    : FontWeight
+                                                                          .w500,
+                                                                color: U.text,
+                                                              ),
+                                                        ),
+                                                        if (!isFolder &&
+                                                            item['size'] !=
+                                                                null &&
+                                                            !name
+                                                                .toLowerCase()
+                                                                .endsWith(
+                                                                  '.md',
+                                                                ))
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.only(
+                                                                  top: 2,
+                                                                ),
+                                                            child: Text(
+                                                              _formatFileSize(
+                                                                item['size']
+                                                                    as int,
+                                                              ),
+                                                              style:
+                                                                  GoogleFonts.outfit(
+                                                                    color:
+                                                                        U.sub,
+                                                                    fontSize:
+                                                                        12,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        // Show last updated in edit mode for all items
+                                                        if (_isEditMode &&
+                                                            (item['updated_at'] !=
+                                                                    null ||
+                                                                item['created_at'] !=
+                                                                    null))
+                                                          Padding(
+                                                            padding:
+                                                                const EdgeInsets.only(
+                                                                  top: 3,
+                                                                ),
+                                                            child: Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                Icon(
+                                                                  Icons
+                                                                      .schedule_rounded,
+                                                                  size: 11,
+                                                                  color: U.dim,
+                                                                ),
+                                                                const SizedBox(
+                                                                  width: 4,
+                                                                ),
+                                                                Text(
+                                                                  _formatRelativeTime(
+                                                                    DateTime.parse(
+                                                                      (item['updated_at'] ??
+                                                                              item['created_at'])
+                                                                          as String,
+                                                                    ),
+                                                                  ),
+                                                                  style: GoogleFonts.outfit(
+                                                                    color:
+                                                                        U.dim,
+                                                                    fontSize:
+                                                                        11,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w400,
+                                                                  ),
+                                                                ),
+                                                                if (item['updated_by_name'] !=
+                                                                    null) ...[
+                                                                  const SizedBox(
+                                                                    width: 8,
+                                                                  ),
+                                                                  Text(
+                                                                    '•',
+                                                                    style: GoogleFonts.outfit(
+                                                                      color:
+                                                                          U.dim,
+                                                                      fontSize:
+                                                                          11,
+                                                                    ),
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 8,
+                                                                  ),
+                                                                  Icon(
+                                                                    Icons
+                                                                        .person_outline_rounded,
+                                                                    size: 11,
+                                                                    color:
+                                                                        U.dim,
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    width: 4,
+                                                                  ),
+                                                                  Text(
+                                                                    item['updated_by_name']
+                                                                        as String,
+                                                                    style: GoogleFonts.outfit(
+                                                                      color:
+                                                                          U.dim,
+                                                                      fontSize:
+                                                                          11,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w400,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ],
+                                                            ),
+                                                          ),
+                                                      ],
                                                     ),
                                                   ),
+                                                  if (_isEditMode)
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        HapticFeedback.lightImpact();
+                                                        _showItemActionSheet(
+                                                          item,
+                                                          isFolder,
+                                                        );
+                                                      },
+                                                      child: Container(
+                                                        width: 32,
+                                                        height: 32,
+                                                        decoration: BoxDecoration(
+                                                          color: U.primary
+                                                              .withValues(
+                                                                alpha: 0.08,
+                                                              ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8,
+                                                              ),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons
+                                                              .more_horiz_rounded,
+                                                          color: U.primary,
+                                                          size: 18,
+                                                        ),
+                                                      ),
+                                                    )
+                                                  else
+                                                    Icon(
+                                                      Icons.chevron_right,
+                                                      color: U.dim.withValues(
+                                                        alpha: 0.9,
+                                                      ),
+                                                      size: 18,
+                                                    ),
                                                 ],
                                               ),
                                             ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_isEditMode)
-                                      PopupMenuButton<String>(
-                                        color: U.surface,
-                                        padding: EdgeInsets.zero,
-                                        tooltip: 'Actions',
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.more_vert,
-                                              color: U.dim,
-                                              size: 16,
-                                            ),
-                                          ),
-                                        ),
-                                        splashRadius: 18,
-                                        onSelected: (value) {
-                                          if (value == 'edit') _showEditOptions(item, isFolder);
-                                          if (value == 'icon') _showIconPicker(path);
-                                        },
-                                        itemBuilder: (ctx) => [
-                                          PopupMenuItem(
-                                            value: 'edit',
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Icon(Icons.edit_outlined, color: U.text, size: 14),
-                                                const SizedBox(width: 6),
-                                                Text('Edit', style: GoogleFonts.outfit(color: U.text, fontSize: 13)),
-                                              ],
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                              value: 'icon',
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.palette_outlined, color: U.primary, size: 14),
-                                                  const SizedBox(width: 6),
-                                                  Text('Change Icon', style: GoogleFonts.outfit(color: U.primary, fontSize: 13)),
-                                                ],
-                                              ),
-                                            ),
-                                        ],
-                                      )
-                                    else
-                                      Icon(
-                                        Icons.chevron_right,
-                                        color: U.dim.withValues(alpha: 0.9),
-                                        size: 18,
-                                      ),
-                                  ],
+                                          ), // closes InkWell
+                                        ), // closes TweenAnimationBuilder
+                                      ],
+                                    );
+                                  },
                                 ),
-                              ),
-                            ),  // closes InkWell
-                              ),  // closes TweenAnimationBuilder
-                            ],
-                          );
-                        },
-                      ),
-              ),
-            ),
+                        ),
+                ),
               ],
             ),
-            if (_isPushing) Positioned.fill(
-              child: AbsorbPointer(
-                absorbing: true,
-                child: Container(
-                  color: U.bg.withValues(alpha: 0.7),
-                  child: const ProfessionalLoading(message: 'Saving changes...'),
+            if (_isPushing)
+              Positioned.fill(
+                child: AbsorbPointer(
+                  absorbing: true,
+                  child: Container(
+                    color: U.bg.withValues(alpha: 0.7),
+                    child: const ProfessionalLoading(
+                      message: 'Saving changes...',
+                    ),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1770,7 +2162,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     final path = item['path'] as String;
     final isFolder = item['type'] == 'dir';
     final displayName = _displayName(name).replaceAll('.md', '');
-    
+
     int countdown = 5;
     Timer? timer;
     bool isDeleting = false;
@@ -1794,66 +2186,74 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             backgroundColor: U.surface,
             title: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: U.red, size: 28),
+                Icon(Icons.delete_outline_rounded, color: U.red, size: 28),
                 const SizedBox(width: 10),
-                Text('Delete Item', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+                Text(
+                  'Move to Trash',
+                  style: GoogleFonts.outfit(
+                    color: U.text,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
             content: Text(
-              'Are you sure you want to permanently delete "$displayName"?\n\nThis action cannot be undone.',
+              'Moving "$displayName" to trash. It can be recovered within 30 days from the trash view.',
               style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
             ),
             actions: [
               TextButton(
-                onPressed: () {
-                  timer?.cancel();
-                  Navigator.pop(ctx);
-                },
+                onPressed: () => Navigator.pop(ctx),
                 child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
               ),
               FilledButton(
-                onPressed: countdown > 0 || isDeleting
+                onPressed: isDeleting
                     ? null
                     : () async {
                         setDialogState(() => isDeleting = true);
-                        Navigator.pop(ctx);
-                        
-                        setState(() => _isPushing = true);
 
-                        bool success = false;
                         try {
-                          if (path.endsWith('.md')) {
-                            await _github.deleteNote(path);
-                          } else {
-                            await _github.deleteFolder(path);
-                          }
-                          success = true;
-                        } catch (e) {
-                          debugPrint("Delete failed: $e");
-                        }
-                        if (success && mounted) {
-                          await _load(forceRefresh: true);
-                        }
-                        if (mounted) setState(() => _isPushing = false);
-
-                        if (mounted) {
-                          if (success) {
+                          await _trashService.moveToTrash(
+                            path: path,
+                            name: displayName,
+                            type: path.endsWith('.md') ? 'file' : 'dir',
+                            universityId: widget.universityFolderName,
+                            github: _github,
+                          );
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            _load(forceRefresh: true);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Deleted "$displayName"'), backgroundColor: U.green),
+                              SnackBar(
+                                content: Text('"$displayName" moved to trash'),
+                                backgroundColor: U.teal,
+                                action: SnackBarAction(
+                                  label: 'VIEW TRASH',
+                                  textColor: U.bg,
+                                  onPressed: _openTrash,
+                                ),
+                              ),
                             );
-                          } else {
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            String errorMsg = e.toString();
+                            if (errorMsg.contains('permission-denied')) {
+                              errorMsg = "Permission Denied: Please check Firestore Security Rules";
+                            }
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to delete "$displayName"'), backgroundColor: U.red),
+                              SnackBar(
+                                content: Text('Failed to trash: $errorMsg'),
+                                backgroundColor: U.red,
+                              ),
                             );
                           }
                         }
                       },
-                style: FilledButton.styleFrom(
-                  backgroundColor: U.red,
-                  disabledBackgroundColor: U.red.withValues(alpha: 0.3),
-                ),
+                style: FilledButton.styleFrom(backgroundColor: U.red),
                 child: Text(
-                  isDeleting ? 'Deleting...' : (countdown > 0 ? 'Delete in ${countdown}s' : 'Delete Now'),
+                  isDeleting ? 'Trashing...' : 'Move to Trash',
                   style: GoogleFonts.outfit(color: U.bg),
                 ),
               ),
@@ -1871,9 +2271,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     final path = item['path'] as String;
     // Show the display name (without __xxxx suffix) in the text field
     final displayOld = _displayName(oldName).replaceAll('.md', '');
-    final controller = TextEditingController(
-      text: displayOld,
-    );
+    final controller = TextEditingController(text: displayOld);
     bool isRenaming = false;
 
     showDialog(
@@ -1912,9 +2310,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   ? null
                   : () async {
                       var newName = controller.text.trim();
-                      if (newName.isEmpty ||
-                          newName == displayOld)
-                        return;
+                      if (newName.isEmpty || newName == displayOld) return;
 
                       if (!isFolder && !newName.endsWith('.md')) {
                         newName += '.md';
@@ -1928,7 +2324,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       // duplicate folder on GitHub.
                       String ghNewName;
                       if (isFolder) {
-                        final oldSuffixMatch = RegExp(r'__[0-9a-f]{4}$').firstMatch(oldName);
+                        final oldSuffixMatch = RegExp(
+                          r'__[0-9a-f]{4}$',
+                        ).firstMatch(oldName);
                         if (oldSuffixMatch != null) {
                           // Preserve the existing suffix
                           ghNewName = '$newName${oldSuffixMatch.group(0)}';
@@ -1981,8 +2379,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           _load(forceRefresh: true);
                           _scheduleReload();
                         }
-                        }
-                      },
+                      }
+                    },
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isRenaming ? 'Renaming...' : 'Rename',
@@ -2016,7 +2414,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
         final approvals = List<String>.from(data['approvals'] ?? []);
         final rejections = List<String>.from(data['rejections'] ?? []);
-        
+
         if (approvals.contains(user.uid)) return;
 
         // Remove from rejections if they had previously rejected
@@ -2025,7 +2423,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         approvals.add(user.uid);
         newApprovalCount = max(0, approvals.length - rejections.length);
 
-        final reqApprovals = _getRequiredApprovals(data['path'] as String? ?? '');
+        final reqApprovals = _getRequiredApprovals(
+          data['path'] as String? ?? '',
+        );
         if ((approvals.length - rejections.length) >= reqApprovals) {
           // This client wins the race — transition to executing
           txn.update(deletionDoc.reference, {
@@ -2036,7 +2436,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           shouldExecuteDelete = true;
           targetPath = data['path'] as String?;
         } else {
-          txn.update(deletionDoc.reference, {'approvals': approvals, 'rejections': rejections});
+          txn.update(deletionDoc.reference, {
+            'approvals': approvals,
+            'rejections': rejections,
+          });
         }
       });
 
@@ -2046,7 +2449,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (path == null || path.isEmpty) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Unable to delete item: missing target path.')),
+              const SnackBar(
+                content: Text('Unable to delete item: missing target path.'),
+              ),
             );
             return;
           }
@@ -2060,7 +2465,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             deleted = true;
           } catch (_) {}
           if (!deleted) {
-            throw Exception('Deletion failed — check permissions or network and try again.');
+            throw Exception(
+              'Deletion failed — check permissions or network and try again.',
+            );
           }
           await deletionDoc.reference.update({
             'isDeleted': true,
@@ -2104,70 +2511,332 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: U.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: U.red),
         );
       }
     }
   }
 
+  /// Unified modern action sheet for editing items (files/folders) at any depth.
+  void _showItemActionSheet(Map<String, dynamic> item, bool isFolder) {
+    _showEditOptions(item, isFolder);
+  }
+
   void _showEditOptions(Map<String, dynamic> item, bool isFolder) {
+    final name = item['name'] as String;
+    final path = item['path'] as String;
+    final displayName = _displayName(name).replaceAll('.md', '');
+    final isPinned = _pinnedPaths.contains(path);
+    final isRoot = _currentPath.isEmpty;
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: U.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 30,
+              offset: const Offset(0, -8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            // ── Drag handle ──
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: U.dim.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // ── Item header ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: U.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: U.primary.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Icon(
+                      isFolder ? Icons.folder_rounded : Icons.article_rounded,
+                      color: U.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isFolder ? 'Folder' : 'Note',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Divider(
+              color: U.border.withValues(alpha: 0.5),
+              height: 1,
+              indent: 24,
+              endIndent: 24,
+            ),
+            const SizedBox(height: 8),
+            // ── Customize section ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'CUSTOMIZE',
+                  style: GoogleFonts.outfit(
+                    color: U.dim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // ── Quick action row (icon, color, pin) ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _buildQuickAction(
+                    icon: Icons.auto_awesome_rounded,
+                    label: 'Icon',
+                    color: U.primary,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showIconPicker(path);
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  _buildQuickAction(
+                    icon: Icons.palette_rounded,
+                    label: 'Color',
+                    color: U.teal,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showColorPicker(path);
+                    },
+                  ),
+                  if (isRoot) ...[
+                    const SizedBox(width: 12),
+                    _buildQuickAction(
+                      icon: isPinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
+                      label: isPinned ? 'Unpin' : 'Pin',
+                      color: U.gold,
+                      isActive: isPinned,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _togglePin(path);
+                        _sortItems();
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Divider(
+              color: U.border.withValues(alpha: 0.5),
+              height: 1,
+              indent: 24,
+              endIndent: 24,
+            ),
+            const SizedBox(height: 8),
+            // ── Actions section ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'ACTIONS',
+                  style: GoogleFonts.outfit(
+                    color: U.dim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // ── Rename ──
+            _buildActionTile(
+              icon: Icons.edit_rounded,
+              label: 'Rename',
+              subtitle: 'Change the display name',
+              color: U.blue,
+              onTap: () {
+                Navigator.pop(ctx);
+                _showRenameDialog(item, isFolder);
+              },
+            ),
+            // ── Delete ──
+            _buildActionTile(
+              icon: Icons.delete_rounded,
+              label: 'Delete',
+              subtitle: 'Permanently remove this item',
+              color: U.red,
+              onTap: () {
+                Navigator.pop(ctx);
+                _showDeleteDialog(item);
+              },
+            ),
+            SizedBox(height: MediaQuery.of(ctx).padding.bottom + 16),
+          ],
+        ),
       ),
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: U.border,
-              borderRadius: BorderRadius.circular(2),
+    );
+  }
+
+  /// Quick action button for the action sheet (icon, color, pin).
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: isActive ? color.withValues(alpha: 0.15) : U.bg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isActive
+                  ? color.withValues(alpha: 0.3)
+                  : U.border.withValues(alpha: 0.5),
+              width: 1,
             ),
           ),
-          const SizedBox(height: 24),
-          ListTile(
-            leading: Icon(Icons.edit_outlined, color: U.text),
-            title: Text('Rename', style: GoogleFonts.outfit(color: U.text)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showRenameDialog(item, isFolder);
-            },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            leading: Icon(Icons.palette_outlined, color: U.primary),
-            title: Text('Change Icon', style: GoogleFonts.outfit(color: U.primary)),
-            onTap: () {
-              Navigator.pop(ctx);
-              final path = item['path'] as String;
-              _showIconPicker(path);
-            },
+        ),
+      ),
+    );
+  }
+
+  /// Action tile for rename/delete in the action sheet.
+  Widget _buildActionTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        splashColor: color.withValues(alpha: 0.08),
+        highlightColor: color.withValues(alpha: 0.04),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: GoogleFonts.outfit(
+                        color: U.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.outfit(
+                        color: U.sub,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: U.dim, size: 20),
+            ],
           ),
-          ListTile(
-            leading: Icon(Icons.color_lens_outlined, color: U.teal),
-            title: Text('Change Color', style: GoogleFonts.outfit(color: U.teal)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showColorPicker(item['path'] as String);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.delete_outline, color: U.red),
-            title: Text('Delete', style: GoogleFonts.outfit(color: U.red)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showDeleteDialog(item);
-            },
-          ),
-          const SizedBox(height: 24),
-        ],
+        ),
       ),
     );
   }
@@ -2205,11 +2874,22 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         children: [
           const SizedBox(height: 12),
           Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(color: U.border, borderRadius: BorderRadius.circular(2)),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: U.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
           const SizedBox(height: 16),
-          Text('Pick a Color', style: GoogleFonts.outfit(color: U.text, fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(
+            'Pick a Color',
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -2248,8 +2928,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       child: isDefault
                           ? Icon(Icons.auto_fix_high, size: 16, color: U.sub)
                           : isSelected
-                              ? const Icon(Icons.check, size: 16, color: Colors.white)
-                              : null,
+                          ? const Icon(
+                              Icons.check,
+                              size: 16,
+                              color: Colors.white,
+                            )
+                          : null,
                     ),
                   ),
                 );
@@ -2262,86 +2946,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     );
   }
 
-  /// Root-folder edit options: rename, change icon, and delete are offered at program level.
+  /// Root-folder edit options — delegates to the unified action sheet.
   void _showRootFolderEditOptions(Map<String, dynamic> item) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: U.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: U.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ListTile(
-            leading: Icon(Icons.edit_outlined, color: U.text),
-            title: Text('Rename', style: GoogleFonts.outfit(color: U.text)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showRenameDialog(item, true); // root is always a folder
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.palette_outlined, color: U.primary),
-            title: Text('Change Icon', style: GoogleFonts.outfit(color: U.primary)),
-            onTap: () {
-              Navigator.pop(ctx);
-              final path = item['path'] as String;
-              _showIconPicker(path);
-            },
-          ),
-          Builder(builder: (_) {
-            final path = item['path'] as String;
-            final isPinned = _pinnedPaths.contains(path);
-            return ListTile(
-              leading: Icon(
-                isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                color: isPinned ? U.gold : U.sub,
-              ),
-              title: Text(
-                isPinned ? 'Unpin' : 'Pin to Top',
-                style: GoogleFonts.outfit(color: isPinned ? U.gold : U.text),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _togglePin(path);
-                _sortItems();
-              },
-            );
-          }),
-          ListTile(
-            leading: Icon(Icons.color_lens_outlined, color: U.teal),
-            title: Text('Change Color', style: GoogleFonts.outfit(color: U.teal)),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showColorPicker(item['path'] as String);
-            },
-          ),
-          ListTile(
-            leading: Icon(Icons.delete_outline, color: U.red),
-            title: Text(
-              'Delete',
-              style: GoogleFonts.outfit(color: U.red),
-            ),
-            onTap: () {
-              Navigator.pop(ctx);
-              _showDeleteDialog(item);
-            },
-          ),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
+    _showEditOptions(item, true);
   }
 
   void _showFailedInfo(QueryDocumentSnapshot deletionDoc) {
@@ -2353,10 +2960,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         backgroundColor: U.surface,
         title: Text(
           'Deletion Failed',
-          style: GoogleFonts.outfit(
-            color: U.text,
-            fontWeight: FontWeight.w600,
-          ),
+          style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600),
         ),
         content: Text(reason, style: GoogleFonts.outfit(color: U.sub)),
         actions: [
@@ -2370,6 +2974,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   }
 
   Widget _buildProgramCard({
+    required int index,
     required String title,
     required String folderPath,
     required VoidCallback onTap,
@@ -2378,7 +2983,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     VoidCallback? onEditTap,
   }) {
     final isPinned = _pinnedPaths.contains(folderPath);
-    // Curated color pairs for vibrant gradients
+    // Curated color pairs for vibrant gradients — guaranteed no two adjacent same
     final colorPairs = [
       [const Color(0xFF6366F1), const Color(0xFFA855F7)], // Indigo -> Purple
       [const Color(0xFFEC4899), const Color(0xFFF43F5E)], // Pink -> Rose
@@ -2391,9 +2996,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       ], // Violet -> Dark Violet
     ];
 
-    // Select color based on title hash
-    final pairIndex = title.hashCode.abs() % colorPairs.length;
-    final pair = colorPairs[pairIndex];
+    // Use sequential index to guarantee no two adjacent cards share the same color
+    final pair = colorPairs[index % colorPairs.length];
 
     final gradient = LinearGradient(
       begin: Alignment.topLeft,
@@ -2410,12 +3014,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           gradient: gradient,
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
-                  BoxShadow(
-                    color: pair[0].withValues(alpha: 0.25),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+            BoxShadow(
+              color: pair[0].withValues(alpha: 0.25),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -2471,10 +3075,16 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               ),
                             );
                           }
-                          final resolvedIcon = (iconKey != null && kFolderIconCatalogue.containsKey(iconKey))
+                          final resolvedIcon =
+                              (iconKey != null &&
+                                  kFolderIconCatalogue.containsKey(iconKey))
                               ? kFolderIconCatalogue[iconKey]!.$1
                               : Icons.collections_bookmark_rounded;
-                          return Icon(resolvedIcon, color: Colors.white, size: 22);
+                          return Icon(
+                            resolvedIcon,
+                            color: Colors.white,
+                            size: 22,
+                          );
                         },
                       ),
                     ),
@@ -2558,7 +3168,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       ),
     );
   }
-
 
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
