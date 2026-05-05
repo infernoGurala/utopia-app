@@ -511,25 +511,6 @@ class NotificationService {
       // Ensure service is initialized
       await initialize();
 
-      // Check if exact alarms are permitted (Android 12+)
-      if (PlatformSupport.isAndroid) {
-        try {
-          final canSchedule = await _localNotifications
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >()
-              ?.canScheduleExactNotifications();
-          if (canSchedule == false) {
-            debugPrint(
-              "NOTIF: Exact alarms not permitted. User needs to grant permission in settings.",
-            );
-            return false;
-          }
-        } catch (e) {
-          debugPrint("NOTIF: Error checking exact alarm permission: $e");
-        }
-      }
-
       // Ensure timezone is initialized and set to IST
       tz.initializeTimeZones();
       final ist = tz.getLocation('Asia/Kolkata');

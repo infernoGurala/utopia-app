@@ -131,8 +131,7 @@ class _TimetableScreenState extends State<TimetableScreen>
       if (!success && mounted) {
         showUtopiaSnackBar(
           context,
-          message:
-              'Failed to schedule notification. Check exact alarm permission in settings.',
+          message: 'Failed to schedule notification. Please try again.',
           tone: UtopiaSnackBarTone.error,
         );
         return;
@@ -156,8 +155,7 @@ class _TimetableScreenState extends State<TimetableScreen>
         if (!success && mounted) {
           showUtopiaSnackBar(
             context,
-            message:
-                'Failed to schedule notification. Check exact alarm permission in settings.',
+            message: 'Failed to schedule notification. Please try again.',
             tone: UtopiaSnackBarTone.error,
           );
           return;
