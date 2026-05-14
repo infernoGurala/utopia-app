@@ -318,37 +318,31 @@ class _TimetableScreenState extends State<TimetableScreen>
             ),
             trailing: Switch(
               value: _notifEnabled,
-              activeColor: U.primary,
-              onChanged: (val) {
-                _toggleNotif(val);
-                Navigator.pop(context);
-              },
+              activeColor: U.dim,
+              onChanged: null, // Untouchable
             ),
           ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
               Icons.access_time_rounded,
-              color: _notifEnabled ? U.primary : U.dim,
+              color: U.dim,
             ),
             title: Text(
               'Notification Time',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: _notifEnabled ? U.text : U.dim,
+                color: U.dim,
               ),
             ),
             subtitle: Text(
               _notifTime.format(context),
-              style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+              style: GoogleFonts.outfit(fontSize: 13, color: U.dim),
             ),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            enabled: _notifEnabled,
-            onTap: () async {
-              Navigator.pop(context);
-              await _pickNotifTime();
-            },
+            trailing: Icon(Icons.chevron_right_rounded, color: U.dim),
+            enabled: false,
+            onTap: null, // Untouchable
           ),
           const SizedBox(height: 12),
           ListTile(

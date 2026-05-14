@@ -544,23 +544,26 @@ Future<AppInitializationState> _initializeApp() async {
       unawaited(NotificationService.initialize());
     }
 
-    try {
-      final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        final url = data['url'] as String?;
-        final anonKey = data['anon_key'] as String?;
-        if (url != null && anonKey != null) {
-          await Supabase.initialize(url: url, anonKey: anonKey);
+    // Initialize Supabase in the background to avoid blocking the splash screen
+    unawaited(() async {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          final url = data['url'] as String?;
+          final anonKey = data['anon_key'] as String?;
+          if (url != null && anonKey != null) {
+            await Supabase.initialize(url: url, anonKey: anonKey);
+          } else {
+            debugPrint('Supabase config missing url or anon_key');
+          }
         } else {
-          debugPrint('Supabase config missing url or anon_key');
+          debugPrint('Supabase config document not found');
         }
-      } else {
-        debugPrint('Supabase config document not found');
+      } catch (e) {
+        debugPrint('Failed to initialize Supabase: $e');
       }
-    } catch (e) {
-      debugPrint('Failed to initialize Supabase: $e');
-    }
+    }());
 
     return const AppInitializationState(firebaseReady: true);
   } catch (e) {

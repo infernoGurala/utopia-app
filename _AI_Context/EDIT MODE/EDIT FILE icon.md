@@ -1,1 +1,0 @@
-an icon to edit the file that opens [[editmode screen opens]]

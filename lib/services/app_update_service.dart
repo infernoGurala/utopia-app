@@ -64,9 +64,21 @@ class AppUpdateService {
           (data['androidMinimumVersion'] ?? data['minimumVersion'] ?? '0.0.0')
               .toString()
               .trim();
-      final apkUrl = (data['androidApkUrl'] ?? data['apkUrl'] ?? '')
+      final abi = await _channel.invokeMethod<String>('getAbi');
+      String apkUrl = (data['androidApkUrl'] ?? data['apkUrl'] ?? '')
           .toString()
           .trim();
+
+      // Architecture-specific optimization fallback
+      if (abi != null) {
+        if (abi.contains('arm64-v8a') && data['apkUrl_arm64'] != null) {
+          apkUrl = data['apkUrl_arm64'].toString().trim();
+        } else if (abi.contains('armeabi-v7a') && data['apkUrl_v7a'] != null) {
+          apkUrl = data['apkUrl_v7a'].toString().trim();
+        } else if (abi.contains('x86_64') && data['apkUrl_x64'] != null) {
+          apkUrl = data['apkUrl_x64'].toString().trim();
+        }
+      }
 
       if (latestVersion.isEmpty || apkUrl.isEmpty) {
         return null;

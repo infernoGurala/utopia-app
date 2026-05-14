@@ -38,6 +38,10 @@ class MainActivity : FlutterActivity() {
                     result.success(installApk(filePath))
                 }
 
+                "getAbi" -> {
+                    result.success(Build.SUPPORTED_ABIS[0])
+                }
+
                 "restartApp" -> {
                     restartApp()
                     result.success(null)

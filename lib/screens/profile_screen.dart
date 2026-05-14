@@ -294,29 +294,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              ChampionAvatarBadge(
-                                scoreRank: scoreRank,
-                                streakRank: streakRank,
-                                email: user?.email,
-                                child: CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: U.primary.withValues(
-                                    alpha: 0.15,
-                                  ),
-                                  backgroundImage: user?.photoURL != null
-                                      ? NetworkImage(user!.photoURL!)
-                                      : null,
-                                  child: user?.photoURL == null
-                                      ? Text(
-                                          (user?.displayName ?? 'U')[0]
-                                              .toUpperCase(),
-                                          style: GoogleFonts.outfit(
-                                            color: U.primary,
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.w700,
+                              GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: U.card,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      title: Row(
+                                        children: [
+                                          Icon(Icons.info_outline_rounded, color: U.primary, size: 24),
+                                          const SizedBox(width: 10),
+                                          Text('Change Profile Photo', style: GoogleFonts.outfit(color: U.text, fontSize: 17, fontWeight: FontWeight.w700)),
+                                        ],
+                                      ),
+                                      content: Text(
+                                        'Your profile photo is linked to your Google account.\n\nTo change it:\n1. Open your Google Account settings\n2. Update your profile picture there\n3. Sign out and sign back in to UTOPIA\n\nThe new photo will appear automatically after re-login.',
+                                        style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.5),
+                                      ),
+                                      actions: [
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: U.primary,
+                                            foregroundColor: U.bg,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                           ),
-                                        )
-                                      : null,
+                                          child: Text('Got it', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                child: ChampionAvatarBadge(
+                                  scoreRank: scoreRank,
+                                  streakRank: streakRank,
+                                  email: user?.email,
+                                  child: CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: U.primary.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    backgroundImage: user?.photoURL != null
+                                        ? NetworkImage(user!.photoURL!)
+                                        : null,
+                                    child: user?.photoURL == null
+                                        ? Text(
+                                            (user?.displayName ?? 'U')[0]
+                                                .toUpperCase(),
+                                            style: GoogleFonts.outfit(
+                                              color: U.primary,
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 16),

@@ -515,64 +515,88 @@ class _ChatScreenState extends State<ChatScreen> {
                         final messageType = (data['type'] ?? 'text').toString();
                         final noteShare =
                             data['noteShare'] as Map<String, dynamic>?;
-                        return _MessageBubble(
-                          messageId: messages[index].id,
-                          isMe: isMe,
-                          messageType: messageType,
-                          text: (data['text'] ?? '').toString(),
-                          timestamp: data['timestamp'] as Timestamp?,
-                          isRead: (data['read'] ?? false) == true,
-                          isEdited: (data['edited'] ?? false) == true,
-                          isDeleted: (data['deleted'] ?? false) == true,
-                          noteShare: noteShare,
-                          replyTo: data['replyTo'] as Map<String, dynamic>?,
-                          avatarLetter: isMe
-                              ? (FirebaseAuth
-                                            .instance
-                                            .currentUser
-                                            ?.displayName ??
-                                        'U')
-                                    .characters
-                                    .first
-                                    .toUpperCase()
-                              : (widget.displayName.isEmpty
-                                    ? 'U'
-                                    : widget.displayName.characters.first
-                                          .toUpperCase()),
-                          avatarPhotoUrl: isMe
-                              ? FirebaseAuth.instance.currentUser?.photoURL
-                              : widget.photoUrl,
-                          onReply: () {
-                            setState(() {
-                              _replyTo = {
-                                'messageId': messages[index].id,
-                                'senderId': senderId,
-                                'senderName': isMe
-                                    ? (FirebaseAuth
-                                              .instance
-                                              .currentUser
-                                              ?.displayName ??
-                                          'You')
-                                    : widget.displayName,
-                                'text': (data['deleted'] ?? false) == true
-                                    ? 'Message unsent'
-                                    : messageType == 'note_share'
-                                    ? 'Shared ${(noteShare?['noteTitle'] ?? 'note').toString()}'
-                                    : (data['text'] ?? '').toString(),
-                              };
-                            });
-                          },
-                          onLongPress: isMe
-                              ? () => _showOwnMessageActions(
-                                  messageId: messages[index].id,
-                                  text: (data['text'] ?? '').toString(),
-                                  isDeleted: (data['deleted'] ?? false) == true,
-                                  canEdit: messageType == 'text',
-                                )
-                              : null,
-                          onOpenNoteShare: noteShare == null
-                              ? null
-                              : () => _openNoteShare(noteShare),
+                        final currentTs = data['timestamp'] as Timestamp?;
+
+                        // Determine if a date separator should appear above this message
+                        bool showDateSep = false;
+                        if (currentTs != null) {
+                          if (index == messages.length - 1) {
+                            showDateSep = true;
+                          } else {
+                            final nextData = messages[index + 1].data();
+                            final nextTs = nextData['timestamp'] as Timestamp?;
+                            if (nextTs != null) {
+                              final c = currentTs.toDate();
+                              final n = nextTs.toDate();
+                              showDateSep = c.year != n.year || c.month != n.month || c.day != n.day;
+                            }
+                          }
+                        }
+
+                        return Column(
+                          children: [
+                            if (showDateSep && currentTs != null)
+                              _ChatDateSeparator(date: currentTs.toDate()),
+                            _MessageBubble(
+                              messageId: messages[index].id,
+                              isMe: isMe,
+                              messageType: messageType,
+                              text: (data['text'] ?? '').toString(),
+                              timestamp: data['timestamp'] as Timestamp?,
+                              isRead: (data['read'] ?? false) == true,
+                              isEdited: (data['edited'] ?? false) == true,
+                              isDeleted: (data['deleted'] ?? false) == true,
+                              noteShare: noteShare,
+                              replyTo: data['replyTo'] as Map<String, dynamic>?,
+                              avatarLetter: isMe
+                                  ? (FirebaseAuth
+                                                .instance
+                                                .currentUser
+                                                ?.displayName ??
+                                            'U')
+                                        .characters
+                                        .first
+                                        .toUpperCase()
+                                  : (widget.displayName.isEmpty
+                                        ? 'U'
+                                        : widget.displayName.characters.first
+                                              .toUpperCase()),
+                              avatarPhotoUrl: isMe
+                                  ? FirebaseAuth.instance.currentUser?.photoURL
+                                  : widget.photoUrl,
+                              onReply: () {
+                                setState(() {
+                                  _replyTo = {
+                                    'messageId': messages[index].id,
+                                    'senderId': senderId,
+                                    'senderName': isMe
+                                        ? (FirebaseAuth
+                                                  .instance
+                                                  .currentUser
+                                                  ?.displayName ??
+                                              'You')
+                                        : widget.displayName,
+                                    'text': (data['deleted'] ?? false) == true
+                                        ? 'Message unsent'
+                                        : messageType == 'note_share'
+                                        ? 'Shared ${(noteShare?['noteTitle'] ?? 'note').toString()}'
+                                        : (data['text'] ?? '').toString(),
+                                  };
+                                });
+                              },
+                              onLongPress: isMe
+                                  ? () => _showOwnMessageActions(
+                                      messageId: messages[index].id,
+                                      text: (data['text'] ?? '').toString(),
+                                      isDeleted: (data['deleted'] ?? false) == true,
+                                      canEdit: messageType == 'text',
+                                    )
+                                  : null,
+                              onOpenNoteShare: noteShare == null
+                                  ? null
+                                  : () => _openNoteShare(noteShare),
+                            ),
+                          ],
                         );
                       },
                     );
@@ -1280,6 +1304,54 @@ class _ChatEmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ChatDateSeparator extends StatelessWidget {
+  const _ChatDateSeparator({required this.date});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = today.difference(target).inDays;
+    String label;
+    if (diff == 0) {
+      label = 'Today';
+    } else if (diff == 1) {
+      label = 'Yesterday';
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      if (date.year == now.year) {
+        label = '${months[date.month - 1]} ${date.day}';
+      } else {
+        label = '${months[date.month - 1]} ${date.day}, ${date.year}';
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: U.border, thickness: 0.5)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Text(
+              label,
+              style: GoogleFonts.outfit(
+                color: U.dim,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(child: Divider(color: U.border, thickness: 0.5)),
+        ],
       ),
     );
   }
