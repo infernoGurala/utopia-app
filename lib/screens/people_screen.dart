@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -476,12 +477,7 @@ class _InlineFollowButton extends StatelessWidget {
           border: bordered ? Border.all(color: U.border) : null,
         ),
         child: loading
-            ? SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: U.primary),
-              )
+            ? const UtopiaLoader(scale: 0.3)
             : Text(
                 label,
                 style: GoogleFonts.outfit(

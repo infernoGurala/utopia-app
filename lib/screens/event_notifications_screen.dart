@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
@@ -59,7 +60,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
         ),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: U.primary))
+          ? const Center(child: UtopiaLoader(scale: 0.7))
           : RefreshIndicator(
               color: U.primary,
               onRefresh: _loadNotifications,

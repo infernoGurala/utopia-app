@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 
 import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
@@ -403,7 +404,7 @@ class _TimetableEditorScreenState extends State<TimetableEditorScreen>
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFCBA6F7)),
+              child: const UtopiaLoader(scale: 0.7),
             )
           : TabBarView(
               controller: _tabController,

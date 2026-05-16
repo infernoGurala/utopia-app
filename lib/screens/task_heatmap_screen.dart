@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../models/focus_models.dart';
@@ -71,7 +72,7 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
       backgroundColor: U.bg,
       body: SafeArea(
         child: _loading
-            ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: U.primary))
+            ? const Center(child: UtopiaLoader(scale: 0.7))
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

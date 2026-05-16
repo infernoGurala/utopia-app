@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
@@ -168,7 +169,7 @@ class _QuotesEditorScreenState extends State<QuotesEditorScreen> {
         title: const Text('Quotes Pool'),
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: U.primary))
+          ? const Center(child: UtopiaLoader(scale: 0.7))
           : _quotes.isEmpty
           ? Center(
               child: Text(

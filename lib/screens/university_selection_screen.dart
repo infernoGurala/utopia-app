@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
@@ -131,7 +132,7 @@ class _UniversitySelectionScreenState extends State<UniversitySelectionScreen> {
           Expanded(
             child: _isLoading
                 ? Center(
-                    child: CircularProgressIndicator(color: U.primary),
+                    child: const UtopiaLoader(scale: 0.7),
                   )
                 : _filteredUniversities.isEmpty
                     ? Center(

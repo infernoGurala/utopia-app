@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-import '../widgets/bouncing_loader.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -893,7 +893,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             children: [
               Expanded(
                 child: _loading
-                ? Center(child: BouncingLoader(color: U.primary))
+                ? const Center(child: UtopiaLoader(scale: 0.7))
                 : _items.isEmpty
                 ? Center(
                     child: Text(

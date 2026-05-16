@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -136,7 +137,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                 if (_isLoading)
                   Expanded(
                     child: Center(
-                      child: CircularProgressIndicator(color: U.primary),
+                      child: const UtopiaLoader(scale: 0.7),
                     ),
                   )
                 else

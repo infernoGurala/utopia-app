@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
@@ -129,7 +130,7 @@ class _TotalAttendanceScreenState extends State<TotalAttendanceScreen> {
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: const UtopiaLoader(scale: 0.6),
               ),
             )
           else

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -154,7 +155,7 @@ class _UniChatScreenState extends State<UniChatScreen> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: U.primary));
+                  return const Center(child: UtopiaLoader(scale: 0.7));
                 }
                 final docs = snapshot.data?.docs ?? [];
                 if (docs.isEmpty) {

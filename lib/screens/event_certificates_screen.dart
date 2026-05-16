@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
@@ -54,7 +55,7 @@ class _EventCertificatesScreenState extends State<EventCertificatesScreen> {
         ),
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: U.primary))
+          ? const Center(child: UtopiaLoader(scale: 0.7))
           : _certificates.isEmpty
               ? Center(
                   child: Column(

@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../main.dart';
@@ -241,17 +242,7 @@ class _GenZLoadingOverlayState extends State<GenZLoadingOverlay>
                                 ),
                               ],
                             ),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3,
-                              strokeCap: StrokeCap.round,
-                              valueColor: AlwaysStoppedAnimation(
-                                Color.lerp(
-                                  _currentGradient[0],
-                                  _currentGradient[1],
-                                  shimmer,
-                                )!,
-                              ),
-                            ),
+                            child: const UtopiaLoader(scale: 0.35),
                           ),
                         ),
 

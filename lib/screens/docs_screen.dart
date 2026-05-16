@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -366,7 +367,7 @@ class _DocsScreenState extends State<DocsScreen> {
               // Doc list
               Expanded(
                 child: !_isReady
-                    ? Center(child: CircularProgressIndicator(color: U.primary, strokeWidth: 2.5))
+                    ? const Center(child: UtopiaLoader(scale: 0.7))
                     : _universityId.isEmpty
                         ? _EmptyState(message: 'No university found.\nPlease set up your profile.')
                         : StreamBuilder<List<UniversityDoc>>(
@@ -374,8 +375,7 @@ class _DocsScreenState extends State<DocsScreen> {
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.waiting) {
                                 return Center(
-                                  child: CircularProgressIndicator(
-                                      color: U.primary, strokeWidth: 2.5),
+                                  child: const UtopiaLoader(scale: 0.7),
                                 );
                               }
                               final docs = snapshot.data ?? [];

@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
@@ -147,7 +148,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
             // List
             Expanded(
               child: _loading
-                  ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: U.primary))
+                  ? const Center(child: UtopiaLoader(scale: 0.7))
                   : _reminders.isEmpty
                       ? Center(child: Text('No reminders yet. Tap + to add one.', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)))
                       : _buildList(),

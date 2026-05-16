@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -551,7 +552,7 @@ class _TimetableScreenState extends State<TimetableScreen>
               ),
       ),
       body: _loading
-          ? Center(child: CircularProgressIndicator(color: U.primary))
+          ? const Center(child: UtopiaLoader(scale: 0.7))
           : _userTimetable == null
           ? _buildEmptyState()
           : TabBarView(

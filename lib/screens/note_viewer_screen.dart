@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1013,10 +1014,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
             Expanded(
               child: _loading
                   ? Center(
-                      child: CircularProgressIndicator(
-                        color: U.primary,
-                        strokeWidth: 1.5,
-                      ),
+                      child: const UtopiaLoader(scale: 0.5),
                     )
                   : RefreshIndicator(
                       color: U.primary,

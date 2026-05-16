@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../widgets/bouncing_loader.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/supabase_global_service.dart';
@@ -1662,9 +1662,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 Expanded(
                   child: _loading
                       ? Center(
-                          child: BouncingLoader(
-                            color: U.primary,
-                          ),
+                          child: const UtopiaLoader(scale: 0.7),
                         )
                       : displayItems.isEmpty
                       ? Center(
@@ -2145,9 +2143,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   child: Container(
                     color: U.bg.withValues(alpha: 0.7),
                     child: const Center(
-                      child: BouncingLoader(
-                        color: Colors.white,
-                      ),
+                      child: UtopiaLoader(scale: 0.7),
                     ),
                   ),
                 ),

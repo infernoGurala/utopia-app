@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import '../main.dart' show U;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -589,10 +590,7 @@ class _IAAScreenState extends State<IAAScreen> {
                   child: SizedBox(
                     width: 24,
                     height: 24,
-                    child: CircularProgressIndicator(
-                      color: U.primary,
-                      strokeWidth: 2.8,
-                    ),
+                    child: const UtopiaLoader(scale: 0.7),
                   ),
                 ),
               ),

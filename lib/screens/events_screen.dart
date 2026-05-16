@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -116,7 +117,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     if (_isLoading)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 80),
-                        child: Center(child: CircularProgressIndicator(color: U.primary)),
+                        child: const Center(child: UtopiaLoader(scale: 0.7)),
                       )
                     else if (_searchQuery.isNotEmpty || _selectedCategory != 'All') ...[
                       _buildSectionTitle('Results'),

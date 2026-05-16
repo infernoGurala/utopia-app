@@ -9,7 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
-import '../widgets/bouncing_loader.dart';
+import '../widgets/utopia_loader.dart';
 import '../services/class_service.dart';
 import '../services/supabase_global_service.dart';
 import 'class_detail_screen.dart';
@@ -313,7 +313,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 const SizedBox(height: 16),
                 Expanded(
               child: _isLoading && _classes.isEmpty
-                  ? Center(child: BouncingLoader(color: U.primary))
+                  ? const Center(child: UtopiaLoader(scale: 0.7))
                   : RefreshIndicator(
                       color: U.primary,
                       backgroundColor: U.surface,

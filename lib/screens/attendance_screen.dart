@@ -9,7 +9,7 @@ import '../services/attendance_cache_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
-import '../widgets/speed_loader.dart';
+import '../widgets/utopia_loader.dart';
 import '../services/attendance_server_preference.dart';
 import 'total_attendance_screen.dart';
 
@@ -868,7 +868,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SpeedLoader(color: U.text),
+          const UtopiaLoader(scale: 0.8),
           const SizedBox(height: 24),
           Text(
             'Fetching live attendance...',
@@ -1804,7 +1804,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
                           child: Center(
                             child: Transform.scale(
                               scale: 0.6,
-                              child: SpeedLoader(color: U.primary),
+                              child: const UtopiaLoader(scale: 0.6),
                             ),
                           ),
                         );
