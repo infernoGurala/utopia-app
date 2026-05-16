@@ -12,6 +12,7 @@ import 'friends_screen.dart';
 import 'map_screen.dart';
 import 'uni_chat_screen.dart';
 import 'docs_screen.dart';
+import 'events_screen.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -141,7 +142,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                       ),
                     ),
                     _UniversityCard(
-                      title: 'People',
+                      title: 'Everyone',
                       icon: Icons.public_outlined,
                       color: U.blue,
                       delay: 250,
