@@ -3,10 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import '../services/role_service.dart';
 import 'event_chat_screen.dart';
 import 'qr_ticket_screen.dart';
 
@@ -22,6 +25,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   late EventModel _event;
   bool _isRegistered = false;
   bool _isLiked = false;
+  bool _isAdmin = false;
 
   bool _isRegistering = false;
 
@@ -41,9 +45,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       return;
     }
     try {
-      final results = await Future.wait([
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      final results = await Future.wait<dynamic>([
         EventService.instance.isRegistered(_event.id!),
         EventService.instance.isLiked(_event.id!),
+        RoleService().isSuperUser(),
       ]);
       // Refresh event data
       final fresh = await EventService.instance.getEvent(_event.id!);
@@ -51,6 +57,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         setState(() {
           _isRegistered = results[0] as bool;
           _isLiked = results[1] as bool;
+          _isAdmin = results[2] as bool;
           if (fresh != null) _event = fresh;
 
         });
@@ -111,8 +118,34 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
   void _shareEvent() {
     SharePlus.instance.share(
-      ShareParams(text: 'Check out ${_event.title} on Utopia! 📅 ${_formatDate(_event.date)} at ${_event.venue}'),
+      ShareParams(text: 'Check out ${_event.title} on Utopia! ${_formatDate(_event.date)} at ${_event.venue}'),
     );
+  }
+
+  Future<void> _deleteEvent() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: U.surface,
+        title: Text('Delete Event', style: GoogleFonts.outfit(color: U.text)),
+        content: Text('Are you sure you want to delete this event? This action cannot be undone.', style: GoogleFonts.outfit(color: U.sub)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text('Delete', style: GoogleFonts.outfit(color: U.red))),
+        ],
+      )
+    );
+    if (confirm != true) return;
+
+    if (_event.id == null) return;
+    try {
+      await EventService.instance.deleteEvent(_event.id!);
+      if (mounted) {
+        Navigator.pop(context); // Go back to feed
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   @override
@@ -195,20 +228,30 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         background: Hero(
           tag: 'event_banner_${_event.id ?? _event.title}',
           child: _event.bannerUrl != null && _event.bannerUrl!.isNotEmpty
-              ? CachedNetworkImage(
-                  imageUrl: _event.bannerUrl!,
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [U.primary.withValues(alpha: 0.8), U.teal.withValues(alpha: 0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+              ? ColorFiltered(
+                  colorFilter: (_event.status == EventStatus.completed || _event.status == EventStatus.cancelled)
+                      ? const ColorFilter.matrix([
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0,      0,      0,      1, 0,
+                        ])
+                      : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                  child: CachedNetworkImage(
+                    imageUrl: _event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [U.primary.withValues(alpha: 0.8), U.teal.withValues(alpha: 0.8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                       ),
+                      child: Center(child: CircularProgressIndicator(color: Colors.white.withValues(alpha: 0.5), strokeWidth: 2)),
                     ),
-                    child: Center(child: CircularProgressIndicator(color: Colors.white.withValues(alpha: 0.5), strokeWidth: 2)),
+                    errorWidget: (_, __, ___) => _buildDefaultBanner(),
                   ),
-                  errorWidget: (_, __, ___) => _buildDefaultBanner(),
                 )
               : _buildDefaultBanner(),
         ),
@@ -297,30 +340,39 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   Widget _buildActionBar() {
-    return Row(
-      children: [
-        _buildActionItem(
-          _isLiked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-          _isLiked ? 'Saved' : 'Save',
-          _toggleLike,
-          highlight: _isLiked,
-        ),
-        const SizedBox(width: 12),
-        _buildActionItem(Icons.chat_bubble_outline_rounded, 'Chat', () {
-          if (_event.id != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => EventChatScreen(event: _event)),
-            );
-          }
-        }),
-        const SizedBox(width: 12),
-        _buildActionItem(Icons.share_outlined, 'Share', _shareEvent),
-      ],
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildActionItem(
+            _isLiked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            _isLiked ? 'Saved' : 'Save',
+            _toggleLike,
+            highlight: _isLiked,
+          ),
+          const SizedBox(width: 12),
+          _buildActionItem(Icons.chat_bubble_outline_rounded, 'Chat', () {
+            if (_event.id != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => EventChatScreen(event: _event)),
+              );
+            }
+          }),
+          const SizedBox(width: 12),
+          _buildActionItem(Icons.share_outlined, 'Share', _shareEvent),
+          if (uid != null && (uid == _event.organizerUid || _isAdmin)) ...[
+            const SizedBox(width: 12),
+            _buildActionItem(Icons.delete_outline_rounded, 'Delete', _deleteEvent, color: U.red),
+          ]
+        ],
+      ),
     ).animate().fadeIn(delay: 200.ms, duration: 400.ms).slideY(begin: 0.1, end: 0);
   }
 
-  Widget _buildActionItem(IconData icon, String label, VoidCallback onTap, {bool highlight = false}) {
+  Widget _buildActionItem(IconData icon, String label, VoidCallback onTap, {bool highlight = false, Color? color}) {
+    final c = color ?? (highlight ? U.primary : U.text);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -333,14 +385,14 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: highlight ? U.primary : U.text),
+            Icon(icon, size: 18, color: c),
             const SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.outfit(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: highlight ? U.primary : U.text,
+                color: c,
               ),
             ),
           ],
@@ -489,9 +541,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            if (_event.providesAttendance) _buildBadge('📋 Attendance', U.teal),
-            if (_event.requiresPayment) _buildBadge('💰 Paid Entry', U.peach),
-            if (_event.providesCertificate) _buildBadge('🏅 Certificate', U.primary),
+            if (_event.providesAttendance) _buildBadge('Attendance', U.teal),
+            if (_event.requiresPayment) _buildBadge('Paid Entry', U.peach),
+            if (_event.providesCertificate) _buildBadge('Certificate', U.primary),
           ],
         ),
       ],
@@ -541,14 +593,22 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   Widget _buildLinkTile(IconData icon, String label, String url, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
@@ -565,8 +625,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           Icon(Icons.chevron_right_rounded, color: U.dim),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildBottomAction() {
     final canRegister = !_event.isRegistrationClosed && !_event.isFull && _event.status != EventStatus.completed && _event.status != EventStatus.cancelled;
@@ -582,7 +643,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           border: Border(top: BorderSide(color: U.border)),
         ),
         child: ElevatedButton(
-          onPressed: (_isRegistering || !canRegister) ? null : _toggleRegistration,
+          onPressed: _isRegistering ? null : (_isRegistered ? _toggleRegistration : (canRegister ? _toggleRegistration : null)),
           style: ElevatedButton.styleFrom(
             backgroundColor: _isRegistered ? U.red : U.primary,
             foregroundColor: U.bg,

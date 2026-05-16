@@ -9,6 +9,8 @@ class EventService {
   static final EventService instance = EventService._();
   EventService._();
 
+  final Set<String> _viewedEvents = {};
+
   SupabaseClient get _sb => Supabase.instance.client;
   String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
@@ -64,10 +66,13 @@ class EventService {
     int limit = 50,
   }) async {
     try {
+      final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2)).toIso8601String().split('T').first;
+      
       var query = _sb
           .from('events')
           .select()
-          .eq('is_approved', true);
+          .eq('is_approved', true)
+          .gte('date', twoDaysAgo);
 
       if (category != null && category.isNotEmpty) {
         query = query.eq('category', category);
@@ -102,10 +107,12 @@ class EventService {
   /// Get trending events (highest combined views + likes).
   Future<List<EventModel>> getTrendingEvents({int limit = 10}) async {
     try {
+      final twoDaysAgo = DateTime.now().subtract(const Duration(days: 2)).toIso8601String().split('T').first;
       final response = await _sb
           .from('events')
           .select()
           .eq('is_approved', true)
+          .gte('date', twoDaysAgo)
           .neq('status', 'cancelled')
           .order('view_count', ascending: false)
           .limit(limit);
@@ -197,6 +204,9 @@ class EventService {
 
   /// Increment view count for an event.
   Future<void> incrementViews(String eventId) async {
+    if (_viewedEvents.contains(eventId)) return;
+    _viewedEvents.add(eventId);
+    
     try {
       await _sb.rpc('increment_event_views', params: {'event_id_param': eventId});
     } catch (e) {
