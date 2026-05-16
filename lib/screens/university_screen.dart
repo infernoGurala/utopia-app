@@ -160,10 +160,12 @@ class _UniversityScreenState extends State<UniversityScreen> {
                     _UniversityCard(
                       title: 'Events',
                       icon: Icons.event_available_outlined,
-                      color: U.sub,
+                      color: const Color(0xFFF59E0B),
                       delay: 300,
-                      isComingSoon: true,
-                      onTap: () {},
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const EventsScreen()),
+                      ),
                     ),
                     _UniversityCard(
                       title: 'Uni Chat',
