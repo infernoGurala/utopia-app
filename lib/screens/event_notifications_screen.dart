@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
@@ -15,11 +16,18 @@ class EventNotificationsScreen extends StatefulWidget {
 class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
   List<EventModel> _endingSoon = [];
   List<EventModel> _newEvents = [];
+  List<String> _dismissedIds = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadDismissedAndNotifications();
+  }
+
+  Future<void> _loadDismissedAndNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    _dismissedIds = prefs.getStringList('dismissed_notifications') ?? [];
     _loadNotifications();
   }
 
@@ -32,14 +40,24 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
       ]);
       if (mounted) {
         setState(() {
-          _endingSoon = results[0];
-          _newEvents = results[1];
+          _endingSoon = (results[0] as List<EventModel>).where((e) => !_dismissedIds.contains(e.id)).toList();
+          _newEvents = (results[1] as List<EventModel>).where((e) => !_dismissedIds.contains(e.id)).toList();
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _dismissNotification(String eventId) async {
+    final prefs = await SharedPreferences.getInstance();
+    _dismissedIds.add(eventId);
+    await prefs.setStringList('dismissed_notifications', _dismissedIds);
+    setState(() {
+      _endingSoon.removeWhere((e) => e.id == eventId);
+      _newEvents.removeWhere((e) => e.id == eventId);
+    });
   }
 
   @override
@@ -69,6 +87,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
                 children: [
                   if (_endingSoon.isNotEmpty) ...[
                     ..._endingSoon.map((event) => _buildNotificationItem(
+                      event.id ?? '',
                       'Registration Ending Soon',
                       '${event.title} registration closes on ${_formatDate(event.registrationDeadline ?? event.date)}.',
                       Icons.warning_amber_rounded,
@@ -78,6 +97,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
                   ],
                   if (_newEvents.isNotEmpty) ...[
                     ..._newEvents.map((event) => _buildNotificationItem(
+                      event.id ?? '',
                       'New Event',
                       '${event.title} was just added by ${event.conductedBy.isNotEmpty ? event.conductedBy : event.organizerName}.',
                       Icons.event_available_rounded,
@@ -104,7 +124,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
     );
   }
 
-  Widget _buildNotificationItem(String title, String body, IconData icon, Color color, {required bool isUnread}) {
+  Widget _buildNotificationItem(String eventId, String title, String body, IconData icon, Color color, {required bool isUnread}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -129,13 +149,26 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: isUnread ? FontWeight.w600 : FontWeight.w500,
-                    color: U.text,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: isUnread ? FontWeight.w600 : FontWeight.w500,
+                          color: U.text,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: U.dim, size: 18),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _dismissNotification(eventId),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(

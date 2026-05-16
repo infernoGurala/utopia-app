@@ -551,17 +551,27 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     ),
                     child: event.bannerUrl != null && event.bannerUrl!.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: event.bannerUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white.withValues(alpha: 0.5),
+                        ? ColorFiltered(
+                            colorFilter: (event.status == EventStatus.completed || event.status == EventStatus.cancelled)
+                                ? const ColorFilter.matrix([
+                                    0.2126, 0.7152, 0.0722, 0, 0,
+                                    0.2126, 0.7152, 0.0722, 0, 0,
+                                    0.2126, 0.7152, 0.0722, 0, 0,
+                                    0,      0,      0,      1, 0,
+                                  ])
+                                : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                            child: CachedNetworkImage(
+                              imageUrl: event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                ),
                               ),
-                            ),
-                            errorWidget: (_, __, ___) => Center(
-                              child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
+                              errorWidget: (_, __, ___) => Center(
+                                child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
+                              ),
                             ),
                           )
                         : Center(

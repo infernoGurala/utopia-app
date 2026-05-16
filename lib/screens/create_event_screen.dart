@@ -26,8 +26,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _shortDescController = TextEditingController();
   final _conductedByController = TextEditingController();
   String _selectedCategory = 'Tech';
-  File? _bannerImage;
-  File? _posterImage;
+  File? _bannerFile;
+  File? _posterFile;
 
   // Step 2 — Scheduling
   final _venueController = TextEditingController();
@@ -45,12 +45,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _whatsappController = TextEditingController();
   final _participationLinkController = TextEditingController();
   final _tagsController = TextEditingController();
+  final _feeAmountController = TextEditingController();
 
   // Step 4 — Flags
   bool _providesAttendance = false;
   bool _requiresPayment = false;
   bool _providesCertificate = false;
-  File? _permissionLetter;
+  File? _permissionFile;
 
   static const _categories = [
     'Tech', 'Sports', 'Workshops', 'Clubs', 'Cultural',
@@ -73,6 +74,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     _whatsappController.dispose();
     _participationLinkController.dispose();
     _tagsController.dispose();
+    _feeAmountController.dispose();
     super.dispose();
   }
 
@@ -81,9 +83,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     if (picked != null) {
       setState(() {
         if (isBanner) {
-          _bannerImage = File(picked.path);
+          _bannerFile = File(picked.path);
         } else {
-          _posterImage = File(picked.path);
+          _posterFile = File(picked.path);
         }
       });
     }
@@ -92,7 +94,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _pickPermissionLetter() async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (picked != null) {
-      setState(() => _permissionLetter = File(picked.path));
+      setState(() => _permissionFile = File(picked.path));
     }
   }
 
@@ -155,6 +157,30 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
+    if (_contactController.text.trim().isEmpty || _conductedByController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Contact numbers and conducted by are required', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
+    if (_bannerFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Banner image is required', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
+    if (_permissionFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Permission letter is required', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
+    if (_requiresPayment && _feeAmountController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter the fee amount', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
 
     setState(() => _isPublishing = true);
 
@@ -169,21 +195,21 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       String? posterUrl;
       String? permissionUrl;
 
-      if (_bannerImage != null) {
+      if (_bannerFile != null) {
         bannerUrl = await CloudinaryService.instance.uploadImage(
-          _bannerImage!,
+          _bannerFile!,
           folder: 'events/banners',
         );
       }
-      if (_posterImage != null) {
+      if (_posterFile != null) {
         posterUrl = await CloudinaryService.instance.uploadImage(
-          _posterImage!,
+          _posterFile!,
           folder: 'events/posters',
         );
       }
-      if (_permissionLetter != null) {
+      if (_permissionFile != null) {
         permissionUrl = await CloudinaryService.instance.uploadImage(
-          _permissionLetter!,
+          _permissionFile!,
           folder: 'events/permissions',
         );
       }
@@ -227,10 +253,11 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         participationLink: _participationLinkController.text.trim().isEmpty ? null : _participationLinkController.text.trim(),
         providesAttendance: _providesAttendance,
         requiresPayment: _requiresPayment,
+        feeAmount: _requiresPayment ? _feeAmountController.text.trim() : null,
         providesCertificate: _providesCertificate,
         permissionLetterUrl: permissionUrl,
         status: EventStatus.upcoming,
-        isApproved: false, // Needs admin approval
+        isApproved: true, // Auto-approved
         universityId: universityId,
         prizeInfo: _prizeInfoController.text.trim().isEmpty ? null : _prizeInfoController.text.trim(),
         requirements: _requirementsController.text.trim().isEmpty ? null : _requirementsController.text.trim(),
@@ -411,9 +438,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  Widget _buildImagePicker(String label, File? file, VoidCallback onTap, IconData icon) {
+  Widget _buildImagePicker(String label, File? file, VoidCallback onTap, VoidCallback onClear, IconData icon) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: file == null ? onTap : null,
       child: Container(
         height: file != null ? 160 : 100,
         width: double.infinity,
@@ -422,9 +449,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           color: U.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: U.border, style: BorderStyle.solid),
-          image: file != null
-              ? DecorationImage(image: FileImage(file), fit: BoxFit.cover)
-              : null,
         ),
         child: file == null
             ? Column(
@@ -435,17 +459,34 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   Text(label, style: GoogleFonts.outfit(color: U.text)),
                 ],
               )
-            : Align(
-                alignment: Alignment.topRight,
-                child: Container(
-                  margin: const EdgeInsets.all(8),
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    shape: BoxShape.circle,
+            : Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.file(file, fit: BoxFit.cover),
+                    ),
                   ),
-                  child: const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
-                ),
+                  Positioned(
+                    top: 8, right: 8,
+                    child: GestureDetector(
+                      onTap: onClear,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 8, left: 8, right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
+                      child: Text(file.path.split('/').last, style: GoogleFonts.outfit(color: Colors.white, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                ]
               ),
       ),
     );
@@ -455,8 +496,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Widget _buildStep1() {
     return Column(
       children: [
-        _buildImagePicker('Upload Banner Image', _bannerImage, () => _pickImage(isBanner: true), Icons.add_photo_alternate_outlined),
-        _buildImagePicker('Upload Poster', _posterImage, () => _pickImage(isBanner: false), Icons.image_outlined),
+        _buildImagePicker('Upload Banner Image', _bannerFile, () => _pickImage(isBanner: true), () => setState(() => _bannerFile = null), Icons.add_photo_alternate_outlined),
+        _buildImagePicker('Upload Poster', _posterFile, () => _pickImage(isBanner: false), () => setState(() => _posterFile = null), Icons.image_outlined),
         _buildField('Event Title', _titleController, icon: Icons.title_rounded),
         _buildField('Short Description', _shortDescController, maxLines: 2, hint: 'Brief one-liner about your event'),
         // Category Dropdown
@@ -578,6 +619,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           activeTrackColor: U.primary.withValues(alpha: 0.3),
           onChanged: (v) => setState(() => _requiresPayment = v),
         ),
+        if (_requiresPayment) ...[
+          const SizedBox(height: 16),
+          _buildField('Registration Fee Amount', _feeAmountController, icon: Icons.currency_rupee_rounded, hint: 'e.g. 150 INR'),
+        ],
         SwitchListTile(
           title: Text('Provides Certificate', style: GoogleFonts.outfit(color: U.text)),
           subtitle: Text('Certificate for participants', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
@@ -589,8 +634,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         const SizedBox(height: 16),
         _buildImagePicker(
           'Upload Permission Letter',
-          _permissionLetter,
+          _permissionFile,
           _pickPermissionLetter,
+          () => setState(() => _permissionFile = null),
           Icons.upload_file_rounded,
         ),
       ],
@@ -609,12 +655,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_bannerImage != null)
+          if (_bannerFile != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.file(_bannerImage!, height: 120, width: double.infinity, fit: BoxFit.cover),
+              child: Image.file(_bannerFile!, height: 120, width: double.infinity, fit: BoxFit.cover),
             ),
-          if (_bannerImage != null) const SizedBox(height: 16),
+          if (_bannerFile != null) const SizedBox(height: 16),
           Text(
             _titleController.text.isEmpty ? 'Untitled Event' : _titleController.text,
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: U.text),
@@ -636,29 +682,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             runSpacing: 8,
             children: [
               if (_providesAttendance) _buildChip('Attendance', U.teal),
-              if (_requiresPayment) _buildChip('Paid', U.peach),
+              if (_requiresPayment) _buildChip('Paid: ${_feeAmountController.text}', U.peach),
               if (_providesCertificate) _buildChip('Certificate', U.primary),
             ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: U.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline_rounded, color: U.primary, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Your event will be submitted for admin approval before it goes live.',
-                    style: GoogleFonts.outfit(color: U.primary, fontSize: 12, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),

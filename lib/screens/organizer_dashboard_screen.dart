@@ -323,6 +323,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                     }
                   }),
                   _buildIconBtn(Icons.visibility_rounded, '${event.viewCount} views', null),
+                  _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event)),
                 ],
               ),
             ],
@@ -330,6 +331,30 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(EventModel event) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: U.surface,
+        title: Text('Delete Event', style: GoogleFonts.outfit(color: U.text)),
+        content: Text('Are you sure you want to delete "${event.title}"? This cannot be undone.', style: GoogleFonts.outfit(color: U.sub)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub))),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: Text('Delete', style: GoogleFonts.outfit(color: U.red))),
+        ],
+      ),
+    );
+
+    if (confirm == true && event.id != null) {
+      try {
+        await EventService.instance.deleteEvent(event.id!);
+        _loadData();
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   Widget _buildIconBtn(IconData icon, String tooltip, VoidCallback? onPressed) {

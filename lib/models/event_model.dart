@@ -95,6 +95,7 @@ class EventModel {
   // Flags
   final bool providesAttendance;
   final bool requiresPayment;
+  final String? feeAmount;
   final bool providesCertificate;
   final String? permissionLetterUrl;
 
@@ -139,6 +140,7 @@ class EventModel {
     this.participationLink,
     this.providesAttendance = false,
     this.requiresPayment = false,
+    this.feeAmount,
     this.providesCertificate = false,
     this.permissionLetterUrl,
     this.status = EventStatus.upcoming,
@@ -182,6 +184,7 @@ class EventModel {
       participationLink: map['participation_link'] as String?,
       providesAttendance: (map['provides_attendance'] as bool?) ?? false,
       requiresPayment: (map['requires_payment'] as bool?) ?? false,
+      feeAmount: map['fee_amount'] as String?,
       providesCertificate: (map['provides_certificate'] as bool?) ?? false,
       permissionLetterUrl: map['permission_letter_url'] as String?,
       status: EventStatus.fromString(map['status'] as String?),
@@ -227,6 +230,7 @@ class EventModel {
       'participation_link': participationLink,
       'provides_attendance': providesAttendance,
       'requires_payment': requiresPayment,
+      'fee_amount': feeAmount,
       'provides_certificate': providesCertificate,
       'permission_letter_url': permissionLetterUrl,
       'status': status.toDbString(),
@@ -264,6 +268,7 @@ class EventModel {
     String? participationLink,
     bool? providesAttendance,
     bool? requiresPayment,
+    String? feeAmount,
     bool? providesCertificate,
     String? permissionLetterUrl,
     EventStatus? status,
@@ -302,6 +307,7 @@ class EventModel {
       participationLink: participationLink ?? this.participationLink,
       providesAttendance: providesAttendance ?? this.providesAttendance,
       requiresPayment: requiresPayment ?? this.requiresPayment,
+      feeAmount: feeAmount ?? this.feeAmount,
       providesCertificate: providesCertificate ?? this.providesCertificate,
       permissionLetterUrl: permissionLetterUrl ?? this.permissionLetterUrl,
       status: status ?? this.status,
