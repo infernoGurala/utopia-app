@@ -69,3 +69,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/welcome_bg/one_light/
+    - assets/daily/
+    - assets/university/

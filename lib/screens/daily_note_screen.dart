@@ -8,7 +8,6 @@ import '../services/focus_supabase_service.dart';
 import 'heatmap_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class DailyNoteScreen extends StatefulWidget {
   const DailyNoteScreen({super.key});
   @override
@@ -19,16 +18,17 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   final _service = FocusSupabaseService();
   DateTime _selectedDate = DateTime.now();
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  bool _editMode = false;
+  
   bool _loading = true;
   bool _markDoneEnabled = true;
   FocusNote? _note;
-  String _content = '';
-  final _editController = TextEditingController();
-  final _scrollController = ScrollController();
+  FocusUserHabits? _userHabits;
   Set<String> _noteDates = {};
   final Set<String> _collapsedSections = {};
 
+  final _journalController = TextEditingController();
+  final _taskController = TextEditingController();
+  final _scrollController = ScrollController();
 
   String _dateStr(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -45,88 +45,88 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     await _service.initialize();
     final prefs = await SharedPreferences.getInstance();
     _markDoneEnabled = prefs.getBool('daily_note_mark_done') ?? true;
-    await _loadNote();
+    await _loadData();
     await _loadMonthDots();
   }
 
-  Future<void> _loadNote() async {
+  Future<void> _loadData() async {
     if (!mounted) return;
     setState(() => _loading = true);
     final dateStr = _dateStr(_selectedDate);
     final note = await _service.loadNote(dateStr);
+    final userHabits = await _service.getUserHabits();
+    
     if (!mounted) return;
     setState(() {
-      _note = note;
-      _content = note?.content ?? '';
-      _editController.text = _content;
+      _note = note ?? FocusNote(userId: _userId, date: dateStr);
+      _userHabits = userHabits ?? FocusUserHabits(userId: _userId);
+      _journalController.text = _note!.journal;
       _loading = false;
     });
   }
 
   Future<void> _loadMonthDots() async {
     final start = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
-    final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0); // last day
+    final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
     final dates = await _service.getNoteDates(_dateStr(start), _dateStr(end));
     if (mounted) setState(() => _noteDates = dates);
   }
 
-
-
   Future<void> _saveNote() async {
-    final userId = _userId;
-    if (userId.isEmpty) return;
-    final dateStr = _dateStr(_selectedDate);
-    final note = FocusNote(
-      id: _note?.id,
-      userId: userId,
-      date: dateStr,
-      content: _content,
+    if (_note == null || _userId.isEmpty) return;
+    
+    final updatedNote = _note!.copyWith(
+      journal: _journalController.text,
     );
-    await _service.saveNote(note);
-    await _loadNote();
-    await _loadMonthDots();
-  }
-
-  void _toggleEditMode() {
-    if (_editMode) {
-      // Switching to read mode — save
-      _content = _editController.text;
-      _saveNote();
-    } else {
-      _editController.text = _content;
-    }
-    setState(() => _editMode = !_editMode);
-  }
-
-  void _onCheckboxToggle(String line, bool? value) {
-    final lines = _content.split('\n');
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].trim() == line.trim()) {
-        if (value == true) {
-          lines[i] = lines[i].replaceFirst('- [ ]', '- [x]');
-        } else {
-          lines[i] = lines[i].replaceFirst('- [x]', '- [ ]');
-        }
-        break;
-      }
-    }
-    _content = lines.join('\n');
-    _saveNote();
-    setState(() {});
+    await _service.saveNote(updatedNote);
+    if (!mounted) return;
+    setState(() => _note = updatedNote);
+    _loadMonthDots();
   }
 
   void _selectDate(DateTime date) {
+    if (_note != null && _journalController.text != _note!.journal) {
+      _saveNote();
+    }
     setState(() => _selectedDate = date);
-    _loadNote();
+    _loadData();
   }
 
+  void _toggleHabit(String habit) {
+    if (_note == null) return;
+    final state = Map<String, bool>.from(_note!.habitsState);
+    state[habit] = !(state[habit] ?? false);
+    _note = _note!.copyWith(habitsState: state);
+    setState(() {});
+    _saveNote();
+  }
 
+  void _addTask(String label) {
+    if (_note == null || label.trim().isEmpty) return;
+    final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
+    tasks.add({'label': label.trim(), 'completed': false});
+    _note = _note!.copyWith(tasks: tasks);
+    _taskController.clear();
+    setState(() {});
+    _saveNote();
+  }
 
-  Future<void> _createFromTemplate() async {
-    final template = await _service.getTemplate();
-    _content = template;
-    _editController.text = _content;
-    setState(() => _editMode = true);
+  void _toggleTask(int index) {
+    if (_note == null) return;
+    final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
+    tasks[index]['completed'] = !(tasks[index]['completed'] == true);
+    _note = _note!.copyWith(tasks: tasks);
+    setState(() {});
+    _saveNote();
+  }
+
+  void _deleteTask(int index) {
+    if (_note == null) return;
+    final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
+    tasks.removeAt(index);
+    _note = _note!.copyWith(tasks: tasks);
+    setState(() {});
+    _saveNote();
   }
 
   void _showMenu() {
@@ -150,7 +150,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                 title: Text('Allow Mark Done', style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w500)),
                 subtitle: Text('Tap checkboxes to toggle completion', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
                 value: _markDoneEnabled,
-                activeColor: U.primary,
+                activeTrackColor: U.primary,
                 onChanged: (v) async {
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('daily_note_mark_done', v);
@@ -159,19 +159,14 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                 },
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),
-              _menuItem(Icons.edit_note_rounded, 'Edit Template', () {
+              _menuItem(Icons.loop_rounded, 'Edit Habits', () {
                 Navigator.pop(ctx);
-                _editTemplate();
+                _editHabits();
               }),
-              _menuItem(Icons.restart_alt_rounded, 'Reset Note to Template', () {
+              _menuItem(Icons.delete_outline_rounded, 'Delete Note', () {
                 Navigator.pop(ctx);
-                _resetCurrentNote();
-              }),
-              if (_note != null)
-                _menuItem(Icons.delete_outline_rounded, 'Delete Note', () {
-                  Navigator.pop(ctx);
-                  _confirmDeleteNote();
-                }, isDestructive: true),
+                _confirmDeleteNote();
+              }, isDestructive: true),
               const SizedBox(height: 16),
             ],
           ),
@@ -188,10 +183,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     );
   }
 
-  Future<void> _editTemplate() async {
-    final template = await _service.getTemplate();
-    final controller = TextEditingController(text: template);
-    if (!mounted) return;
+  Future<void> _editHabits() async {
+    final controller = TextEditingController(text: _userHabits?.habits.join('\n') ?? '');
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -207,19 +200,17 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Text('Edit Template', style: GoogleFonts.playfairDisplay(color: U.text, fontSize: 20, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
+                    Text('Edit Habits', style: GoogleFonts.playfairDisplay(color: U.text, fontSize: 20, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
                     const Spacer(),
-                    IconButton(
-                      icon: Icon(Icons.refresh_rounded, color: U.sub, size: 20),
-                      tooltip: 'Reset to Default',
-                      onPressed: () {
-                        controller.text = FocusSupabaseService.defaultTemplate;
-                      },
-                    ),
                     TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: Text('Save', style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600))),
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('Enter one habit per line.', style: GoogleFonts.outfit(color: U.dim, fontSize: 13)),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -237,29 +228,11 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
         ),
       ),
     );
-    if (result != null) {
-      await _service.saveTemplate(result);
-    }
-  }
-
-  Future<void> _resetCurrentNote() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: U.surface,
-        title: Text('Reset Note?', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
-        content: Text('This will replace the current note with your saved template.', style: GoogleFonts.outfit(color: U.sub)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Reset', style: GoogleFonts.outfit(color: U.red))),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      _content = await _service.getTemplate();
-      _editController.text = _content;
-      await _saveNote();
-      setState(() {});
+    if (result != null && _userHabits != null) {
+      final habits = result.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      final newConfig = _userHabits!.copyWith(habits: habits);
+      await _service.saveUserHabits(newConfig);
+      setState(() => _userHabits = newConfig);
     }
   }
 
@@ -278,71 +251,115 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     );
     if (confirmed == true) {
       await _service.deleteNote(_dateStr(_selectedDate));
-      await _loadNote();
+      await _loadData();
       await _loadMonthDots();
     }
   }
 
   @override
   void dispose() {
-    _editController.dispose();
+    if (_note != null && _journalController.text != _note!.journal) {
+      _saveNote();
+    }
+    _journalController.dispose();
+    _taskController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgImage = isDark ? 'assets/daily/dark.png' : 'assets/daily/light.png';
+
     return Scaffold(
       backgroundColor: U.bg,
       endDrawer: _buildCalendarDrawer(),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
+      body: Stack(
+        children: [
+          // Background Image (Top Half)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.6,
+            child: Opacity(
+              opacity: isDark ? 0.7 : 0.9,
+              child: Image.asset(
+                bgImage,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+          ),
+          // Gradient overlay for seamless blending
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.61,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    U.bg.withValues(alpha: 0.1),
+                    U.bg.withValues(alpha: 0.5),
+                    U.bg,
+                  ],
+                  stops: const [0.0, 0.6, 1.0],
+                ),
+              ),
+            ),
+          ),
+          
+          SafeArea(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
                 Expanded(child: _loading ? _buildLoading() : _buildNoteBody()),
               ],
             ),
-            // The Ribbon
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Builder(
-                builder: (ctx) => GestureDetector(
-                  onPanUpdate: (details) {
-                    if (details.delta.dx < -5) {
-                      Scaffold.of(ctx).openEndDrawer();
-                    }
-                  },
-                  onTap: () => Scaffold.of(ctx).openEndDrawer(),
-                  child: Container(
-                    width: 8,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.transparent, U.primary.withValues(alpha: 0.15)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
+          ),
+          // Slide bar to open calendar
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Builder(
+              builder: (ctx) => GestureDetector(
+                onPanUpdate: (details) {
+                  if (details.delta.dx < -5) {
+                    Scaffold.of(ctx).openEndDrawer();
+                  }
+                },
+                onTap: () => Scaffold.of(ctx).openEndDrawer(),
+                child: Container(
+                  width: 24,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.transparent, U.primary.withValues(alpha: 0.15)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                     ),
-                    child: Center(
-                      child: Container(
-                        width: 3,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: U.primary.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 6,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -373,19 +390,6 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               const SizedBox(width: 12),
               Text('Daily Note', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
               const Spacer(),
-              GestureDetector(
-                onTap: _toggleEditMode,
-                child: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: _editMode ? U.primary.withValues(alpha: 0.12) : U.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _editMode ? U.primary.withValues(alpha: 0.3) : U.border, width: 0.5),
-                  ),
-                  child: Icon(_editMode ? Icons.visibility_outlined : Icons.edit_outlined, color: _editMode ? U.primary : U.sub, size: 17),
-                ),
-              ),
-              const SizedBox(width: 8),
               Builder(
                 builder: (ctx) => GestureDetector(
                   onTap: () => Scaffold.of(ctx).openEndDrawer(),
@@ -511,47 +515,24 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                       final hasNote = _noteDates.contains(_dateStr(date));
                       
                       Color textColor = U.sub;
-                      if (isSelected) textColor = U.primary;
-                      else if (isToday) textColor = U.text;
-                      else if (date.isBefore(today) || isToday) textColor = const Color(0xFF88A0B0); // past days tint
+                      if (isSelected) {
+                        textColor = U.primary;
+                      } else if (isToday) {
+                        textColor = U.text;
+                      } else if (date.isBefore(today) || isToday) {
+                        textColor = const Color(0xFF88A0B0);
+                      }
 
                       return GestureDetector(
-                        onTap: () async {
+                        onTap: () {
                           Navigator.pop(context);
-                          if (hasNote) {
-                            _selectDate(date);
-                          } else {
-                            // Ask user if they want to create a note
-                            final create = await showDialog<bool>(
-                              context: this.context,
-                              builder: (ctx) => AlertDialog(
-                                backgroundColor: U.surface,
-                                title: Text('Create Note?', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
-                                content: Text(
-                                  'No note exists for ${date.day}/${date.month}/${date.year}. Create one from your template?',
-                                  style: GoogleFonts.outfit(color: U.sub),
-                                ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Just View', style: GoogleFonts.outfit(color: U.sub))),
-                                  TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Create', style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600))),
-                                ],
-                              ),
-                            );
-                            _selectDate(date);
-                            if (create == true) {
-                              final template = await _service.getTemplate();
-                              _content = template;
-                              _editController.text = _content;
-                              await _saveNote();
-                              setState(() {});
-                            }
-                          }
+                          _selectDate(date);
                         },
                         child: Container(
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white.withValues(alpha: 0.05) : Colors.transparent,
+                            color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
-                            border: isSelected ? Border.all(color: Colors.white.withValues(alpha: 0.1)) : null,
+                            border: isSelected ? Border.all(color: U.primary.withValues(alpha: 0.2)) : null,
                           ),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -566,9 +547,9 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Container(width: 4, height: 4, decoration: const BoxDecoration(color: Color(0xFF00B4D8), shape: BoxShape.circle)),
+                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary, shape: BoxShape.circle)),
                                     const SizedBox(width: 2),
-                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: const Color(0xFF00B4D8).withValues(alpha: 0.4), shape: BoxShape.circle)),
+                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary.withValues(alpha: 0.4), shape: BoxShape.circle)),
                                   ],
                                 )
                               else
@@ -593,136 +574,189 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   }
 
   Widget _buildNoteBody() {
-    if (_editMode) return _buildEditMode();
-    if (_content.isEmpty) return _buildEmptyState();
-    return _buildReadMode();
+    return ListView(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+      children: [
+        _buildHabitsCard(),
+        const SizedBox(height: 16),
+        _buildTasksCard(),
+        const SizedBox(height: 16),
+        _buildJournalCard(),
+      ],
+    );
   }
 
-  Widget _buildEditMode() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: TextField(
-        controller: _editController,
-        maxLines: null,
-        expands: true,
-        style: GoogleFonts.jetBrainsMono(color: U.text, fontSize: 14, height: 1.7),
-        decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+  Widget _buildHabitsCard() {
+    final title = 'Habits';
+    final isCollapsed = _collapsedSections.contains(title);
+    final accent = U.blue;
+    final icon = Icons.loop_rounded;
+
+    final habits = _userHabits?.habits ?? [];
+    if (habits.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: U.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: U.border, width: 0.5),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(icon, color: U.dim, size: 28),
+              const SizedBox(height: 8),
+              Text('No habits configured', style: GoogleFonts.outfit(color: U.dim)),
+              const SizedBox(height: 8),
+              TextButton(onPressed: _editHabits, child: Text('Setup Habits', style: GoogleFonts.outfit(color: accent))),
+            ],
+          ),
+        ),
+      );
+    }
+
+    int doneCount = 0;
+    for (final h in habits) {
+      if (_note?.habitsState[h] == true) doneCount++;
+    }
+
+    return _buildCardWrapper(
+      title: title,
+      icon: icon,
+      accent: accent,
+      isCollapsed: isCollapsed,
+      onToggle: () => setState(() {
+        isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
+      }),
+      subtitle: '$doneCount of ${habits.length} done',
+      progress: habits.isEmpty ? 0 : doneCount / habits.length,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final habit in habits)
+            _buildCheckItem(
+              label: habit,
+              checked: _note?.habitsState[habit] == true,
+              isTask: false,
+              onTap: () => _toggleHabit(habit),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: GestureDetector(
-        onTap: _createFromTemplate,
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(
-                  color: U.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(Icons.edit_note_rounded, color: U.primary, size: 32),
-              ),
-              const SizedBox(height: 20),
-              Text('No note yet', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Text('Tap to create from your template', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)),
-            ],
+  Widget _buildTasksCard() {
+    final title = 'Tasks';
+    final isCollapsed = _collapsedSections.contains(title);
+    final accent = U.teal;
+    final icon = Icons.checklist_rounded;
+
+    final tasks = _note?.tasks ?? [];
+    int doneCount = 0;
+    for (final t in tasks) {
+      if (t['completed'] == true) doneCount++;
+    }
+
+    return _buildCardWrapper(
+      title: title,
+      icon: icon,
+      accent: accent,
+      isCollapsed: isCollapsed,
+      onToggle: () => setState(() {
+        isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
+      }),
+      subtitle: tasks.isEmpty ? '0 tasks' : '$doneCount of ${tasks.length} done',
+      progress: tasks.isEmpty ? 0 : doneCount / tasks.length,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < tasks.length; i++)
+            _buildCheckItem(
+              label: tasks[i]['label'],
+              checked: tasks[i]['completed'] == true,
+              isTask: true,
+              onTap: () => _toggleTask(i),
+              onDelete: () => _deleteTask(i),
+            ),
+          const SizedBox(height: 8),
+          // Add Task Field
+          TextField(
+            controller: _taskController,
+            style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'Add a new task...',
+              hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 15),
+              border: InputBorder.none,
+              prefixIcon: Icon(Icons.add_rounded, color: U.dim, size: 20),
+            ),
+            onSubmitted: (val) => _addTask(val),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJournalCard() {
+    final title = 'Journal';
+    final isCollapsed = _collapsedSections.contains(title);
+    final accent = U.peach;
+    final icon = Icons.edit_rounded;
+
+    return _buildCardWrapper(
+      title: title,
+      icon: icon,
+      accent: accent,
+      isCollapsed: isCollapsed,
+      onToggle: () => setState(() {
+        isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
+      }),
+      child: Focus(
+        onFocusChange: (hasFocus) {
+          if (!hasFocus) _saveNote();
+        },
+        child: TextField(
+          controller: _journalController,
+          maxLines: null,
+          style: GoogleFonts.outfit(color: U.text, fontSize: 15, height: 1.6),
+          decoration: InputDecoration(
+            hintText: 'Write your thoughts...',
+            hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 15),
+            border: InputBorder.none,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildReadMode() {
-    final sectionData = _parseSectionsGrouped(_content);
-
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
-      children: [
-        for (final section in sectionData)
-          _buildSectionCard(section),
-      ],
-    );
-  }
-
-  List<Map<String, dynamic>> _parseSectionsGrouped(String content) {
-    final lines = content.split('\n');
-    final sections = <Map<String, dynamic>>[];
-    Map<String, dynamic>? current;
-
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.startsWith('## ')) {
-        if (current != null) sections.add(current);
-        current = {'title': trimmed.substring(3), 'items': <Map<String, dynamic>>[]};
-        continue;
-      }
-      if (current == null) continue;
-
-      final checkedMatch = RegExp(r'^- \[x\] (.+)$', caseSensitive: false).firstMatch(trimmed);
-      final uncheckedMatch = RegExp(r'^- \[ \] (.+)$').firstMatch(trimmed);
-
-      if (checkedMatch != null) {
-        (current['items'] as List).add({'type': 'check', 'label': checkedMatch.group(1)!.trim(), 'checked': true, 'raw': line});
-      } else if (uncheckedMatch != null) {
-        (current['items'] as List).add({'type': 'check', 'label': uncheckedMatch.group(1)!.trim(), 'checked': false, 'raw': line});
-      } else if (trimmed.isNotEmpty) {
-        (current['items'] as List).add({'type': 'text', 'text': trimmed});
-      }
-    }
-    if (current != null) sections.add(current);
-    return sections;
-  }
-
-  IconData _sectionIcon(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('habit')) return Icons.loop_rounded;
-    if (t.contains('task')) return Icons.checklist_rounded;
-    if (t.contains('journal')) return Icons.edit_rounded;
-    return Icons.notes_rounded;
-  }
-
-  Color _sectionAccent(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('habit')) return U.blue;
-    if (t.contains('task')) return U.teal;
-    if (t.contains('journal')) return U.peach;
-    return U.primary;
-  }
-
-  Widget _buildSectionCard(Map<String, dynamic> section) {
-    final title = section['title'] as String;
-    final items = section['items'] as List<Map<String, dynamic>>;
-    final isCollapsed = _collapsedSections.contains(title);
-    final accent = _sectionAccent(title);
-    final icon = _sectionIcon(title);
-
-    // Count completed for check items
-    final checkItems = items.where((i) => i['type'] == 'check').toList();
-    final doneCount = checkItems.where((i) => i['checked'] == true).length;
-    final hasChecks = checkItems.isNotEmpty;
-
+  Widget _buildCardWrapper({
+    required String title,
+    required IconData icon,
+    required Color accent,
+    required bool isCollapsed,
+    required VoidCallback onToggle,
+    required Widget child,
+    String? subtitle,
+    double? progress,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: U.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: U.border, width: 0.5),
+        color: U.card.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: U.border, width: 1.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          // Section header
           GestureDetector(
-            onTap: () => setState(() {
-              isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
-            }),
+            onTap: onToggle,
             behavior: HitTestBehavior.opaque,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
@@ -739,14 +773,15 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                   const SizedBox(width: 12),
                   Text(title, style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w600)),
                   const Spacer(),
-                  if (hasChecks) ...[
-                    Text('$doneCount of ${checkItems.length} done', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+                  if (subtitle != null) ...[
+                    Text(subtitle, style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
                     const SizedBox(width: 8),
-                    // Mini progress
+                  ],
+                  if (progress != null) ...[
                     SizedBox(
                       width: 20, height: 20,
                       child: CircularProgressIndicator(
-                        value: checkItems.isEmpty ? 0 : doneCount / checkItems.length,
+                        value: progress,
                         strokeWidth: 2.5,
                         backgroundColor: U.border,
                         color: accent,
@@ -759,37 +794,30 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               ),
             ),
           ),
-          // Items
           if (!isCollapsed)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final item in items)
-                    if (item['type'] == 'check')
-                      _buildCheckItem(item['label'], item['checked'], true, item['raw'])
-                    else
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: _buildMarkdownText(item['text']),
-                      ),
-                ],
-              ),
+              child: child,
             ),
         ],
       ),
     );
   }
 
-  Widget _buildCheckItem(String label, bool checked, bool isTask, String rawLine) {
+  Widget _buildCheckItem({
+    required String label,
+    required bool checked,
+    required bool isTask,
+    required VoidCallback onTap,
+    VoidCallback? onDelete,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: _markDoneEnabled ? () => _onCheckboxToggle(rawLine, !checked) : null,
+            onTap: _markDoneEnabled ? onTap : null,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 20, height: 20,
@@ -819,42 +847,17 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
             ),
           ),
           if (isTask)
+            GestureDetector(
+              onTap: onDelete,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Icon(Icons.close_rounded, color: U.dim.withValues(alpha: 0.5), size: 18),
+              ),
+            ),
+          if (isTask && onDelete == null)
             Icon(Icons.insights_rounded, color: U.dim.withValues(alpha: 0.5), size: 16),
         ],
       ),
     );
-  }
-
-  Widget _buildMarkdownText(String text) {
-    // Simple markdown rendering for journal section
-    TextStyle style = GoogleFonts.outfit(color: U.text, fontSize: 15, height: 1.6);
-
-    // Bold
-    if (text.contains('**')) {
-      return Text.rich(_parseInlineMarkdown(text), style: style);
-    }
-
-    return Text(text, style: style);
-  }
-
-  TextSpan _parseInlineMarkdown(String text) {
-    final spans = <InlineSpan>[];
-    final parts = text.split('**');
-    for (int i = 0; i < parts.length; i++) {
-      if (i.isOdd) {
-        spans.add(TextSpan(text: parts[i], style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: U.text)));
-      } else {
-        // Handle italic within non-bold parts
-        final italicParts = parts[i].split('_');
-        for (int j = 0; j < italicParts.length; j++) {
-          if (j.isOdd) {
-            spans.add(TextSpan(text: italicParts[j], style: GoogleFonts.outfit(fontStyle: FontStyle.italic, color: U.text)));
-          } else {
-            spans.add(TextSpan(text: italicParts[j]));
-          }
-        }
-      }
-    }
-    return TextSpan(children: spans);
   }
 }
