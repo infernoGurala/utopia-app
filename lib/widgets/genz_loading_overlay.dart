@@ -242,7 +242,10 @@ class _GenZLoadingOverlayState extends State<GenZLoadingOverlay>
                                 ),
                               ],
                             ),
-                            child: const UtopiaLoader(scale: 0.35),
+                            child: const UtopiaLoader(
+                              scale: 0.35,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
 

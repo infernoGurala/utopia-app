@@ -49,17 +49,16 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
 
   @override
   Widget build(BuildContext context) {
-    // mainSize corresponds to 4em in CSS
     final double mainSize = 40 * widget.scale;
-    final Color textColor = widget.color ?? U.text;
-    final Color shadowColor = textColor.withValues(alpha: 0.5);
+    final Color textColor = widget.color ?? U.primary;
+    final Color shadowColor = textColor.withValues(alpha: 0.4);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: mainSize * 1.825, // 7.3em / 4 = 1.825
-          height: mainSize * 0.25, // 1em / 4 = 0.25
+          width: mainSize * 1.825,
+          height: mainSize * 0.25,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -75,11 +74,10 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
             ],
           ),
         ),
-        const SizedBox(height: 2), // Small gap before line
-        // Line at the bottom
+        const SizedBox(height: 2), 
         Container(
-          height: mainSize * 0.0125, // 0.05em / 4 = 0.0125
-          width: mainSize * 0.125, // (mainSize / 2) / 4 = 0.125
+          height: mainSize * 0.0125, 
+          width: mainSize * 0.125, 
           decoration: BoxDecoration(
             color: textColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(mainSize * 0.0125),
@@ -88,11 +86,10 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
           child: AnimatedBuilder(
             animation: _wobbleAnimation,
             builder: (context, child) {
-              // translate -90% to 90%
               final double t = _wobbleAnimation.value;
               final double x = (t <= 0.5) 
-                  ? (-0.9 + (t * 2) * 1.8) // 0 to 0.5 -> -0.9 to 0.9
-                  : (0.9 - (t - 0.5) * 2 * 1.8); // 0.5 to 1 -> 0.9 to -0.9
+                  ? (-0.9 + (t * 2) * 1.8) 
+                  : (0.9 - (t - 0.5) * 2 * 1.8); 
               
               return FractionallySizedBox(
                 alignment: Alignment(x, 0),
@@ -123,7 +120,7 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
     final double marginLeft = marginLeftEm * (mainSize / 4);
 
     return Positioned(
-      left: (mainSize * 0.9125) + marginLeft - (mainSize * 0.5), // Center adjustment
+      left: (mainSize * 0.9125) + marginLeft - (mainSize * 0.5), 
       child: Opacity(
         opacity: opacity,
         child: ClipRect(
@@ -132,7 +129,6 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
             animation: _scrollAnimation,
             builder: (context, child) {
               final double scrollPos = _scrollAnimation.value;
-              // translateX(-100%) to (100%)
               final double offset = (scrollPos * 2 - 1) * mainSize * 0.5;
 
               return Transform.translate(
@@ -159,33 +155,36 @@ class _UtopiaLoaderState extends State<UtopiaLoader>
   }
 
   LinearGradient _getGradient(int index, Color text, Color shadow, double t) {
-    // Background size is 200%, position animates
-    // We simulate this by adjusting stops based on t
-    final List<Color> colors = [text, shadow];
-    double stop;
+    final double shift = -0.98 + (t * 2.0); 
+    double s1, s2;
+    bool invert = false;
 
-    // CSS gradients have specific stops for each slice
     switch (index) {
-      case 1: stop = 0.04; break;
-      case 2: stop = 0.09; break;
-      case 3: stop = 0.15; break;
-      case 4: stop = 0.20; break;
-      case 6: return LinearGradient(colors: [shadow, text], stops: [0.29 - (1-t), 0.32 - (1-t)], tileMode: TileMode.mirror);
-      case 7: return LinearGradient(colors: [shadow, text], stops: [0.34 - (1-t), 0.37 - (1-t)], tileMode: TileMode.mirror);
-      case 8: return LinearGradient(colors: [shadow, text], stops: [0.39 - (1-t), 0.42 - (1-t)], tileMode: TileMode.mirror);
-      case 9: return LinearGradient(colors: [shadow, text], stops: [0.45 - (1-t), 0.48 - (1-t)], tileMode: TileMode.mirror);
+      case 1: s1 = 0.04; s2 = 0.07; break;
+      case 2: s1 = 0.09; s2 = 0.13; break;
+      case 3: s1 = 0.15; s2 = 0.18; break;
+      case 4: s1 = 0.20; s2 = 0.23; break;
+      case 5: return LinearGradient(colors: [text, text]);
+      case 6: s1 = 0.29; s2 = 0.32; invert = true; break;
+      case 7: s1 = 0.34; s2 = 0.37; invert = true; break;
+      case 8: s1 = 0.39; s2 = 0.42; invert = true; break;
+      case 9: s1 = 0.45; s2 = 0.48; invert = true; break;
       default: return LinearGradient(colors: [text, text]);
     }
 
-    // Simulate shadow animation by shifting stops
-    // background-position: -98% to 102%
-    final double shift = (t * 2) - 1; // -1 to 1
+    final double p1 = (s1 + shift).clamp(0.0, 1.0);
+    final double p2 = (s2 + stopToOther(s1, s2) + shift).clamp(0.0, 1.0);
+
     return LinearGradient(
-      colors: colors,
-      stops: [stop + shift, stop + 0.03 + shift],
-      tileMode: TileMode.mirror,
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      colors: invert ? [shadow, text] : [text, shadow],
+      stops: [p1, p2],
+      tileMode: TileMode.clamp,
     );
   }
+
+  double stopToOther(double s1, double s2) => s2 - s1;
 }
 
 class _SliceClipper extends CustomClipper<Rect> {
