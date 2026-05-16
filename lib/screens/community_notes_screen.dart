@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../widgets/professional_loading.dart';
+import '../widgets/bouncing_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/supabase_global_service.dart';
@@ -1661,11 +1661,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 // ── Main content ──
                 Expanded(
                   child: _loading
-                      ? ProfessionalLoading(
-                          message:
-                              _kLoadingMessages[Random().nextInt(
-                                _kLoadingMessages.length,
-                              )],
+                      ? Center(
+                          child: BouncingLoader(
+                            color: U.primary,
+                          ),
                         )
                       : displayItems.isEmpty
                       ? Center(
@@ -2145,8 +2144,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   absorbing: true,
                   child: Container(
                     color: U.bg.withValues(alpha: 0.7),
-                    child: const ProfessionalLoading(
-                      message: 'Saving changes...',
+                    child: const Center(
+                      child: BouncingLoader(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),

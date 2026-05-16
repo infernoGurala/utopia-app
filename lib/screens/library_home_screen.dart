@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
+import '../widgets/bouncing_loader.dart';
 import '../services/class_service.dart';
 import '../services/supabase_global_service.dart';
 import 'class_detail_screen.dart';
@@ -312,7 +313,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 const SizedBox(height: 16),
                 Expanded(
               child: _isLoading && _classes.isEmpty
-                  ? Center(child: CircularProgressIndicator(color: U.primary))
+                  ? Center(child: BouncingLoader(color: U.primary))
                   : RefreshIndicator(
                       color: U.primary,
                       backgroundColor: U.surface,
@@ -695,21 +696,27 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           color: U.surface,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 20,
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 24,
               offset: const Offset(0, 10),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
               // Background Shapes
@@ -725,39 +732,52 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 right: topRightBracket ? 0 : null,
                 left: topRightBracket ? null : 0,
                 child: CustomPaint(
-                  size: const Size(44, 44),
+                  size: const Size(48, 48),
                   painter: _SolidTrianglePainter(color: color, topRight: topRightBracket),
                 ),
               ),
               if (showPin)
                 Positioned(
-                  top: 12,
-                  right: 12,
+                  top: 14,
+                  right: 14,
                   child: Icon(Icons.push_pin_rounded, size: 18, color: color.withValues(alpha: 0.6)),
                 ),
               // Content
               Padding(
-                padding: const EdgeInsets.all(18.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Circular Icon
                     Container(
-                      width: 52,
-                      height: 52,
+                      width: 54,
+                      height: 54,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: color.withValues(alpha: 0.08),
+                        color: U.surface,
+                        gradient: RadialGradient(
+                          colors: [
+                            Colors.white,
+                            color.withValues(alpha: 0.08),
+                          ]
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            blurRadius: 10,
+                            color: color.withValues(alpha: 0.15),
+                            blurRadius: 16,
                             spreadRadius: 2,
+                            offset: const Offset(0, 6),
+                          ),
+                          const BoxShadow(
+                            color: Colors.white,
+                            blurRadius: 12,
+                            spreadRadius: 4,
+                            offset: Offset(-4, -4),
                           ),
                         ],
                       ),
                       child: Center(
-                        child: Icon(icon, color: color, size: 26),
+                        child: Icon(icon, color: color, size: 28),
                       ),
                     ),
                     const Spacer(),
@@ -766,48 +786,48 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       title,
                       style: GoogleFonts.outfit(
                         color: U.text,
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.5,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     // Dash
                     Container(
-                      width: 18,
-                      height: 2.5,
+                      width: 24,
+                      height: 3,
                       decoration: BoxDecoration(
                         color: color,
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     // Description
                     Text(
                       description,
                       style: GoogleFonts.outfit(
                         color: U.dim,
-                        fontSize: 11,
-                        height: 1.4,
+                        fontSize: 10.5,
+                        height: 1.3,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     // Bottom Left Arrow
                     Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: U.surface,
+                        color: Colors.white,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: color.withValues(alpha: 0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
                           ),
                         ],
                       ),
@@ -1160,7 +1180,11 @@ class _SolidTrianglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = color
+      ..shader = LinearGradient(
+        colors: [color, color.withValues(alpha: 0.5)],
+        begin: topRight ? Alignment.topRight : Alignment.topLeft,
+        end: topRight ? Alignment.bottomLeft : Alignment.bottomRight,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
       ..style = PaintingStyle.fill;
 
     final path = Path();

@@ -1,8 +1,10 @@
 import 'dart:ui';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -293,7 +295,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                 child: CircleAvatar(
                                   backgroundColor: U.card,
                                   backgroundImage: _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty
-                                      ? NetworkImage(_userPhotoUrl!)
+                                      ? CachedNetworkImageProvider(_userPhotoUrl!)
                                       : null,
                                   child: _userPhotoUrl == null || _userPhotoUrl!.isEmpty
                                       ? Icon(Icons.person, color: U.dim, size: 24)

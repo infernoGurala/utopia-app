@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1314,7 +1316,7 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                               ),
                               backgroundImage:
                                   photoUrl != null && photoUrl.isNotEmpty
-                                  ? NetworkImage(photoUrl)
+                                  ? CachedNetworkImageProvider(photoUrl)
                                   : null,
                               child: photoUrl == null || photoUrl.isEmpty
                                   ? Text(

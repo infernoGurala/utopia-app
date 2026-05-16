@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -373,7 +374,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   backgroundImage:
                                       widget.photoUrl != null &&
                                           widget.photoUrl!.isNotEmpty
-                                      ? NetworkImage(widget.photoUrl!)
+                                      ? CachedNetworkImageProvider(widget.photoUrl!)
                                       : null,
                                   child:
                                       widget.photoUrl == null ||
@@ -612,7 +613,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   backgroundImage:
                                       widget.photoUrl != null &&
                                           widget.photoUrl!.isNotEmpty
-                                      ? NetworkImage(widget.photoUrl!)
+                                      ? CachedNetworkImageProvider(widget.photoUrl!)
                                       : null,
                                   child:
                                       widget.photoUrl == null ||
@@ -897,7 +898,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
       backgroundColor: _isMe ? U.primary.withValues(alpha: 0.18) : U.border,
       backgroundImage:
           widget.avatarPhotoUrl != null && widget.avatarPhotoUrl!.isNotEmpty
-          ? NetworkImage(widget.avatarPhotoUrl!)
+          ? CachedNetworkImageProvider(widget.avatarPhotoUrl!)
           : null,
       child: widget.avatarPhotoUrl == null || widget.avatarPhotoUrl!.isEmpty
           ? Text(

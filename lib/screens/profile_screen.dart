@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
@@ -320,7 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     alpha: 0.15,
                                   ),
                                   backgroundImage: user?.photoURL != null
-                                      ? NetworkImage(user!.photoURL!)
+                                      ? CachedNetworkImageProvider(user!.photoURL!)
                                       : null,
                                   child: user?.photoURL == null
                                       ? Text(

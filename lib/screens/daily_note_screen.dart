@@ -330,14 +330,15 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
             bottom: 0,
             child: Builder(
               builder: (ctx) => GestureDetector(
-                onPanUpdate: (details) {
-                  if (details.delta.dx < -5) {
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragUpdate: (details) {
+                  if (details.primaryDelta != null && details.primaryDelta! < -1) {
                     Scaffold.of(ctx).openEndDrawer();
                   }
                 },
                 onTap: () => Scaffold.of(ctx).openEndDrawer(),
                 child: Container(
-                  width: 24,
+                  width: 48,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.transparent, U.primary.withValues(alpha: 0.15)],
@@ -345,13 +346,22 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                       end: Alignment.centerRight,
                     ),
                   ),
-                  child: Center(
+                  child: Align(
+                    alignment: Alignment.centerRight,
                     child: Container(
-                      width: 6,
-                      height: 80,
+                      width: 10,
+                      height: 140,
+                      margin: const EdgeInsets.only(right: 2),
                       decoration: BoxDecoration(
-                        color: U.primary.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(4),
+                        color: U.primary.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: U.primary.withValues(alpha: 0.5),
+                            blurRadius: 12,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
                     ),
                   ),

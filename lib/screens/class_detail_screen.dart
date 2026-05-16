@@ -3,7 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-import '../widgets/professional_loading.dart';
+import '../widgets/bouncing_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -893,7 +893,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
             children: [
               Expanded(
                 child: _loading
-                ? ProfessionalLoading(message: 'Loading notes...')
+                ? Center(child: BouncingLoader(color: U.primary))
                 : _items.isEmpty
                 ? Center(
                     child: Text(

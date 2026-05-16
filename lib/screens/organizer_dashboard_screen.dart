@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
@@ -130,7 +131,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           CircleAvatar(
             radius: 32,
             backgroundColor: U.primary.withValues(alpha: 0.2),
-            backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+            backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
             child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 32) : null,
           ),
           const SizedBox(width: 16),

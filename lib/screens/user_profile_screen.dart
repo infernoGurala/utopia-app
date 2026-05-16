@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -143,7 +144,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                               ),
                                               body: Center(
                                                 child: InteractiveViewer(
-                                                  child: Image.network(photoUrl),
+                                                  child: CachedNetworkImage(imageUrl: photoUrl),
                                                 ),
                                               ),
                                             ),
@@ -157,7 +158,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                           U.primary.withValues(alpha: 0.15),
                                       backgroundImage:
                                           photoUrl != null && photoUrl.isNotEmpty
-                                              ? NetworkImage(photoUrl)
+                                              ? CachedNetworkImageProvider(photoUrl)
                                               : null,
                                       child: photoUrl == null || photoUrl.isEmpty
                                           ? Text(

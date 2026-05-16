@@ -9,6 +9,7 @@ import '../services/attendance_cache_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
+import '../widgets/speed_loader.dart';
 import '../services/attendance_server_preference.dart';
 import 'total_attendance_screen.dart';
 
@@ -867,20 +868,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: U.card,
-              border: Border.all(color: U.border),
-            ),
-            child: const Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-          ),
-          const SizedBox(height: 18),
+          SpeedLoader(color: U.text),
+          const SizedBox(height: 24),
           Text(
             'Fetching live attendance...',
             style: GoogleFonts.outfit(
@@ -1810,9 +1799,14 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
 
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         debugPrint('[DEBUG][Sheet] Loading... showing spinner');
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 28),
-                          child: Center(child: CircularProgressIndicator()),
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          child: Center(
+                            child: Transform.scale(
+                              scale: 0.6,
+                              child: SpeedLoader(color: U.primary),
+                            ),
+                          ),
                         );
                       }
 
