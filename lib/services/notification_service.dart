@@ -12,7 +12,6 @@ import 'package:utopia_app/firebase_options.dart';
 import 'package:utopia_app/main.dart';
 import 'package:utopia_app/services/platform_support.dart';
 import 'package:utopia_app/screens/chat_screen.dart';
-import 'package:utopia_app/screens/sciwordle_screen.dart';
 import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -138,10 +137,6 @@ class NotificationService {
           }
 
           if (type == 'morning_notification' && !U.morningNotifEnabled) {
-            return;
-          }
-
-          if (type == 'sci_wordle' && !U.sciWordleNotifEnabled) {
             return;
           }
 
@@ -429,14 +424,6 @@ class NotificationService {
         if (opened) {
           return;
         }
-      }
-      return;
-    }
-
-    if (type == 'sci_wordle') {
-      final navigator = navigatorKey.currentState;
-      if (navigator != null) {
-        unawaited(navigator.push(buildForwardRoute(const SciwordleScreen())));
       }
       return;
     }

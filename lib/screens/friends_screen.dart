@@ -8,10 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/chat_service.dart';
 import '../services/follow_service.dart';
-import '../services/game_champion_service.dart';
-import '../services/sciwordle_service.dart';
 import '../widgets/app_motion.dart';
-import '../widgets/game_champion_badge.dart';
 import 'chat_screen.dart';
 import 'follow_requests_screen.dart';
 import 'user_profile_screen.dart';
@@ -30,14 +27,12 @@ class _FriendsScreenState extends State<FriendsScreen>
     with SingleTickerProviderStateMixin {
   final ChatService _chatService = ChatService();
   final FollowService _followService = FollowService();
-  final SciwordleService _sciService = SciwordleService();
 
   late final TabController _tabController;
 
   StreamSubscription<Map<String, Map<String, dynamic>>>?
       _recentChatsSubscription;
   Map<String, Map<String, dynamic>> _recentChats = const {};
-  Map<String, int> _streaks = {};
 
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
@@ -54,20 +49,11 @@ class _FriendsScreenState extends State<FriendsScreen>
       if (!mounted) return;
       setState(() => _recentChats = value);
     });
-    _loadStreaks();
     _searchController.addListener(() {
       if (mounted) setState(() {});
     });
   }
 
-  Future<void> _loadStreaks() async {
-    final leaderboard = await _sciService.fetchLeaderboard();
-    final streakMap = <String, int>{};
-    for (final entry in leaderboard) {
-      streakMap[entry.uid] = entry.streak;
-    }
-    if (mounted) setState(() => _streaks = streakMap);
-  }
 
   @override
   void dispose() {
@@ -262,7 +248,6 @@ class _FriendsScreenState extends State<FriendsScreen>
                 chatService: _chatService,
                 followService: _followService,
                 recentChats: _recentChats,
-                streaks: _streaks,
                 query: _searchController.text.trim().toLowerCase(),
               ),
             ),
@@ -281,7 +266,6 @@ class _FollowingList extends StatelessWidget {
     required this.chatService,
     required this.followService,
     required this.recentChats,
-    required this.streaks,
     required this.query,
   });
 
@@ -289,19 +273,12 @@ class _FollowingList extends StatelessWidget {
   final ChatService chatService;
   final FollowService followService;
   final Map<String, Map<String, dynamic>> recentChats;
-  final Map<String, int> streaks;
   final String query;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Map<String, int>>(
-      stream: GameChampionService.topScoreRanksStream(),
-      builder: (context, scoreRanksSnap) {
-        return StreamBuilder<Map<String, int>>(
-          stream: GameChampionService.topStreakRanksStream(),
-          builder: (context, streakRanksSnap) {
-            // Get UIDs this user is following
-            return StreamBuilder<List<String>>(
+    // Get UIDs this user is following
+    return StreamBuilder<List<String>>(
               stream: followService.followingUidsStream(currentUid),
               builder: (context, followingSnap) {
                 if (followingSnap.connectionState ==
@@ -394,9 +371,6 @@ class _FollowingList extends StatelessWidget {
 
                         return _FriendRow(
                           user: user,
-                          scoreRank: scoreRanksSnap.data?[uid],
-                          streakRank: streakRanksSnap.data?[uid],
-                          streak: streaks[uid] ?? 0,
                           chatMeta: chatMeta,
                           currentUid: currentUid,
                           followService: followService,
@@ -422,10 +396,6 @@ class _FollowingList extends StatelessWidget {
                 );
               },
             );
-          },
-        );
-      },
-    );
   }
 }
 
@@ -434,9 +404,6 @@ class _FollowingList extends StatelessWidget {
 class _FriendRow extends StatelessWidget {
   const _FriendRow({
     required this.user,
-    this.scoreRank,
-    this.streakRank,
-    required this.streak,
     required this.chatMeta,
     required this.currentUid,
     required this.followService,
@@ -444,9 +411,6 @@ class _FriendRow extends StatelessWidget {
   });
 
   final Map<String, dynamic> user;
-  final int? scoreRank;
-  final int? streakRank;
-  final int streak;
   final Map<String, dynamic>? chatMeta;
   final String currentUid;
   final FollowService followService;
@@ -479,30 +443,25 @@ class _FriendRow extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                ChampionAvatarBadge(
-                  scoreRank: scoreRank,
-                  streakRank: streakRank,
-                  email: email,
-                  child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: U.primary.withValues(alpha: 0.16),
-                    backgroundImage:
-                        photoUrl != null && photoUrl.isNotEmpty
-                            ? NetworkImage(photoUrl)
-                            : null,
-                    child: photoUrl == null || photoUrl.isEmpty
-                        ? Text(
-                            displayName.isEmpty
-                                ? 'U'
-                                : displayName[0].toUpperCase(),
-                            style: GoogleFonts.outfit(
-                              color: U.primary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          )
-                        : null,
-                  ),
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: U.primary.withValues(alpha: 0.16),
+                  backgroundImage:
+                      photoUrl != null && photoUrl.isNotEmpty
+                          ? NetworkImage(photoUrl)
+                          : null,
+                  child: photoUrl == null || photoUrl.isEmpty
+                      ? Text(
+                          displayName.isEmpty
+                              ? 'U'
+                              : displayName[0].toUpperCase(),
+                          style: GoogleFonts.outfit(
+                            color: U.primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      : null,
                 ),
                 if (isOnline)
                   Positioned(
@@ -527,17 +486,25 @@ class _FriendRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ChampionNameText(
-                    name: displayName,
-                    scoreRank: scoreRank,
-                    streakRank: streakRank,
-                    email: email,
-                    isSuperUser: user['role'] == 'superuser',
-                    style: GoogleFonts.outfit(
-                      color: U.text,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (user['role'] == 'superuser') ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   lastMessageRaw.isNotEmpty
@@ -568,22 +535,6 @@ class _FriendRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (streak > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🔥', style: TextStyle(fontSize: 12)),
-                      const SizedBox(width: 2),
-                      Text(
-                        '$streak',
-                        style: GoogleFonts.outfit(
-                          color: const Color(0xFFF9E2AF),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
                 const SizedBox(height: 2),
                 Text(
                   isOnline ? 'Online' : _lastSeenLabel(lastSeen),

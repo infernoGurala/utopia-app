@@ -7,9 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
 import '../services/chat_service.dart';
-import '../services/game_champion_service.dart';
 import '../services/notification_service.dart';
-import '../widgets/game_champion_badge.dart';
 import '../widgets/app_motion.dart';
 import 'note_viewer_screen.dart';
 import 'user_profile_screen.dart';
@@ -324,43 +322,33 @@ class _ChatScreenState extends State<ChatScreen> {
         appBar: AppBar(
           backgroundColor: U.bg,
           titleSpacing: 0,
-          title: StreamBuilder<Map<String, int>>(
-            stream: GameChampionService.topScoreRanksStream(),
-            builder: (context, scoreRanksSnapshot) {
-              return StreamBuilder<Map<String, int>>(
-                stream: GameChampionService.topStreakRanksStream(),
-                builder: (context, streakRanksSnapshot) {
-                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                    stream: _chatStream,
-                    builder: (context, chatSnapshot) {
-                      return StreamBuilder<
-                        DocumentSnapshot<Map<String, dynamic>>
-                      >(
-                        stream: _otherUserStream,
-                        builder: (context, userSnapshot) {
-                          final chatData = chatSnapshot.data?.data();
-                          final userData = userSnapshot.data?.data();
-                          final isOtherTyping =
-                              (chatData?['typing_${widget.otherUserId}'] ??
-                                  false) ==
-                              true;
-                          final lastSeen = userData?['lastSeen'];
-                          final scoreRank =
-                              scoreRanksSnapshot.data?[widget.otherUserId];
-                          final streakRank =
-                              streakRanksSnapshot.data?[widget.otherUserId];
-                          final isOnline =
-                              lastSeen is Timestamp &&
-                              DateTime.now().difference(lastSeen.toDate()) <=
-                                  const Duration(minutes: 5);
-                          final subtitle = isOtherTyping
-                              ? 'typing...'
-                              : (isOnline
-                                    ? 'Online'
-                                    : _lastSeenLabel(
-                                        lastSeen,
-                                        fallback: widget.email,
-                                      ));
+          title: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _chatStream,
+            builder: (context, chatSnapshot) {
+              return StreamBuilder<
+                DocumentSnapshot<Map<String, dynamic>>
+              >(
+                stream: _otherUserStream,
+                builder: (context, userSnapshot) {
+                  final chatData = chatSnapshot.data?.data();
+                  final userData = userSnapshot.data?.data();
+                  final isOtherTyping =
+                      (chatData?['typing_${widget.otherUserId}'] ??
+                          false) ==
+                      true;
+                  final lastSeen = userData?['lastSeen'];
+                  final isOnline =
+                      lastSeen is Timestamp &&
+                      DateTime.now().difference(lastSeen.toDate()) <=
+                          const Duration(minutes: 5);
+                  final subtitle = isOtherTyping
+                      ? 'typing...'
+                      : (isOnline
+                            ? 'Online'
+                            : _lastSeenLabel(
+                                lastSeen,
+                                fallback: widget.email,
+                              ));
 
                           return GestureDetector(
                             onTap: () {
@@ -377,37 +365,31 @@ class _ChatScreenState extends State<ChatScreen> {
                             },
                             child: Row(
                               children: [
-                                ChampionAvatarBadge(
-                                  scoreRank: scoreRank,
-                                  streakRank: streakRank,
-                                  email: widget.email,
-                                  showGlow: false,
-                                  child: CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: U.primary.withValues(
-                                      alpha: 0.16,
-                                    ),
-                                    backgroundImage:
-                                        widget.photoUrl != null &&
-                                            widget.photoUrl!.isNotEmpty
-                                        ? NetworkImage(widget.photoUrl!)
-                                        : null,
-                                    child:
-                                        widget.photoUrl == null ||
-                                            widget.photoUrl!.isEmpty
-                                        ? Text(
-                                            widget.displayName.isEmpty
-                                                ? 'U'
-                                                : widget.displayName[0]
-                                                      .toUpperCase(),
-                                            style: GoogleFonts.outfit(
-                                              color: U.primary,
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          )
-                                        : null,
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: U.primary.withValues(
+                                    alpha: 0.16,
                                   ),
+                                  backgroundImage:
+                                      widget.photoUrl != null &&
+                                          widget.photoUrl!.isNotEmpty
+                                      ? NetworkImage(widget.photoUrl!)
+                                      : null,
+                                  child:
+                                      widget.photoUrl == null ||
+                                          widget.photoUrl!.isEmpty
+                                      ? Text(
+                                          widget.displayName.isEmpty
+                                              ? 'U'
+                                              : widget.displayName[0]
+                                                    .toUpperCase(),
+                                          style: GoogleFonts.outfit(
+                                            color: U.primary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -415,19 +397,25 @@ class _ChatScreenState extends State<ChatScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      ChampionNameText(
-                                        name: widget.displayName,
-                                        scoreRank: scoreRank,
-                                        streakRank: streakRank,
-                                        email: widget.email,
-                                        isSuperUser: userData?['role'] == 'superuser',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.outfit(
-                                          color: U.text,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              widget.displayName,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.outfit(
+                                                color: U.text,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          if (userData?['role'] == 'superuser') ...[
+                                            const SizedBox(width: 4),
+                                            Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                                          ],
+                                        ],
                                       ),
                                       Text(
                                         subtitle,
@@ -446,22 +434,18 @@ class _ChatScreenState extends State<ChatScreen> {
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
+                                ],
+                              ),
+                            );
                 },
               );
             },
           ),
         ),
         body: Column(
-            children: [
-              Expanded(
-                child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          children: [
+            Expanded(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: _messagesStream,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
