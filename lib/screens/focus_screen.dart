@@ -52,7 +52,7 @@ class _FocusScreenState extends State<FocusScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
               child: Text(
-                'Focus',
+                'Utopia',
                 style: GoogleFonts.playfairDisplay(
                   color: U.text,
                   fontSize: 32,

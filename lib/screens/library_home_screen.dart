@@ -203,7 +203,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                   Row(
                     children: [
                       Text(
-                        'Utopia',
+                        'Semesters',
                         style: GoogleFonts.playfairDisplay(
                           fontSize: 32,
                           fontWeight: FontWeight.w700,

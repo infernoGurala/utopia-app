@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
 import '../services/follow_service.dart';
@@ -551,6 +552,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: U.border.withValues(alpha: 0.5),
                       ),
 
+                      // Share This App
+                      _groupedTile(
+                        icon: Icons.share_outlined,
+                        label: 'Share This App',
+                        sub: 'Invite friends to join UTOPIA',
+                        color: U.primary,
+                        onTap: () {
+                          Share.share('Join me on UTOPIA! 🚀 The productivity platform.\n\nhttps://inferalis.space/download-utopia');
+                        },
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 0.5,
+                        color: U.border.withValues(alpha: 0.5),
+                      ),
                       // Report Bugs & Suggestions
                       _groupedTile(
                         icon: Icons.bug_report_outlined,

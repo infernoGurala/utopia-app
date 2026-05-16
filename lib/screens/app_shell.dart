@@ -23,7 +23,7 @@ class _AppShellState extends State<AppShell> {
   late final PageController _pageController;
 
   final List<Widget?> _screens = [
-    const LibraryHomeScreen(),
+    const FocusScreen(),
     null,
     null,
     null,
@@ -33,10 +33,10 @@ class _AppShellState extends State<AppShell> {
     if (_screens[index] == null) {
       switch (index) {
         case 1:
-          _screens[index] = const UniversityScreen();
+          _screens[index] = const LibraryHomeScreen();
           break;
         case 2:
-          _screens[index] = const FocusScreen();
+          _screens[index] = const UniversityScreen();
           break;
         case 3:
           _screens[index] = const ProfileScreen();
@@ -138,7 +138,7 @@ class _AppShellState extends State<AppShell> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                               ),
                               onPressed: () {
-                                Share.share('Join me on UTOPIA! 🚀 The best app for our university.\n\nhttps://inferalis.space/download-utopia');
+                                Share.share('Join me on UTOPIA! 🚀 The productivity platform.\n\nhttps://inferalis.space/download-utopia');
                                 Navigator.pop(context);
                               },
                               child: Text('Share App', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
@@ -335,24 +335,24 @@ class _AppShellState extends State<AppShell> {
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
                                 _NavItem(
-                                  icon: Icons.auto_stories_outlined,
-                                  activeIcon: Icons.auto_stories_rounded,
+                                  icon: Icons.local_fire_department_outlined,
+                                  activeIcon: Icons.local_fire_department_rounded,
                                   isActive: _index == 0,
                                   accent: accent,
                                   isDark: isDark,
                                   onTap: () => _setIndex(0),
                                 ),
                                 _NavItem(
-                                  icon: Icons.school_outlined,
-                                  activeIcon: Icons.school_rounded,
+                                  icon: Icons.auto_stories_outlined,
+                                  activeIcon: Icons.auto_stories_rounded,
                                   isActive: _index == 1,
                                   accent: accent,
                                   isDark: isDark,
                                   onTap: () => _setIndex(1),
                                 ),
                                 _NavItem(
-                                  icon: Icons.local_fire_department_outlined,
-                                  activeIcon: Icons.local_fire_department_rounded,
+                                  icon: Icons.school_outlined,
+                                  activeIcon: Icons.school_rounded,
                                   isActive: _index == 2,
                                   accent: accent,
                                   isDark: isDark,

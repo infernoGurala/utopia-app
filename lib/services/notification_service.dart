@@ -10,7 +10,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:utopia_app/firebase_options.dart';
 import 'package:utopia_app/main.dart';
-import 'package:utopia_app/services/chat_emoji_catalog.dart';
 import 'package:utopia_app/services/platform_support.dart';
 import 'package:utopia_app/screens/chat_screen.dart';
 import 'package:utopia_app/screens/sciwordle_screen.dart';
@@ -323,7 +322,7 @@ class NotificationService {
       return;
     }
 
-    final previewBody = ChatEmojiCatalog.notificationPreviewText(body);
+    final previewBody = body;
     final message = switch ((title.trim().isNotEmpty, body.trim().isNotEmpty)) {
       (true, true) => '$title: $previewBody',
       (true, false) => title,

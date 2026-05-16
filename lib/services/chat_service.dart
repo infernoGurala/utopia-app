@@ -4,8 +4,6 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
-import 'chat_emoji_catalog.dart';
-
 class ChatService {
   static final ChatService _instance = ChatService._internal();
   factory ChatService() => _instance;
@@ -190,7 +188,7 @@ class ChatService {
     final chatRef = _firestore.collection('chats').doc(chatId);
     final messageRef = chatRef.collection('messages').doc();
     final sentAt = Timestamp.now();
-    final previewText = ChatEmojiCatalog.notificationPreviewText(trimmed);
+    final previewText = trimmed;
 
     try {
       final batch = _firestore.batch();
@@ -439,7 +437,7 @@ class ChatService {
 
     final latestTimestamp = latest['timestamp'];
     final rawText = (latest['text'] ?? '').toString();
-    final previewText = ChatEmojiCatalog.notificationPreviewText(rawText);
+    final previewText = rawText;
 
     await chatRef.set({
       'lastMessageRaw': rawText,

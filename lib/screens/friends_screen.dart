@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
-import '../services/chat_emoji_catalog.dart';
 import '../services/chat_service.dart';
 import '../services/follow_service.dart';
 import '../services/game_champion_service.dart';
@@ -542,11 +541,9 @@ class _FriendRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   lastMessageRaw.isNotEmpty
-                      ? ChatEmojiCatalog.buildInlinePreview(
+                      ? Text(
                           lastMessageRaw,
-                          fontSize: 12,
-                          textColor: U.sub,
-                          emojiSize: 16,
+                          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         )
