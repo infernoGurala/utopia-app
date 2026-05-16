@@ -67,3 +67,5 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/welcome_bg/one_light/morning.png
