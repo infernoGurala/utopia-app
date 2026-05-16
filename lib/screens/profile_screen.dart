@@ -13,9 +13,7 @@ import '../main.dart';
 import '../services/cache_service.dart';
 import '../services/follow_service.dart';
 import '../services/platform_support.dart';
-import '../widgets/game_champion_badge.dart';
 import '../services/role_service.dart';
-import '../services/game_champion_service.dart';
 import 'developer_panel_screen.dart';
 import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
@@ -272,19 +270,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     .fadeIn(duration: 500.ms, curve: Curves.easeOut)
                     .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                 const SizedBox(height: 32),
-                StreamBuilder<Map<String, int>>(
-                  stream: GameChampionService.topScoreRanksStream(),
-                  builder: (context, scoreRanksSnapshot) {
-                    return StreamBuilder<Map<String, int>>(
-                      stream: GameChampionService.topStreakRanksStream(),
-                      builder: (context, streakRanksSnapshot) {
-                        final uid = user?.uid;
-                        final scoreRank = uid != null
-                            ? (scoreRanksSnapshot.data?[uid])
-                            : null;
-                        final streakRank = uid != null
-                            ? (streakRanksSnapshot.data?[uid])
-                            : null;
+                Builder(
+                  builder: (context) {
                         return Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -327,30 +314,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                   );
                                 },
-                                child: ChampionAvatarBadge(
-                                  scoreRank: scoreRank,
-                                  streakRank: streakRank,
-                                  email: user?.email,
-                                  child: CircleAvatar(
-                                    radius: 28,
-                                    backgroundColor: U.primary.withValues(
-                                      alpha: 0.15,
-                                    ),
-                                    backgroundImage: user?.photoURL != null
-                                        ? NetworkImage(user!.photoURL!)
-                                        : null,
-                                    child: user?.photoURL == null
-                                        ? Text(
-                                            (user?.displayName ?? 'U')[0]
-                                                .toUpperCase(),
-                                            style: GoogleFonts.outfit(
-                                              color: U.primary,
-                                              fontSize: 22,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          )
-                                        : null,
+                                child: CircleAvatar(
+                                  radius: 28,
+                                  backgroundColor: U.primary.withValues(
+                                    alpha: 0.15,
                                   ),
+                                  backgroundImage: user?.photoURL != null
+                                      ? NetworkImage(user!.photoURL!)
+                                      : null,
+                                  child: user?.photoURL == null
+                                      ? Text(
+                                          (user?.displayName ?? 'U')[0]
+                                              .toUpperCase(),
+                                          style: GoogleFonts.outfit(
+                                            color: U.primary,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -359,17 +341,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    ChampionNameText(
-                                      name: user?.displayName ?? 'Student',
-                                      scoreRank: scoreRank,
-                                      streakRank: streakRank,
-                                      email: user?.email,
-                                      isSuperUser: _isSuperUser,
-                                      style: GoogleFonts.outfit(
-                                        color: U.text,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            user?.displayName ?? 'Student',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.outfit(
+                                              color: U.text,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        if (_isSuperUser) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -455,10 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         );
                       },
-                    );
-
-                  },
-                ),
+                    ),
                 const SizedBox(height: 24),
                 Container(
                   decoration: BoxDecoration(

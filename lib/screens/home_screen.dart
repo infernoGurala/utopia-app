@@ -13,7 +13,7 @@ import '../services/supabase_notes_service.dart';
 import '../services/role_service.dart';
 import '../widgets/app_motion.dart';
 import 'editor_screen.dart';
-import 'sciwordle_screen.dart';
+
 import 'note_viewer_screen.dart';
 import 'search_screen.dart';
 import 'timetable_screen.dart';
@@ -470,7 +470,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           if (_isSuperUser) const SizedBox(height: 8),
-          _SciWordleFAB(),
         ],
       ),
       body: SafeArea(
@@ -780,40 +779,6 @@ class _HeaderAction extends StatelessWidget {
   }
 }
 
-class _SciWordleFAB extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [U.primary, U.primary.withValues(alpha: 0.85)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: U.primary.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SciwordleScreen()),
-          ),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: Colors.white,
-              size: 26,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _LibrarySkeleton extends StatelessWidget {
   const _LibrarySkeleton();

@@ -7,20 +7,18 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
 import '../services/follow_service.dart';
-import '../services/game_champion_service.dart';
 import '../widgets/app_motion.dart';
-import '../widgets/game_champion_badge.dart';
 import 'user_profile_screen.dart';
 
-class EveryoneScreen extends StatefulWidget {
-  const EveryoneScreen({super.key, this.universityId});
+class PeopleScreen extends StatefulWidget {
+  const PeopleScreen({super.key, this.universityId});
   final String? universityId;
 
   @override
-  State<EveryoneScreen> createState() => _EveryoneScreenState();
+  State<PeopleScreen> createState() => _PeopleScreenState();
 }
 
-class _EveryoneScreenState extends State<EveryoneScreen> {
+class _PeopleScreenState extends State<PeopleScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
 
@@ -193,20 +191,13 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
 
             // ── List ────────────────────────────────────────────────────────
             Expanded(
-              child: StreamBuilder<Map<String, int>>(
-                stream: GameChampionService.topScoreRanksStream(),
-                builder: (context, scoreRanksSnap) {
-                  return StreamBuilder<Map<String, int>>(
-                    stream: GameChampionService.topStreakRanksStream(),
-                    builder: (context, streakRanksSnap) {
-                      return StreamBuilder<
-                          QuerySnapshot<Map<String, dynamic>>>(
-                        stream: _buildStream(),
-                        builder: (context, snap) {
-                          if (snap.connectionState ==
-                              ConnectionState.waiting) {
-                            return const _LoadingSkeleton();
-                          }
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _buildStream(),
+                builder: (context, snap) {
+                  if (snap.connectionState ==
+                      ConnectionState.waiting) {
+                    return const _LoadingSkeleton();
+                  }
                           if (snap.hasError) {
                             debugPrint('EVERYONE SCREEN ERROR: ${snap.error}');
                             return _Empty(
@@ -263,13 +254,9 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
                             itemBuilder: (context, index) {
                               final user = users[index];
                               final uid = user['uid'].toString();
-                              return _EveryoneRow(
+                              return _PeopleRow(
                                 user: user,
                                 currentUid: _currentUid,
-                                scoreRank:
-                                    scoreRanksSnap.data?[uid],
-                                streakRank:
-                                    streakRanksSnap.data?[uid],
                                 onTap: () {
                                   Navigator.of(context).push(
                                     buildForwardRoute(
@@ -289,10 +276,6 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
                               );
                             },
                           );
-                        },
-                      );
-                    },
-                  );
                 },
               ),
             ),
@@ -303,28 +286,24 @@ class _EveryoneScreenState extends State<EveryoneScreen> {
   }
 }
 
-// ─── Everyone Row ─────────────────────────────────────────────────────────────
+// ─── People Row ─────────────────────────────────────────────────────────────
 
-class _EveryoneRow extends StatefulWidget {
-  const _EveryoneRow({
+class _PeopleRow extends StatefulWidget {
+  const _PeopleRow({
     required this.user,
     required this.currentUid,
-    this.scoreRank,
-    this.streakRank,
     required this.onTap,
   });
 
   final Map<String, dynamic> user;
   final String currentUid;
-  final int? scoreRank;
-  final int? streakRank;
   final VoidCallback onTap;
 
   @override
-  State<_EveryoneRow> createState() => _EveryoneRowState();
+  State<_PeopleRow> createState() => _PeopleRowState();
 }
 
-class _EveryoneRowState extends State<_EveryoneRow> {
+class _PeopleRowState extends State<_PeopleRow> {
   final FollowService _followService = FollowService();
   bool _loading = false;
 
@@ -356,30 +335,25 @@ class _EveryoneRowState extends State<_EveryoneRow> {
         child: Row(
           children: [
             // Avatar
-            ChampionAvatarBadge(
-              scoreRank: widget.scoreRank,
-              streakRank: widget.streakRank,
-              email: email,
-              child: CircleAvatar(
-                radius: 22,
-                backgroundColor: U.primary.withValues(alpha: 0.16),
-                backgroundImage:
-                    photoUrl != null && photoUrl.isNotEmpty
-                        ? NetworkImage(photoUrl)
-                        : null,
-                child: photoUrl == null || photoUrl.isEmpty
-                    ? Text(
-                        displayName.isEmpty
-                            ? 'U'
-                            : displayName[0].toUpperCase(),
-                        style: GoogleFonts.outfit(
-                          color: U.primary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    : null,
-              ),
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: U.primary.withValues(alpha: 0.16),
+              backgroundImage:
+                  photoUrl != null && photoUrl.isNotEmpty
+                      ? NetworkImage(photoUrl)
+                      : null,
+              child: photoUrl == null || photoUrl.isEmpty
+                  ? Text(
+                      displayName.isEmpty
+                          ? 'U'
+                          : displayName[0].toUpperCase(),
+                      style: GoogleFonts.outfit(
+                        color: U.primary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 14),
 
@@ -388,17 +362,25 @@ class _EveryoneRowState extends State<_EveryoneRow> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ChampionNameText(
-                    name: displayName,
-                    scoreRank: widget.scoreRank,
-                    streakRank: widget.streakRank,
-                    email: email,
-                    isSuperUser: widget.user['role'] == 'superuser',
-                    style: GoogleFonts.outfit(
-                      color: U.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (widget.user['role'] == 'superuser') ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                      ],
+                    ],
                   ),
                   if (bio.isNotEmpty)
                     Text(

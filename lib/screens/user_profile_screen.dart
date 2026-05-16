@@ -7,9 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
 import '../services/follow_service.dart';
-import '../services/game_champion_service.dart';
 import '../widgets/app_motion.dart';
-import '../widgets/game_champion_badge.dart';
 import 'chat_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -95,17 +93,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           final university =
               (userData['selectedUniversityId'] ?? '').toString();
 
-          return StreamBuilder<Map<String, int>>(
-            stream: GameChampionService.topScoreRanksStream(),
-            builder: (context, scoreRanksSnap) {
-              return StreamBuilder<Map<String, int>>(
-                stream: GameChampionService.topStreakRanksStream(),
-                builder: (context, streakRanksSnap) {
-                  final scoreRank = scoreRanksSnap.data?[widget.uid];
-                  final streakRank = streakRanksSnap.data?[widget.uid];
-
-                  return CustomScrollView(
-                    slivers: [
+          return CustomScrollView(
+            slivers: [
                       // ── App bar ──────────────────────────────────────────
                       SliverAppBar(
                         backgroundColor: U.bg,
@@ -162,31 +151,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         );
                                       }
                                     },
-                                    child: ChampionAvatarBadge(
-                                      scoreRank: scoreRank,
-                                      streakRank: streakRank,
-                                      email: widget.email,
-                                      child: CircleAvatar(
-                                        radius: 44,
-                                        backgroundColor:
-                                            U.primary.withValues(alpha: 0.15),
-                                        backgroundImage:
-                                            photoUrl != null && photoUrl.isNotEmpty
-                                                ? NetworkImage(photoUrl)
-                                                : null,
-                                        child: photoUrl == null || photoUrl.isEmpty
-                                            ? Text(
-                                                displayName.isEmpty
-                                                    ? 'U'
-                                                    : displayName[0].toUpperCase(),
-                                                style: GoogleFonts.outfit(
-                                                  color: U.primary,
-                                                  fontSize: 32,
-                                                  fontWeight: FontWeight.w700,
-                                                ),
-                                              )
-                                            : null,
-                                      ),
+                                    child: CircleAvatar(
+                                      radius: 44,
+                                      backgroundColor:
+                                          U.primary.withValues(alpha: 0.15),
+                                      backgroundImage:
+                                          photoUrl != null && photoUrl.isNotEmpty
+                                              ? NetworkImage(photoUrl)
+                                              : null,
+                                      child: photoUrl == null || photoUrl.isEmpty
+                                          ? Text(
+                                              displayName.isEmpty
+                                                  ? 'U'
+                                                  : displayName[0].toUpperCase(),
+                                              style: GoogleFonts.outfit(
+                                                color: U.primary,
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                   ),
                                   const SizedBox(width: 24),
@@ -230,18 +214,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ChampionNameText(
-                                    name: displayName,
-                                    scoreRank: scoreRank,
-                                    streakRank: streakRank,
-                                    email: widget.email,
-                                    isSuperUser:
-                                        userData['role'] == 'superuser',
-                                    style: GoogleFonts.outfit(
-                                      color: U.text,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          displayName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.outfit(
+                                            color: U.text,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      if (userData['role'] == 'superuser') ...[
+                                        const SizedBox(width: 4),
+                                        Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                                      ],
+                                    ],
                                   ),
                                   if (university.isNotEmpty) ...[
                                     const SizedBox(height: 2),
@@ -371,10 +362,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       ),
                     ],
                   );
-                },
-              );
-            },
-          );
         },
       ),
     );

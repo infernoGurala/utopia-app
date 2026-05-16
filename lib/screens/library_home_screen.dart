@@ -14,7 +14,6 @@ import '../services/supabase_global_service.dart';
 import 'class_detail_screen.dart';
 import 'class_settings_screen.dart';
 import 'community_notes_screen.dart';
-import 'sciwordle_screen.dart';
 import 'timetable_screen.dart';
 
 class LibraryHomeScreen extends StatefulWidget {
@@ -189,75 +188,129 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       backgroundColor: U.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+      body: Stack(
+        children: [
+          // Background Image
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.45,
+            child: Opacity(
+              opacity: isDark ? 0.3 : 0.6,
+              child: Image.asset(
+                'assets/semesters/background.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
+          ),
+          // Gradient fade for background
+          Positioned(
+            top: MediaQuery.sizeOf(context).height * 0.2,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.25,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    U.bg.withValues(alpha: 0.0),
+                    U.bg,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Semesters',
-                        style: GoogleFonts.playfairDisplay(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: U.text,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -1,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Semesters',
+                              style: GoogleFonts.playfairDisplay(
+                                color: U.text,
+                                fontSize: 42,
+                                fontWeight: FontWeight.w700,
+                                fontStyle: FontStyle.normal,
+                                letterSpacing: -1,
+                              ),
+                            ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Access your academic resources',
+                              style: GoogleFonts.outfit(color: U.dim, fontSize: 14, fontWeight: FontWeight.w400),
+                            ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      AnimatedOpacity(
-                        opacity: (_isLoading || _isSyncing) ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 400),
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: SizedBox(
-                            width: 50,
-                            child: LinearProgressIndicator(
-                              backgroundColor: U.border,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                U.primary,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedOpacity(
+                            opacity: (_isLoading || _isSyncing) ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 400),
+                            child: SizedBox(
+                              width: 30,
+                              child: LinearProgressIndicator(
+                                backgroundColor: U.border,
+                                valueColor: AlwaysStoppedAnimation<Color>(U.primary),
+                                minHeight: 2,
+                                borderRadius: BorderRadius.circular(2),
                               ),
-                              minHeight: 2,
-                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: Icon(Icons.calendar_month_rounded, color: U.text, size: 22),
-                        tooltip: 'Timetable',
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                          );
-                        },
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
+                          const SizedBox(width: 8),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: U.surface,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              icon: Icon(Icons.calendar_month_rounded, color: U.text, size: 20),
+                              tooltip: 'Timetable',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                                );
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ).animate().fadeIn(delay: 200.ms, duration: 500.ms).scale(curve: Curves.easeOutBack),
+                        ],
                       ),
                     ],
                   ),
-                  Text(
-                    'Access your academic resources',
-                    style: GoogleFonts.outfit(color: U.dim, fontSize: 13),
-                  ),
-                ],
-              )
-                  .animate()
-                  .fadeIn(duration: 500.ms, curve: Curves.easeOut)
-                  .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
-            ),
-            const SizedBox(height: 24),
-            Expanded(
+                ),
+                const SizedBox(height: 16),
+                Expanded(
               child: _isLoading && _classes.isEmpty
                   ? Center(child: CircularProgressIndicator(color: U.primary))
                   : RefreshIndicator(
@@ -269,13 +322,10 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                         padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
-                        childAspectRatio: 1.0,
+                        childAspectRatio: 0.75,
                         children: <Widget>[
                           // ── Community Notes (Design A) ──
                           _buildCommunityTile(context),
-
-                          // ── SciWordle (Design I) ──
-                          _buildSciWordleTile(context),
 
                           // ── User classes (pinned first) ──
                           ...(() {
@@ -309,15 +359,23 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           ],
         ),
       ),
+      ],
+      ),
     );
   }
 
   // ──────────────────────────────────────────────────────────────────
-  // Community Notes — Design A "Centered Ring"
+  // Community Notes
   // ──────────────────────────────────────────────────────────────────
   Widget _buildCommunityTile(BuildContext context) {
-    final accent = U.teal;
-    return InkWell(
+    return _buildModernCard(
+      context: context,
+      title: 'COMMUNITY',
+      description: 'Connect, collaborate\nand grow together',
+      icon: Icons.people_alt_rounded,
+      color: U.blue,
+      topRightBracket: true,
+      backgroundShape: Icon(Icons.bubble_chart, size: 100, color: U.blue.withValues(alpha: 0.04)),
       onTap: () {
         Navigator.push(
           context,
@@ -328,153 +386,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              U.surface,
-              Color.lerp(U.surface, U.bg, 0.65)!,
-            ],
-          ),
-          border: Border.all(color: U.border.withValues(alpha: 0.6), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(17),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -10, bottom: -10,
-                child: Icon(Icons.groups_rounded, size: 75, color: accent.withValues(alpha: 0.05)),
-              ),
-              Positioned(
-                top: 0, left: 20, right: 20,
-                child: Container(
-                  height: 2,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(2),
-                    gradient: LinearGradient(colors: [
-                      accent.withValues(alpha: 0.0),
-                      accent.withValues(alpha: 0.45),
-                      accent.withValues(alpha: 0.0),
-                    ]),
-                  ),
-                ),
-              ),
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: accent.withValues(alpha: 0.08),
-                          border: Border.all(color: accent.withValues(alpha: 0.22), width: 1),
-                        ),
-                        child: Icon(Icons.groups_rounded, color: accent, size: 26),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'COMMUNITY',
-                        style: GoogleFonts.outfit(
-                          color: U.text, fontSize: 11.5,
-                          letterSpacing: 1.8, fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ──────────────────────────────────────────────────────────────────
-  // SciWordle — Design I "Radial Glow"
-  // ──────────────────────────────────────────────────────────────────
-  Widget _buildSciWordleTile(BuildContext context) {
-    final accent = U.primary;
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SciwordleScreen()),
-        );
-      },
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: Color.lerp(U.bg, U.surface, 0.3),
-          border: Border.all(color: U.border.withValues(alpha: 0.4), width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
-              blurRadius: 12,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(17),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Center(
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          accent.withValues(alpha: 0.12),
-                          accent.withValues(alpha: 0.03),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bolt_rounded, color: accent, size: 32),
-                    const SizedBox(height: 14),
-                    Text(
-                      'SCIWORDLE',
-                      style: GoogleFonts.outfit(
-                        color: U.text, fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -482,96 +393,32 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   // Class card — Design K "Corner Bracket"
   // ──────────────────────────────────────────────────────────────────
   Widget _buildClassTile(BuildContext context, ClassModel c) {
-    final accent = U.peach;
     final isPinned = _pinnedClassIds.contains(c.classId);
-    return InkWell(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ClassDetailScreen(
-              classModel: c,
-              universityFolderName: _universityId,
-            ),
-          ),
-        );
-        if (mounted) {
-          _loadData(forceRefresh: true);
-        }
-      },
+    return GestureDetector(
       onLongPress: () => _showClassLongPressMenu(c),
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: U.surface,
-          border: Border.all(
-            color: isPinned
-                ? U.primary.withValues(alpha: 0.35)
-                : U.border.withValues(alpha: 0.45),
-            width: isPinned ? 1.2 : 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: _buildModernCard(
+        context: context,
+        title: c.name.toUpperCase(),
+        description: 'Explore notes, PYQs\nand study material',
+        icon: Icons.menu_book_rounded,
+        color: U.peach,
+        topRightBracket: false,
+        backgroundShape: Icon(Icons.settings, size: 110, color: U.peach.withValues(alpha: 0.05)),
+        showPin: isPinned,
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ClassDetailScreen(
+                classModel: c,
+                universityFolderName: _universityId,
+              ),
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(17),
-          child: CustomPaint(
-            painter: _CornerBracketPainter(accent.withValues(alpha: 0.4)),
-            child: Stack(
-              children: [
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.menu_book_rounded, color: accent, size: 30),
-                      const SizedBox(height: 12),
-                      Text(
-                        c.name.toUpperCase(),
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          color: U.text, fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.8,
-                        ),
-                      ),
-                      if (_ownerNames[c.creatorUid] != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          _ownerNames[c.creatorUid]!,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            color: U.sub,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                // Pin indicator
-                if (isPinned)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Icon(
-                      Icons.push_pin_rounded,
-                      size: 14,
-                      color: U.primary.withValues(alpha: 0.55),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
+          );
+          if (mounted) {
+            _loadData(forceRefresh: true);
+          }
+        },
       ),
     );
   }
@@ -823,27 +670,150 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
+    return _buildModernCard(
+      context: context,
+      title: label,
+      description: 'Create a new class\nand get started',
+      icon: Icons.add_circle_outline,
+      color: U.teal,
+      topRightBracket: false,
+      backgroundShape: Icon(Icons.layers, size: 110, color: U.teal.withValues(alpha: 0.05)),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildModernCard({
+    required BuildContext context,
+    required String title,
+    required String description,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    required bool topRightBracket,
+    Widget? backgroundShape,
+    bool showPin = false,
+  }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           color: U.surface,
-          border: Border.all(color: U.border.withValues(alpha: 0.35), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
             children: [
-              Icon(icon, color: U.sub, size: 28),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                style: GoogleFonts.outfit(
-                  color: U.sub, fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
+              // Background Shapes
+              if (backgroundShape != null)
+                Positioned(
+                  right: -25,
+                  bottom: -25,
+                  child: backgroundShape,
+                ),
+              // Corner Bracket
+              Positioned(
+                top: 0,
+                right: topRightBracket ? 0 : null,
+                left: topRightBracket ? null : 0,
+                child: CustomPaint(
+                  size: const Size(44, 44),
+                  painter: _SolidTrianglePainter(color: color, topRight: topRightBracket),
+                ),
+              ),
+              if (showPin)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Icon(Icons.push_pin_rounded, size: 18, color: color.withValues(alpha: 0.6)),
+                ),
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(18.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Circular Icon
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color.withValues(alpha: 0.08),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Icon(icon, color: color, size: 26),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Title
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        color: U.text,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    // Dash
+                    Container(
+                      width: 18,
+                      height: 2.5,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Description
+                    Text(
+                      description,
+                      style: GoogleFonts.outfit(
+                        color: U.dim,
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    // Bottom Left Arrow
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: U.surface,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(Icons.arrow_forward_rounded, color: color, size: 16),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1181,30 +1151,36 @@ class UpperCaseTextFormatter extends TextInputFormatter {
 
 
 
-class _CornerBracketPainter extends CustomPainter {
-  _CornerBracketPainter(this.color);
+class _SolidTrianglePainter extends CustomPainter {
   final Color color;
+  final bool topRight;
+
+  _SolidTrianglePainter({required this.color, required this.topRight});
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
+      ..style = PaintingStyle.fill;
 
-    const len = 22.0;
-    const inset = 14.0;
+    final path = Path();
+    if (topRight) {
+      path.moveTo(0, 0);
+      path.lineTo(size.width, 0);
+      path.lineTo(size.width, size.height);
+      path.close();
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(size.width, 0);
+      path.lineTo(0, size.height);
+      path.close();
+    }
 
-    // Top-left bracket
-    canvas.drawLine(const Offset(inset, inset), const Offset(inset + len, inset), paint);
-    canvas.drawLine(const Offset(inset, inset), const Offset(inset, inset + len), paint);
-
-    // Bottom-right bracket
-    canvas.drawLine(Offset(size.width - inset, size.height - inset), Offset(size.width - inset - len, size.height - inset), paint);
-    canvas.drawLine(Offset(size.width - inset, size.height - inset), Offset(size.width - inset, size.height - inset - len), paint);
+    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SolidTrianglePainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.topRight != topRight;
+  }
 }

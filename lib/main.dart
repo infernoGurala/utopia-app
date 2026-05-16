@@ -419,8 +419,6 @@ final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
 
 
 final ValueNotifier<bool> morningNotifEnabledNotifier = ValueNotifier<bool>(true);
-final ValueNotifier<bool> sciWordleNotifEnabledNotifier = ValueNotifier<bool>(true);
-
 final ValueNotifier<int> appLoadingCounter = ValueNotifier<int>(0);
 
 void _applySystemUiForTheme(AppTheme theme) {
@@ -592,10 +590,6 @@ Future<void> _loadAppToggleSettings() async {
   if (cachedMorning != null) {
     morningNotifEnabledNotifier.value = cachedMorning == 'true';
   }
-  final cachedWordle = await CacheService().getAppSetting('sci_wordle_notif_enabled');
-  if (cachedWordle != null) {
-    sciWordleNotifEnabledNotifier.value = cachedWordle == 'true';
-  }
 }
 
 void main() async {
@@ -654,8 +648,6 @@ class U {
 
 
   static bool get morningNotifEnabled => morningNotifEnabledNotifier.value;
-  static bool get sciWordleNotifEnabled => sciWordleNotifEnabledNotifier.value;
-
   static AppTheme themeForKey(String? key) {
     for (final theme in appThemes) {
       if (theme.key == key) {

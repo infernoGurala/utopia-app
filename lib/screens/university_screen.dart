@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
 import 'attendance_screen.dart';
-import 'everyone_screen.dart';
+import 'people_screen.dart';
 import 'friends_screen.dart';
 import 'map_screen.dart';
 import 'uni_chat_screen.dart';
@@ -128,22 +128,6 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           ],
                         ),
                       ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: U.surface,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Icon(Icons.search_rounded, color: U.text, size: 20),
-                      ).animate().fadeIn(delay: 200.ms, duration: 500.ms).scale(curve: Curves.easeOutBack),
                     ],
                   ),
                 ),
@@ -199,7 +183,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           ),
                         ),
                         _UniversityCard(
-                          title: 'Everyone',
+                          title: 'People',
                           subtitle: 'Explore the\ncampus community',
                           icon: Icons.public_outlined,
                           color: U.blue,
@@ -207,7 +191,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EveryoneScreen(
+                              builder: (_) => PeopleScreen(
                                 universityId: _universityId.isNotEmpty
                                     ? _universityId
                                     : null,
