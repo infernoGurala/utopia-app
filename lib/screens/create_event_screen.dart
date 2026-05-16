@@ -1,7 +1,14 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main.dart';
+import '../models/event_model.dart';
+import '../services/event_service.dart';
+import '../services/cloudinary_service.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -12,41 +19,264 @@ class CreateEventScreen extends StatefulWidget {
 
 class _CreateEventScreenState extends State<CreateEventScreen> {
   int _currentStep = 0;
+  bool _isPublishing = false;
 
+  // Step 1 — Basic Info
   final _titleController = TextEditingController();
-  final _categoryController = TextEditingController(text: 'Tech');
-  final _dateController = TextEditingController();
-  final _timeController = TextEditingController();
+  final _shortDescController = TextEditingController();
+  final _conductedByController = TextEditingController();
+  String _selectedCategory = 'Tech';
+  File? _bannerImage;
+  File? _posterImage;
+
+  // Step 2 — Scheduling
   final _venueController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _participantLimitController = TextEditingController();
+  DateTime _selectedDate = DateTime.now().add(const Duration(days: 7));
+  TimeOfDay _startTime = const TimeOfDay(hour: 10, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 17, minute: 0);
+  DateTime? _registrationDeadline;
+
+  // Step 3 — Details
+  final _fullDescController = TextEditingController();
+  final _requirementsController = TextEditingController();
+  final _prizeInfoController = TextEditingController();
   final _contactController = TextEditingController();
   final _whatsappController = TextEditingController();
-  final _conductedByController = TextEditingController();
-  
+  final _participationLinkController = TextEditingController();
+  final _tagsController = TextEditingController();
+
+  // Step 4 — Flags
   bool _providesAttendance = false;
   bool _requiresPayment = false;
   bool _providesCertificate = false;
+  File? _permissionLetter;
+
+  static const _categories = [
+    'Tech', 'Sports', 'Workshops', 'Clubs', 'Cultural',
+    'Gaming', 'Music', 'Startup', 'Hackathons', 'AI', 'Robotics', 'Competitions',
+  ];
+
+  final _picker = ImagePicker();
 
   @override
   void dispose() {
     _titleController.dispose();
-    _categoryController.dispose();
-    _dateController.dispose();
-    _timeController.dispose();
+    _shortDescController.dispose();
+    _conductedByController.dispose();
     _venueController.dispose();
-    _descriptionController.dispose();
+    _participantLimitController.dispose();
+    _fullDescController.dispose();
+    _requirementsController.dispose();
+    _prizeInfoController.dispose();
     _contactController.dispose();
     _whatsappController.dispose();
-    _conductedByController.dispose();
+    _participationLinkController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickImage({required bool isBanner}) async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked != null) {
+      setState(() {
+        if (isBanner) {
+          _bannerImage = File(picked.path);
+        } else {
+          _posterImage = File(picked.path);
+        }
+      });
+    }
+  }
+
+  Future<void> _pickPermissionLetter() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (picked != null) {
+      setState(() => _permissionLetter = File(picked.path));
+    }
+  }
+
+  Future<void> _selectDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (date != null) {
+      setState(() => _selectedDate = date);
+    }
+  }
+
+  Future<void> _selectTime({required bool isStart}) async {
+    final time = await showTimePicker(
+      context: context,
+      initialTime: isStart ? _startTime : _endTime,
+    );
+    if (time != null) {
+      setState(() {
+        if (isStart) {
+          _startTime = time;
+        } else {
+          _endTime = time;
+        }
+      });
+    }
+  }
+
+  Future<void> _selectDeadline() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _registrationDeadline ?? _selectedDate.subtract(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: _selectedDate,
+    );
+    if (date != null) {
+      setState(() => _registrationDeadline = date);
+    }
+  }
+
+  String _formatTimeOfDay(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, '0');
+    final p = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$h:$m $p';
+  }
+
+  String _formatDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+
+  Future<void> _publishEvent() async {
+    if (_titleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please enter an event title', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
+
+    setState(() => _isPublishing = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Not signed in');
+      }
+
+      // Upload images to Cloudinary
+      String? bannerUrl;
+      String? posterUrl;
+      String? permissionUrl;
+
+      if (_bannerImage != null) {
+        bannerUrl = await CloudinaryService.instance.uploadImage(
+          _bannerImage!,
+          folder: 'events/banners',
+        );
+      }
+      if (_posterImage != null) {
+        posterUrl = await CloudinaryService.instance.uploadImage(
+          _posterImage!,
+          folder: 'events/posters',
+        );
+      }
+      if (_permissionLetter != null) {
+        permissionUrl = await CloudinaryService.instance.uploadImage(
+          _permissionLetter!,
+          folder: 'events/permissions',
+        );
+      }
+
+      // Get university ID
+      String? universityId;
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        universityId = userDoc.data()?['selectedUniversityId'] as String?;
+      } catch (_) {}
+
+      // Parse tags
+      final tags = _tagsController.text
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+
+      final event = EventModel(
+        title: _titleController.text.trim(),
+        shortDescription: _shortDescController.text.trim(),
+        fullDescription: _fullDescController.text.trim(),
+        category: _selectedCategory,
+        tags: tags,
+        bannerUrl: bannerUrl,
+        posterUrl: posterUrl,
+        date: _selectedDate,
+        startTime: _formatTimeOfDay(_startTime),
+        endTime: _formatTimeOfDay(_endTime),
+        venue: _venueController.text.trim(),
+        participantLimit: int.tryParse(_participantLimitController.text) ?? 0,
+        registrationDeadline: _registrationDeadline,
+        organizerUid: user.uid,
+        organizerName: user.displayName ?? 'Organizer',
+        conductedBy: _conductedByController.text.trim(),
+        contactNumbers: _contactController.text.trim(),
+        whatsappLink: _whatsappController.text.trim().isEmpty ? null : _whatsappController.text.trim(),
+        participationLink: _participationLinkController.text.trim().isEmpty ? null : _participationLinkController.text.trim(),
+        providesAttendance: _providesAttendance,
+        requiresPayment: _requiresPayment,
+        providesCertificate: _providesCertificate,
+        permissionLetterUrl: permissionUrl,
+        status: EventStatus.upcoming,
+        isApproved: false, // Needs admin approval
+        universityId: universityId,
+        prizeInfo: _prizeInfoController.text.trim().isEmpty ? null : _prizeInfoController.text.trim(),
+        requirements: _requirementsController.text.trim().isEmpty ? null : _requirementsController.text.trim(),
+      );
+
+      final eventId = await EventService.instance.createEvent(event);
+
+      if (mounted) {
+        if (eventId != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Event submitted for approval!', style: GoogleFonts.outfit()),
+              backgroundColor: U.teal,
+            ),
+          );
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to create event. Please try again.', style: GoogleFonts.outfit()),
+              backgroundColor: U.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.outfit()),
+            backgroundColor: U.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isPublishing = false);
+      }
+    }
+  }
+
   void _onStepContinue() {
-    if (_currentStep < 3) {
+    if (_currentStep < 4) {
       setState(() => _currentStep += 1);
     } else {
-      // Publish event
-      Navigator.pop(context);
+      _publishEvent();
     }
   }
 
@@ -71,88 +301,99 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ),
         title: Text(
           'Upload Event',
-          style: GoogleFonts.outfit(
-            color: U.text,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
+          style: GoogleFonts.outfit(color: U.text, fontSize: 20, fontWeight: FontWeight.w600),
         ),
       ),
-      body: Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: U.primary,
-            onSurface: U.text,
-          ).copyWith(
-            primary: U.primary,
-            secondary: U.teal,
-          ),
-        ),
-        child: Stepper(
-          currentStep: _currentStep,
-          onStepContinue: _onStepContinue,
-          onStepCancel: _onStepCancel,
-          onStepTapped: (index) => setState(() => _currentStep = index),
-          elevation: 0,
-          type: StepperType.vertical,
-          controlsBuilder: (context, details) {
-            final isLastStep = _currentStep == 3;
-            return Padding(
-              padding: const EdgeInsets.only(top: 24),
-              child: Row(
+      body: _isPublishing
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: details.onStepContinue,
-                      child: Text(isLastStep ? 'Publish Event' : 'Continue'),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  if (_currentStep > 0)
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: details.onStepCancel,
-                        child: const Text('Back'),
-                      ),
-                    ),
+                  CircularProgressIndicator(color: U.primary),
+                  const SizedBox(height: 16),
+                  Text('Publishing event...', style: GoogleFonts.outfit(color: U.sub, fontSize: 16)),
                 ],
               ),
-            );
-          },
-          steps: [
-            Step(
-              title: Text('Basic Info', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
-              subtitle: Text('Poster, title, category', style: GoogleFonts.outfit(color: U.sub)),
-              content: _buildBasicInfoStep(),
-              isActive: _currentStep >= 0,
-              state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+            )
+          : Theme(
+              data: Theme.of(context).copyWith(
+                colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: U.primary,
+                  secondary: U.teal,
+                ),
+              ),
+              child: Stepper(
+                currentStep: _currentStep,
+                onStepContinue: _onStepContinue,
+                onStepCancel: _onStepCancel,
+                onStepTapped: (index) => setState(() => _currentStep = index),
+                elevation: 0,
+                type: StepperType.vertical,
+                controlsBuilder: (context, details) {
+                  final isLastStep = _currentStep == 4;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: details.onStepContinue,
+                            child: Text(isLastStep ? 'Publish Event' : 'Continue'),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        if (_currentStep > 0)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: details.onStepCancel,
+                              child: const Text('Back'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+                steps: [
+                  Step(
+                    title: Text('Basic Info', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
+                    subtitle: Text('Banner, title, category', style: GoogleFonts.outfit(color: U.sub)),
+                    content: _buildStep1(),
+                    isActive: _currentStep >= 0,
+                    state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+                  ),
+                  Step(
+                    title: Text('Scheduling', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
+                    subtitle: Text('Date, time, venue', style: GoogleFonts.outfit(color: U.sub)),
+                    content: _buildStep2(),
+                    isActive: _currentStep >= 1,
+                    state: _currentStep > 1 ? StepState.complete : StepState.indexed,
+                  ),
+                  Step(
+                    title: Text('Details', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
+                    subtitle: Text('Description, contact', style: GoogleFonts.outfit(color: U.sub)),
+                    content: _buildStep3(),
+                    isActive: _currentStep >= 2,
+                    state: _currentStep > 2 ? StepState.complete : StepState.indexed,
+                  ),
+                  Step(
+                    title: Text('Options', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
+                    subtitle: Text('Attendance, payment, certificate', style: GoogleFonts.outfit(color: U.sub)),
+                    content: _buildStep4(),
+                    isActive: _currentStep >= 3,
+                    state: _currentStep > 3 ? StepState.complete : StepState.indexed,
+                  ),
+                  Step(
+                    title: Text('Preview', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
+                    content: _buildStep5Preview(),
+                    isActive: _currentStep >= 4,
+                  ),
+                ],
+              ),
             ),
-            Step(
-              title: Text('Scheduling', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
-              subtitle: Text('Date, time, venue', style: GoogleFonts.outfit(color: U.sub)),
-              content: _buildSchedulingStep(),
-              isActive: _currentStep >= 1,
-              state: _currentStep > 1 ? StepState.complete : StepState.indexed,
-            ),
-            Step(
-              title: Text('Details', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
-              subtitle: Text('Description, flags', style: GoogleFonts.outfit(color: U.sub)),
-              content: _buildDetailsStep(),
-              isActive: _currentStep >= 2,
-              state: _currentStep > 2 ? StepState.complete : StepState.indexed,
-            ),
-            Step(
-              title: Text('Preview', style: GoogleFonts.outfit(fontSize: 18, color: U.text)),
-              content: _buildPreviewStep(),
-              isActive: _currentStep >= 3,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, IconData? icon}) {
+  Widget _buildField(String label, TextEditingController controller, {int maxLines = 1, IconData? icon, String? hint}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
@@ -162,97 +403,202 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         decoration: InputDecoration(
           labelText: label,
           labelStyle: GoogleFonts.outfit(color: U.sub),
+          hintText: hint,
+          hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 13),
           prefixIcon: icon != null ? Icon(icon, color: U.dim) : null,
         ),
       ),
     );
   }
 
-  Widget _buildBasicInfoStep() {
+  Widget _buildImagePicker(String label, File? file, VoidCallback onTap, IconData icon) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: file != null ? 160 : 100,
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: U.border, style: BorderStyle.solid),
+          image: file != null
+              ? DecorationImage(image: FileImage(file), fit: BoxFit.cover)
+              : null,
+        ),
+        child: file == null
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: U.primary, size: 32),
+                  const SizedBox(height: 8),
+                  Text(label, style: GoogleFonts.outfit(color: U.text)),
+                ],
+              )
+            : Align(
+                alignment: Alignment.topRight,
+                child: Container(
+                  margin: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.edit_rounded, color: Colors.white, size: 16),
+                ),
+              ),
+      ),
+    );
+  }
+
+  // ── Step 1: Basic Info ──
+  Widget _buildStep1() {
     return Column(
       children: [
-        Container(
-          height: 120,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: U.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: U.border, style: BorderStyle.solid),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add_photo_alternate_outlined, color: U.primary, size: 32),
-              const SizedBox(height: 8),
-              Text('Upload Banner Image', style: GoogleFonts.outfit(color: U.text)),
-            ],
+        _buildImagePicker('Upload Banner Image', _bannerImage, () => _pickImage(isBanner: true), Icons.add_photo_alternate_outlined),
+        _buildImagePicker('Upload Poster', _posterImage, () => _pickImage(isBanner: false), Icons.image_outlined),
+        _buildField('Event Title', _titleController, icon: Icons.title_rounded),
+        _buildField('Short Description', _shortDescController, maxLines: 2, hint: 'Brief one-liner about your event'),
+        // Category Dropdown
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: DropdownButtonFormField<String>(
+            value: _selectedCategory,
+            decoration: InputDecoration(
+              labelText: 'Category',
+              labelStyle: GoogleFonts.outfit(color: U.sub),
+              prefixIcon: Icon(Icons.category_rounded, color: U.dim),
+            ),
+            style: GoogleFonts.outfit(color: U.text),
+            dropdownColor: U.surface,
+            items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+            onChanged: (v) => setState(() => _selectedCategory = v ?? 'Tech'),
           ),
         ),
-        const SizedBox(height: 16),
-        _buildTextField('Event Title', _titleController),
-        _buildTextField('Category (e.g. Tech, Sports)', _categoryController),
-        _buildTextField('Conducted By (Organizer)', _conductedByController, icon: Icons.group_rounded),
-        const SizedBox(height: 8),
-        Container(
-          height: 80,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: U.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: U.border, style: BorderStyle.solid),
+        _buildField('Conducted By (Organizer)', _conductedByController, icon: Icons.group_rounded),
+      ],
+    ).animate().fadeIn();
+  }
+
+  // ── Step 2: Scheduling ──
+  Widget _buildStep2() {
+    return Column(
+      children: [
+        // Date
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: U.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.calendar_today_rounded, color: U.primary),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.upload_file_rounded, color: U.teal),
-              const SizedBox(width: 8),
-              Text('Upload Permission Letter', style: GoogleFonts.outfit(color: U.text)),
-            ],
+          title: Text('Event Date', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+          subtitle: Text(_formatDate(_selectedDate), style: GoogleFonts.outfit(color: U.sub)),
+          trailing: Icon(Icons.chevron_right_rounded, color: U.dim),
+          onTap: _selectDate,
+        ),
+        const SizedBox(height: 12),
+        // Start Time
+        Row(
+          children: [
+            Expanded(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.access_time_rounded, color: U.teal),
+                title: Text('Start', style: GoogleFonts.outfit(color: U.text, fontSize: 14)),
+                subtitle: Text(_formatTimeOfDay(_startTime), style: GoogleFonts.outfit(color: U.sub)),
+                onTap: () => _selectTime(isStart: true),
+              ),
+            ),
+            Expanded(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.access_time_filled_rounded, color: U.peach),
+                title: Text('End', style: GoogleFonts.outfit(color: U.text, fontSize: 14)),
+                subtitle: Text(_formatTimeOfDay(_endTime), style: GoogleFonts.outfit(color: U.sub)),
+                onTap: () => _selectTime(isStart: false),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildField('Venue', _venueController, icon: Icons.location_on_rounded),
+        _buildField('Participant Limit (0 = unlimited)', _participantLimitController, icon: Icons.people_rounded),
+        // Registration Deadline
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(Icons.event_busy_rounded, color: U.red),
+          title: Text('Registration Deadline', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+          subtitle: Text(
+            _registrationDeadline != null ? _formatDate(_registrationDeadline!) : 'Not set (open until event)',
+            style: GoogleFonts.outfit(color: U.sub),
           ),
+          trailing: Icon(Icons.chevron_right_rounded, color: U.dim),
+          onTap: _selectDeadline,
         ),
       ],
     ).animate().fadeIn();
   }
 
-  Widget _buildSchedulingStep() {
+  // ── Step 3: Details ──
+  Widget _buildStep3() {
     return Column(
       children: [
-        _buildTextField('Date (e.g. May 20, 2026)', _dateController, icon: Icons.calendar_today_rounded),
-        _buildTextField('Time (e.g. 10:00 AM)', _timeController, icon: Icons.access_time_rounded),
-        _buildTextField('Venue', _venueController, icon: Icons.location_on_rounded),
+        _buildField('Full Description', _fullDescController, maxLines: 5, hint: 'Detailed info about your event...'),
+        _buildField('Requirements', _requirementsController, maxLines: 2, icon: Icons.checklist_rounded, hint: 'e.g. Laptop, Student ID'),
+        _buildField('Prize Information', _prizeInfoController, maxLines: 2, icon: Icons.emoji_events_rounded, hint: 'e.g. ₹10,000 prize pool'),
+        _buildField('Contact Numbers', _contactController, icon: Icons.phone_rounded),
+        _buildField('WhatsApp Group Link', _whatsappController, icon: Icons.link_rounded),
+        _buildField('Participation Link', _participationLinkController, icon: Icons.open_in_new_rounded, hint: 'External registration link'),
+        _buildField('Tags (comma separated)', _tagsController, icon: Icons.tag_rounded, hint: 'e.g. coding, web, flutter'),
       ],
     ).animate().fadeIn();
   }
 
-  Widget _buildDetailsStep() {
+  // ── Step 4: Options ──
+  Widget _buildStep4() {
     return Column(
       children: [
-        _buildTextField('Description', _descriptionController, maxLines: 4),
-        _buildTextField('Contact Numbers', _contactController, icon: Icons.phone_rounded),
-        _buildTextField('WhatsApp Group Link', _whatsappController, icon: Icons.link_rounded),
         SwitchListTile(
           title: Text('Provides Attendance', style: GoogleFonts.outfit(color: U.text)),
+          subtitle: Text('Attendees can log attendance', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
           value: _providesAttendance,
-          activeColor: U.primary,
+          activeThumbColor: U.primary,
+          activeTrackColor: U.primary.withValues(alpha: 0.3),
           onChanged: (v) => setState(() => _providesAttendance = v),
         ),
         SwitchListTile(
-          title: Text('Requires Payment Fee', style: GoogleFonts.outfit(color: U.text)),
+          title: Text('Requires Payment', style: GoogleFonts.outfit(color: U.text)),
+          subtitle: Text('Entry fee for the event', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
           value: _requiresPayment,
-          activeColor: U.primary,
+          activeThumbColor: U.primary,
+          activeTrackColor: U.primary.withValues(alpha: 0.3),
           onChanged: (v) => setState(() => _requiresPayment = v),
         ),
         SwitchListTile(
-          title: Text('Credits / Certificate', style: GoogleFonts.outfit(color: U.text)),
+          title: Text('Provides Certificate', style: GoogleFonts.outfit(color: U.text)),
+          subtitle: Text('Certificate for participants', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
           value: _providesCertificate,
-          activeColor: U.primary,
+          activeThumbColor: U.primary,
+          activeTrackColor: U.primary.withValues(alpha: 0.3),
           onChanged: (v) => setState(() => _providesCertificate = v),
+        ),
+        const SizedBox(height: 16),
+        _buildImagePicker(
+          'Upload Permission Letter',
+          _permissionLetter,
+          _pickPermissionLetter,
+          Icons.upload_file_rounded,
         ),
       ],
     ).animate().fadeIn();
   }
 
-  Widget _buildPreviewStep() {
+  // ── Step 5: Preview ──
+  Widget _buildStep5Preview() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -263,26 +609,85 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_bannerImage != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(_bannerImage!, height: 120, width: double.infinity, fit: BoxFit.cover),
+            ),
+          if (_bannerImage != null) const SizedBox(height: 16),
           Text(
             _titleController.text.isEmpty ? 'Untitled Event' : _titleController.text,
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: U.text),
+            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: U.text),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_dateController.text} at ${_timeController.text}',
-            style: GoogleFonts.outfit(color: U.sub),
-          ),
-          Text(
-            _venueController.text,
-            style: GoogleFonts.outfit(color: U.sub),
+          if (_shortDescController.text.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(_shortDescController.text, style: GoogleFonts.outfit(color: U.sub, fontSize: 14)),
+          ],
+          const SizedBox(height: 12),
+          _previewRow(Icons.category_rounded, _selectedCategory),
+          _previewRow(Icons.calendar_today_rounded, _formatDate(_selectedDate)),
+          _previewRow(Icons.access_time_rounded, '${_formatTimeOfDay(_startTime)} - ${_formatTimeOfDay(_endTime)}'),
+          if (_venueController.text.isNotEmpty) _previewRow(Icons.location_on_rounded, _venueController.text),
+          if (_conductedByController.text.isNotEmpty) _previewRow(Icons.group_rounded, _conductedByController.text),
+          if (_contactController.text.isNotEmpty) _previewRow(Icons.phone_rounded, _contactController.text),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (_providesAttendance) _buildChip('Attendance', U.teal),
+              if (_requiresPayment) _buildChip('Paid', U.peach),
+              if (_providesCertificate) _buildChip('Certificate', U.primary),
+            ],
           ),
           const SizedBox(height: 16),
-          Text(
-            'Event looks good! Ready to publish?',
-            style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w500),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: U.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: U.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Your event will be submitted for admin approval before it goes live.',
+                    style: GoogleFonts.outfit(color: U.primary, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     ).animate().fadeIn();
+  }
+
+  Widget _previewRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: U.dim),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: GoogleFonts.outfit(color: U.text, fontSize: 14))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(String label, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(label, style: GoogleFonts.outfit(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+    );
   }
 }
