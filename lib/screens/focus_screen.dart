@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../main.dart';
 import 'daily_note_screen.dart';
 import 'heatmap_home_screen.dart';
+import 'profile_screen.dart';
 import 'reminders_screen.dart';
 import '../services/focus_supabase_service.dart';
 
@@ -57,6 +59,14 @@ class _FocusScreenState extends State<FocusScreen> {
   String get _motivationalText {
     final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
     return _motivationalTexts[dayOfYear % _motivationalTexts.length];
+  }
+
+  String get _bgImagePath {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'assets/welcome_bg/one_light/morning.png';
+    if (hour < 17) return 'assets/welcome_bg/one_light/afternoon.png';
+    if (hour < 20) return 'assets/welcome_bg/one_light/evening.png';
+    return 'assets/welcome_bg/one_light/night.png';
   }
 
   @override
@@ -131,7 +141,7 @@ class _FocusScreenState extends State<FocusScreen> {
     final topPadding = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F1F6),
+      backgroundColor: U.bg,
       body: Stack(
         children: [
           // ── Background Image ──
@@ -140,10 +150,15 @@ class _FocusScreenState extends State<FocusScreen> {
             left: 0,
             right: 0,
             height: screenHeight * 0.58,
-            child: Image.asset(
-              'assets/welcome_bg/one_light/morning.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+            child: ColorFiltered(
+              colorFilter: appThemeNotifier.value.isDark
+                  ? ColorFilter.mode(Colors.black.withValues(alpha: 0.45), BlendMode.srcATop)
+                  : ColorFilter.mode(Colors.white.withValues(alpha: 0.45), BlendMode.srcATop),
+              child: Image.asset(
+                _bgImagePath,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
             ),
           ),
 
@@ -160,9 +175,9 @@ class _FocusScreenState extends State<FocusScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    const Color(0xFFF0F1F6).withValues(alpha: 0.6),
-                    const Color(0xFFF0F1F6).withValues(alpha: 0.95),
-                    const Color(0xFFF0F1F6),
+                    U.bg.withValues(alpha: 0.6),
+                    U.bg.withValues(alpha: 0.95),
+                    U.bg,
                   ],
                   stops: const [0.0, 0.35, 0.7, 1.0],
                 ),
@@ -176,7 +191,7 @@ class _FocusScreenState extends State<FocusScreen> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: Container(color: const Color(0xFFF0F1F6)),
+            child: Container(color: U.bg),
           ),
 
           // ── Main scrollable content ──
@@ -203,13 +218,13 @@ class _FocusScreenState extends State<FocusScreen> {
                                 style: GoogleFonts.playfairDisplay(
                                   fontSize: 42,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1A1A2E),
+                                  color: U.primary,
                                   fontStyle: FontStyle.italic,
                                   letterSpacing: -1.5,
                                   height: 1.1,
                                   shadows: [
                                     Shadow(
-                                      color: Colors.black.withValues(alpha: 0.08),
+                                      color: U.primary.withValues(alpha: 0.2),
                                       blurRadius: 12,
                                       offset: const Offset(0, 3),
                                     ),
@@ -220,7 +235,7 @@ class _FocusScreenState extends State<FocusScreen> {
                               Text(
                                 'Stay productive and track your habits',
                                 style: GoogleFonts.outfit(
-                                  color: const Color(0xFF555577),
+                                  color: U.sub,
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w400,
                                 ),
@@ -233,32 +248,59 @@ class _FocusScreenState extends State<FocusScreen> {
 
                         // Profile Avatar
                         GestureDetector(
-                          onTap: () {},
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                width: 2.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 12,
-                                  spreadRadius: 2,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Animated Energy Ring
+                              Container(
+                                width: 54,
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: SweepGradient(
+                                    colors: [
+                                      U.primary.withValues(alpha: 0.0),
+                                      U.primary,
+                                      U.primary.withValues(alpha: 0.0),
+                                    ],
+                                    stops: const [0.1, 0.5, 0.9],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: U.primary.withValues(alpha: 0.3),
+                                      blurRadius: 10,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 24,
-                              backgroundColor: const Color(0xFFE8E8F0),
-                              backgroundImage: _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty
-                                  ? NetworkImage(_userPhotoUrl!)
-                                  : null,
-                              child: _userPhotoUrl == null || _userPhotoUrl!.isEmpty
-                                  ? Icon(Icons.person, color: const Color(0xFF888899), size: 24)
-                                  : null,
-                            ),
+                              ).animate(onPlay: (controller) => controller.repeat()).rotate(duration: 3.seconds),
+
+                              // Inner Avatar
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: U.bg.withValues(alpha: 0.6), // Subtle inner separator
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  backgroundColor: U.card,
+                                  backgroundImage: _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty
+                                      ? NetworkImage(_userPhotoUrl!)
+                                      : null,
+                                  child: _userPhotoUrl == null || _userPhotoUrl!.isEmpty
+                                      ? Icon(Icons.person, color: U.dim, size: 24)
+                                      : null,
+                                ),
+                              ),
+                            ],
                           ),
                         ).animate()
                             .fadeIn(delay: 200.ms, duration: 500.ms)
@@ -279,7 +321,7 @@ class _FocusScreenState extends State<FocusScreen> {
                           style: GoogleFonts.outfit(
                             fontSize: 26,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1A1A2E),
+                            color: U.text,
                             height: 1.2,
                           ),
                         ),
@@ -289,7 +331,7 @@ class _FocusScreenState extends State<FocusScreen> {
                           style: GoogleFonts.outfit(
                             fontSize: 15,
                             fontWeight: FontWeight.w400,
-                            color: const Color(0xFF555577),
+                            color: U.sub,
                             height: 1.45,
                           ),
                         ),
@@ -314,9 +356,9 @@ class _FocusScreenState extends State<FocusScreen> {
                                 title: 'Daily Note',
                                 description: 'Write your thoughts\nand ideas',
                                 icon: Icons.edit_note_rounded,
-                                iconColor: const Color(0xFF4078F2),
+                                iconColor: U.blue,
                                 statLabel: 'Write today',
-                                statColor: const Color(0xFF4078F2),
+                                statColor: U.blue,
                                 delay: 400,
                                 onTap: () => Navigator.push(
                                   context,
@@ -330,9 +372,9 @@ class _FocusScreenState extends State<FocusScreen> {
                                 title: 'Activity',
                                 description: 'Track your habits\nand progress',
                                 icon: Icons.grid_view_rounded,
-                                iconColor: const Color(0xFFE88A2A),
+                                iconColor: U.peach,
                                 statLabel: '$_activeHabits habits active',
-                                statColor: const Color(0xFFE88A2A),
+                                statColor: U.peach,
                                 delay: 500,
                                 onTap: () => Navigator.push(
                                   context,
@@ -348,9 +390,9 @@ class _FocusScreenState extends State<FocusScreen> {
                           title: 'Reminders',
                           description: 'Stay on top of your\nimportant tasks',
                           icon: Icons.notifications_outlined,
-                          iconColor: const Color(0xFF7C6AF7),
+                          iconColor: U.lavender,
                           statLabel: '$_upcomingReminders upcoming',
-                          statColor: const Color(0xFF7C6AF7),
+                          statColor: U.lavender,
                           delay: 600,
                           isWide: true,
                           onTap: () => Navigator.push(
@@ -370,10 +412,10 @@ class _FocusScreenState extends State<FocusScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.75),
+                        color: U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.4 : 0.75),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: U.border.withValues(alpha: 0.5),
                           width: 1,
                         ),
                         boxShadow: [
@@ -389,12 +431,12 @@ class _FocusScreenState extends State<FocusScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF4078F2).withValues(alpha: 0.1),
+                              color: U.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
                               Icons.auto_awesome_rounded,
-                              color: const Color(0xFF4078F2).withValues(alpha: 0.7),
+                              color: U.primary.withValues(alpha: 0.7),
                               size: 20,
                             ),
                           ),
@@ -409,7 +451,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w600,
                                     fontStyle: FontStyle.italic,
-                                    color: const Color(0xFF2A2A40),
+                                    color: U.text,
                                     height: 1.35,
                                   ),
                                   maxLines: 2,
@@ -420,7 +462,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                   _quoteSubtitle,
                                   style: GoogleFonts.outfit(
                                     fontSize: 12,
-                                    color: const Color(0xFF7A7A99),
+                                    color: U.sub,
                                     height: 1.3,
                                   ),
                                 ),
@@ -432,8 +474,9 @@ class _FocusScreenState extends State<FocusScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF5F5FA),
+                                color: U.card,
                                 borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: U.border, width: 0.5),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -443,7 +486,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                     style: GoogleFonts.outfit(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF555577),
+                                      color: U.text,
                                     ),
                                   ),
                                   const SizedBox(width: 3),
@@ -507,10 +550,10 @@ class _FeatureCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.55),
+              color: U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.4 : 0.55),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: U.border.withValues(alpha: appThemeNotifier.value.isDark ? 0.3 : 0.7),
                 width: 1,
               ),
               boxShadow: [
@@ -552,16 +595,16 @@ class _FeatureCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: U.surface.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: U.border.withValues(alpha: 0.5),
                     width: 0.5,
                   ),
                 ),
                 child: Icon(
                   Icons.chevron_right_rounded,
-                  color: const Color(0xFF666680),
+                  color: U.dim,
                   size: 16,
                 ),
               ),
@@ -575,7 +618,7 @@ class _FeatureCard extends StatelessWidget {
             style: GoogleFonts.outfit(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF1A1A2E),
+              color: U.text,
             ),
           ),
           const SizedBox(height: 3),
@@ -585,7 +628,7 @@ class _FeatureCard extends StatelessWidget {
             description,
             style: GoogleFonts.outfit(
               fontSize: 12,
-              color: const Color(0xFF7A7A99),
+              color: U.sub,
               height: 1.35,
             ),
             maxLines: 2,
@@ -639,7 +682,7 @@ class _FeatureCard extends StatelessWidget {
                 style: GoogleFonts.outfit(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1A1A2E),
+                  color: U.text,
                 ),
               ),
               const SizedBox(height: 3),
@@ -647,7 +690,7 @@ class _FeatureCard extends StatelessWidget {
                 description.replaceAll('\n', ' '),
                 style: GoogleFonts.outfit(
                   fontSize: 12,
-                  color: const Color(0xFF7A7A99),
+                  color: U.sub,
                   height: 1.35,
                 ),
                 maxLines: 1,
@@ -678,16 +721,16 @@ class _FeatureCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.7),
+            color: U.surface.withValues(alpha: 0.7),
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: U.border.withValues(alpha: 0.5),
               width: 0.5,
             ),
           ),
           child: Icon(
             Icons.chevron_right_rounded,
-            color: const Color(0xFF666680),
+            color: U.dim,
             size: 16,
           ),
         ),

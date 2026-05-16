@@ -28,14 +28,43 @@ class FocusDatabaseService {
     final path = p.join(dir.path, 'focus_data.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('DROP TABLE IF EXISTS daily_notes');
+          await db.execute('''
+            CREATE TABLE daily_notes (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              date TEXT NOT NULL,
+              habits_state TEXT NOT NULL DEFAULT '{}',
+              tasks TEXT NOT NULL DEFAULT '[]',
+              journal TEXT NOT NULL DEFAULT '',
+              sync_status TEXT NOT NULL DEFAULT 'pending',
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              UNIQUE(user_id, date)
+            )
+          ''');
+          await db.execute('CREATE INDEX idx_notes_user_date ON daily_notes(user_id, date)');
+          await db.execute('''
+            CREATE TABLE focus_user_habits (
+              user_id TEXT PRIMARY KEY,
+              habits TEXT NOT NULL DEFAULT '[]',
+              sync_status TEXT NOT NULL DEFAULT 'pending'
+            )
+          ''');
+        }
+      },
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE daily_notes (
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             date TEXT NOT NULL,
-            content TEXT NOT NULL,
+            habits_state TEXT NOT NULL DEFAULT '{}',
+            tasks TEXT NOT NULL DEFAULT '[]',
+            journal TEXT NOT NULL DEFAULT '',
             sync_status TEXT NOT NULL DEFAULT 'pending',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
@@ -44,6 +73,14 @@ class FocusDatabaseService {
         ''');
         await db.execute('''
           CREATE INDEX idx_notes_user_date ON daily_notes(user_id, date)
+        ''');
+
+        await db.execute('''
+          CREATE TABLE focus_user_habits (
+            user_id TEXT PRIMARY KEY,
+            habits TEXT NOT NULL DEFAULT '[]',
+            sync_status TEXT NOT NULL DEFAULT 'pending'
+          )
         ''');
 
         await db.execute('''
@@ -95,6 +132,29 @@ class FocusDatabaseService {
           )
         ''');
       },
+    );
+  }
+
+  // ──────────────────────────── User Habits Config ────────────────────────────
+
+  Future<FocusUserHabits?> getUserHabits(String userId) async {
+    final db = await database;
+    final results = await db.query(
+      'focus_user_habits',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return FocusUserHabits.fromMap(results.first);
+  }
+
+  Future<void> saveUserHabits(FocusUserHabits habits) async {
+    final db = await database;
+    await db.insert(
+      'focus_user_habits',
+      habits.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
@@ -377,6 +437,16 @@ class FocusDatabaseService {
     return results.map(FocusNote.fromMap).toList();
   }
 
+  Future<List<FocusUserHabits>> getPendingUserHabits() async {
+    final db = await database;
+    final results = await db.query(
+      'focus_user_habits',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+    return results.map(FocusUserHabits.fromMap).toList();
+  }
+
   Future<List<HabitCompletion>> getPendingCompletions() async {
     final db = await database;
     final results = await db.query(
@@ -394,6 +464,16 @@ class FocusDatabaseService {
       {'sync_status': 'synced'},
       where: 'user_id = ? AND date = ?',
       whereArgs: [userId, date],
+    );
+  }
+
+  Future<void> markUserHabitsSynced(String userId) async {
+    final db = await database;
+    await db.update(
+      'focus_user_habits',
+      {'sync_status': 'synced'},
+      where: 'user_id = ?',
+      whereArgs: [userId],
     );
   }
 

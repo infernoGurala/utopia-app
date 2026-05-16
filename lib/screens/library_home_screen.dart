@@ -207,16 +207,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         style: GoogleFonts.playfairDisplay(
                           fontSize: 32,
                           fontWeight: FontWeight.w700,
-                          color: U.primary,
+                          color: U.text,
                           fontStyle: FontStyle.italic,
                           letterSpacing: -1,
-                          shadows: [
-                            Shadow(
-                              color: U.primary.withValues(alpha: 0.2),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
                       ),
                       const SizedBox(width: 12),

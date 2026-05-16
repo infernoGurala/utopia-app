@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
 import 'heatmap_home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 class DailyNoteScreen extends StatefulWidget {
@@ -20,12 +21,13 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool _editMode = false;
   bool _loading = true;
+  bool _markDoneEnabled = true;
   FocusNote? _note;
   String _content = '';
   final _editController = TextEditingController();
   final _scrollController = ScrollController();
   Set<String> _noteDates = {};
-
+  final Set<String> _collapsedSections = {};
 
 
   String _dateStr(DateTime d) =>
@@ -41,6 +43,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
 
   Future<void> _init() async {
     await _service.initialize();
+    final prefs = await SharedPreferences.getInstance();
+    _markDoneEnabled = prefs.getBool('daily_note_mark_done') ?? true;
     await _loadNote();
     await _loadMonthDots();
   }
@@ -132,28 +136,45 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(width: 32, height: 4, decoration: BoxDecoration(color: U.dim, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            _menuItem(Icons.edit_note_rounded, 'Edit Template', () {
-              Navigator.pop(ctx);
-              _editTemplate();
-            }),
-            _menuItem(Icons.restart_alt_rounded, 'Reset Note to Template', () {
-              Navigator.pop(ctx);
-              _resetCurrentNote();
-            }),
-            if (_note != null)
-              _menuItem(Icons.delete_outline_rounded, 'Delete Note', () {
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(width: 32, height: 4, decoration: BoxDecoration(color: U.dim, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 16),
+              // Mark Done toggle
+              SwitchListTile(
+                secondary: Icon(Icons.check_circle_outline_rounded, color: U.sub, size: 22),
+                title: Text('Allow Mark Done', style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w500)),
+                subtitle: Text('Tap checkboxes to toggle completion', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+                value: _markDoneEnabled,
+                activeColor: U.primary,
+                onChanged: (v) async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('daily_note_mark_done', v);
+                  setSheetState(() => _markDoneEnabled = v);
+                  setState(() {});
+                },
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              _menuItem(Icons.edit_note_rounded, 'Edit Template', () {
                 Navigator.pop(ctx);
-                _confirmDeleteNote();
-              }, isDestructive: true),
-            const SizedBox(height: 16),
-          ],
+                _editTemplate();
+              }),
+              _menuItem(Icons.restart_alt_rounded, 'Reset Note to Template', () {
+                Navigator.pop(ctx);
+                _resetCurrentNote();
+              }),
+              if (_note != null)
+                _menuItem(Icons.delete_outline_rounded, 'Delete Note', () {
+                  Navigator.pop(ctx);
+                  _confirmDeleteNote();
+                }, isDestructive: true),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -327,37 +348,80 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   }
 
   Widget _buildHeader() {
+    const dayFull = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+    const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title row
+          // Top bar
           Row(
             children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.arrow_back_rounded, color: U.text),
-                padding: EdgeInsets.zero,
-                alignment: Alignment.centerLeft,
-                constraints: const BoxConstraints(minWidth: 32),
-              ),
-              Text('Daily Note', style: GoogleFonts.playfairDisplay(fontSize: 28, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
-              const Spacer(),
-              IconButton(
-                onPressed: _toggleEditMode,
-                icon: Icon(_editMode ? Icons.visibility_outlined : Icons.edit_outlined, color: U.sub, size: 22),
-              ),
-              Builder(
-                builder: (ctx) => IconButton(
-                  onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-                  icon: Icon(Icons.calendar_today_rounded, color: U.sub, size: 20),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.arrow_back_rounded, color: U.text, size: 18),
                 ),
               ),
-              IconButton(onPressed: _showMenu, icon: Icon(Icons.more_vert_rounded, color: U.sub, size: 22)),
+              const SizedBox(width: 12),
+              Text('Daily Note', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+              const Spacer(),
+              GestureDetector(
+                onTap: _toggleEditMode,
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: _editMode ? U.primary.withValues(alpha: 0.12) : U.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _editMode ? U.primary.withValues(alpha: 0.3) : U.border, width: 0.5),
+                  ),
+                  child: Icon(_editMode ? Icons.visibility_outlined : Icons.edit_outlined, color: _editMode ? U.primary : U.sub, size: 17),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openEndDrawer(),
+                  child: Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: U.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: U.border, width: 0.5),
+                    ),
+                    child: Icon(Icons.calendar_today_rounded, color: U.sub, size: 17),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _showMenu,
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.settings_outlined, color: U.sub, size: 17),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
+          // Date hero
+          Text(dayFull[_selectedDate.weekday], style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: U.primary, letterSpacing: 2.5)),
+          const SizedBox(height: 4),
+          Text('${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
+            style: GoogleFonts.playfairDisplay(fontSize: 28, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -534,40 +598,6 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     return _buildReadMode();
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: GestureDetector(
-        onTap: _createFromTemplate,
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDateLabel(),
-              const SizedBox(height: 32),
-              Text('Tap the pencil to start writing.', style: GoogleFonts.outfit(color: U.dim, fontSize: 15)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDateLabel() {
-    const dayFull = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-    const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(dayFull[_selectedDate.weekday], style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: U.primary, letterSpacing: 2)),
-        const SizedBox(height: 2),
-        Text('${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
-          style: GoogleFonts.playfairDisplay(fontSize: 26, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
-      ],
-    );
-  }
-
   Widget _buildEditMode() {
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -581,58 +611,175 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Center(
+      child: GestureDetector(
+        onTap: _createFromTemplate,
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: U.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(Icons.edit_note_rounded, color: U.primary, size: 32),
+              ),
+              const SizedBox(height: 20),
+              Text('No note yet', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Text('Tap to create from your template', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildReadMode() {
-    final sections = _parseSections(_content);
+    final sectionData = _parseSectionsGrouped(_content);
 
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 120),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
       children: [
-        _buildDateLabel(),
-        const SizedBox(height: 24),
-        ...sections,
+        for (final section in sectionData)
+          _buildSectionCard(section),
       ],
     );
   }
 
-  List<Widget> _parseSections(String content) {
+  List<Map<String, dynamic>> _parseSectionsGrouped(String content) {
     final lines = content.split('\n');
-    final widgets = <Widget>[];
-    String? currentSection;
+    final sections = <Map<String, dynamic>>[];
+    Map<String, dynamic>? current;
 
     for (final line in lines) {
       final trimmed = line.trim();
-
       if (trimmed.startsWith('## ')) {
-        final heading = trimmed.substring(3);
-        currentSection = heading.toLowerCase();
-        widgets.add(Padding(
-          padding: const EdgeInsets.only(top: 24, bottom: 8),
-          child: Text(heading, style: GoogleFonts.playfairDisplay(fontSize: 20, fontWeight: FontWeight.w600, fontStyle: FontStyle.italic, color: U.primary)),
-        ));
+        if (current != null) sections.add(current);
+        current = {'title': trimmed.substring(3), 'items': <Map<String, dynamic>>[]};
         continue;
       }
+      if (current == null) continue;
 
-      // Checkbox items
       final checkedMatch = RegExp(r'^- \[x\] (.+)$', caseSensitive: false).firstMatch(trimmed);
       final uncheckedMatch = RegExp(r'^- \[ \] (.+)$').firstMatch(trimmed);
 
       if (checkedMatch != null) {
-        final label = checkedMatch.group(1)!.trim();
-        widgets.add(_buildCheckItem(label, true, true, line));
+        (current['items'] as List).add({'type': 'check', 'label': checkedMatch.group(1)!.trim(), 'checked': true, 'raw': line});
       } else if (uncheckedMatch != null) {
-        final label = uncheckedMatch.group(1)!.trim();
-        widgets.add(_buildCheckItem(label, false, true, line));
+        (current['items'] as List).add({'type': 'check', 'label': uncheckedMatch.group(1)!.trim(), 'checked': false, 'raw': line});
       } else if (trimmed.isNotEmpty) {
-        // Plain text (journal)
-        widgets.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
-          child: _buildMarkdownText(trimmed),
-        ));
+        (current['items'] as List).add({'type': 'text', 'text': trimmed});
       }
     }
+    if (current != null) sections.add(current);
+    return sections;
+  }
 
-    return widgets;
+  IconData _sectionIcon(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('habit')) return Icons.loop_rounded;
+    if (t.contains('task')) return Icons.checklist_rounded;
+    if (t.contains('journal')) return Icons.edit_rounded;
+    return Icons.notes_rounded;
+  }
+
+  Color _sectionAccent(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('habit')) return U.blue;
+    if (t.contains('task')) return U.teal;
+    if (t.contains('journal')) return U.peach;
+    return U.primary;
+  }
+
+  Widget _buildSectionCard(Map<String, dynamic> section) {
+    final title = section['title'] as String;
+    final items = section['items'] as List<Map<String, dynamic>>;
+    final isCollapsed = _collapsedSections.contains(title);
+    final accent = _sectionAccent(title);
+    final icon = _sectionIcon(title);
+
+    // Count completed for check items
+    final checkItems = items.where((i) => i['type'] == 'check').toList();
+    final doneCount = checkItems.where((i) => i['checked'] == true).length;
+    final hasChecks = checkItems.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: U.border, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          // Section header
+          GestureDetector(
+            onTap: () => setState(() {
+              isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
+            }),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, color: accent, size: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(title, style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  if (hasChecks) ...[
+                    Text('$doneCount of ${checkItems.length} done', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+                    const SizedBox(width: 8),
+                    // Mini progress
+                    SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                        value: checkItems.isEmpty ? 0 : doneCount / checkItems.length,
+                        strokeWidth: 2.5,
+                        backgroundColor: U.border,
+                        color: accent,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Icon(isCollapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded, color: U.dim, size: 20),
+                ],
+              ),
+            ),
+          ),
+          // Items
+          if (!isCollapsed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final item in items)
+                    if (item['type'] == 'check')
+                      _buildCheckItem(item['label'], item['checked'], true, item['raw'])
+                    else
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: _buildMarkdownText(item['text']),
+                      ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCheckItem(String label, bool checked, bool isTask, String rawLine) {
@@ -642,7 +789,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () => _onCheckboxToggle(rawLine, !checked),
+            onTap: _markDoneEnabled ? () => _onCheckboxToggle(rawLine, !checked) : null,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 20, height: 20,
@@ -671,6 +818,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               ),
             ),
           ),
+          if (isTask)
+            Icon(Icons.insights_rounded, color: U.dim.withValues(alpha: 0.5), size: 16),
         ],
       ),
     );

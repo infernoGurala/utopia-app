@@ -10,8 +10,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'profile_screen.dart';
-
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
   @override
@@ -26,7 +24,6 @@ class _AppShellState extends State<AppShell> {
     const FocusScreen(),
     null,
     null,
-    null,
   ];
 
   Widget _getScreen(int index) {
@@ -37,9 +34,6 @@ class _AppShellState extends State<AppShell> {
           break;
         case 2:
           _screens[index] = const UniversityScreen();
-          break;
-        case 3:
-          _screens[index] = const ProfileScreen();
           break;
       }
     }
@@ -295,7 +289,6 @@ class _AppShellState extends State<AppShell> {
                   _KeepAliveWrapper(child: _getScreen(0)),
                   _KeepAliveWrapper(child: _getScreen(1)),
                   _KeepAliveWrapper(child: _getScreen(2)),
-                  _KeepAliveWrapper(child: _getScreen(3)),
                 ],
               ),
               // Floating glassmorphic nav bar
@@ -357,14 +350,6 @@ class _AppShellState extends State<AppShell> {
                                   accent: accent,
                                   isDark: isDark,
                                   onTap: () => _setIndex(2),
-                                ),
-                                _NavItem(
-                                  icon: Icons.person_outline_rounded,
-                                  activeIcon: Icons.person_rounded,
-                                  isActive: _index == 3,
-                                  accent: accent,
-                                  isDark: isDark,
-                                  onTap: () => _setIndex(3),
                                 ),
                               ],
                             ),

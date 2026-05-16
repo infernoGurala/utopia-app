@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Data models for the Focus productivity feature.
 ///
 /// Three core models:
@@ -9,7 +11,9 @@ class FocusNote {
   final String? id;
   final String userId;
   final String date; // YYYY-MM-DD
-  final String content;
+  final Map<String, bool> habitsState; // { "habitName": true/false }
+  final List<Map<String, dynamic>> tasks; // [ {"label": "Task", "completed": false} ]
+  final String journal;
   final String syncStatus; // 'synced', 'pending'
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -18,7 +22,9 @@ class FocusNote {
     this.id,
     required this.userId,
     required this.date,
-    required this.content,
+    this.habitsState = const {},
+    this.tasks = const [],
+    this.journal = '',
     this.syncStatus = 'pending',
     this.createdAt,
     this.updatedAt,
@@ -28,7 +34,9 @@ class FocusNote {
     String? id,
     String? userId,
     String? date,
-    String? content,
+    Map<String, bool>? habitsState,
+    List<Map<String, dynamic>>? tasks,
+    String? journal,
     String? syncStatus,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,7 +45,9 @@ class FocusNote {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       date: date ?? this.date,
-      content: content ?? this.content,
+      habitsState: habitsState ?? this.habitsState,
+      tasks: tasks ?? this.tasks,
+      journal: journal ?? this.journal,
       syncStatus: syncStatus ?? this.syncStatus,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -49,7 +59,9 @@ class FocusNote {
       if (id != null) 'id': id,
       'user_id': userId,
       'date': date,
-      'content': content,
+      'habits_state': jsonEncode(habitsState),
+      'tasks': jsonEncode(tasks),
+      'journal': journal,
       'sync_status': syncStatus,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
       'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
@@ -57,11 +69,37 @@ class FocusNote {
   }
 
   factory FocusNote.fromMap(Map<String, dynamic> map) {
+    Map<String, bool> parsedHabits = {};
+    if (map['habits_state'] != null) {
+      if (map['habits_state'] is String) {
+        try {
+          final decoded = jsonDecode(map['habits_state'] as String) as Map;
+          parsedHabits = decoded.map((k, v) => MapEntry(k.toString(), v == true));
+        } catch (_) {}
+      } else if (map['habits_state'] is Map) {
+        parsedHabits = (map['habits_state'] as Map).map((k, v) => MapEntry(k.toString(), v == true));
+      }
+    }
+
+    List<Map<String, dynamic>> parsedTasks = [];
+    if (map['tasks'] != null) {
+      if (map['tasks'] is String) {
+        try {
+          final decoded = jsonDecode(map['tasks'] as String) as List;
+          parsedTasks = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } catch (_) {}
+      } else if (map['tasks'] is List) {
+        parsedTasks = (map['tasks'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    }
+
     return FocusNote(
       id: map['id'] as String?,
       userId: map['user_id'] as String,
       date: map['date'] as String,
-      content: map['content'] as String,
+      habitsState: parsedHabits,
+      tasks: parsedTasks,
+      journal: map['journal'] as String? ?? '',
       syncStatus: (map['sync_status'] as String?) ?? 'synced',
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'] as String)
@@ -77,7 +115,67 @@ class FocusNote {
     return {
       'user_id': userId,
       'date': date,
-      'content': content,
+      'habits_state': habitsState, // Supabase JSONB natively takes Dart maps
+      'tasks': tasks, // Supabase JSONB natively takes Dart lists
+      'journal': journal,
+    };
+  }
+}
+
+class FocusUserHabits {
+  final String userId;
+  final List<String> habits;
+  final String syncStatus;
+
+  const FocusUserHabits({
+    required this.userId,
+    this.habits = const [],
+    this.syncStatus = 'pending',
+  });
+
+  FocusUserHabits copyWith({
+    String? userId,
+    List<String>? habits,
+    String? syncStatus,
+  }) {
+    return FocusUserHabits(
+      userId: userId ?? this.userId,
+      habits: habits ?? this.habits,
+      syncStatus: syncStatus ?? this.syncStatus,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'user_id': userId,
+      'habits': jsonEncode(habits),
+      'sync_status': syncStatus,
+    };
+  }
+
+  factory FocusUserHabits.fromMap(Map<String, dynamic> map) {
+    List<String> parsedHabits = [];
+    if (map['habits'] != null) {
+      if (map['habits'] is String) {
+        try {
+          final decoded = jsonDecode(map['habits'] as String) as List;
+          parsedHabits = decoded.map((e) => e.toString()).toList();
+        } catch (_) {}
+      } else if (map['habits'] is List) {
+        parsedHabits = (map['habits'] as List).map((e) => e.toString()).toList();
+      }
+    }
+    return FocusUserHabits(
+      userId: map['user_id'] as String,
+      habits: parsedHabits,
+      syncStatus: (map['sync_status'] as String?) ?? 'synced',
+    );
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    return {
+      'user_id': userId,
+      'habits': habits,
     };
   }
 }

@@ -88,15 +88,35 @@ class FocusSupabaseService {
     await _db.saveNote(noteWithId);
 
     // 2. Extract task completions and save locally
-    final tasks = _extractTasks(noteWithId.content);
-    final completions = tasks.map((t) => HabitCompletion(
-      userId: noteWithId.userId,
-      date: noteWithId.date,
-      taskName: t.normalizedName,
-      completed: t.completed,
-      completionCount: t.completed ? 1 : 0,
-      syncStatus: 'pending',
-    )).toList();
+    final List<HabitCompletion> completions = [];
+    
+    // Habits
+    noteWithId.habitsState.forEach((habitName, completed) {
+      completions.add(HabitCompletion(
+        userId: noteWithId.userId,
+        date: noteWithId.date,
+        taskName: habitName.toLowerCase().trim(),
+        completed: completed,
+        completionCount: completed ? 1 : 0,
+        syncStatus: 'pending',
+      ));
+    });
+
+    // Tasks
+    for (final task in noteWithId.tasks) {
+      final label = (task['label'] as String?)?.toLowerCase().trim() ?? '';
+      if (label.isEmpty) continue;
+      final completed = task['completed'] == true;
+      completions.add(HabitCompletion(
+        userId: noteWithId.userId,
+        date: noteWithId.date,
+        taskName: label,
+        completed: completed,
+        completionCount: completed ? 1 : 0,
+        syncStatus: 'pending',
+      ));
+    }
+
     await _db.saveCompletions(noteWithId.userId, noteWithId.date, completions);
 
     // 3. Sync to Supabase in background
@@ -145,15 +165,7 @@ class FocusSupabaseService {
             .maybeSingle();
 
         if (response != null) {
-          final remoteNote = FocusNote(
-            id: response['id'] as String,
-            userId: response['user_id'] as String,
-            date: response['date'] as String,
-            content: response['content'] as String,
-            syncStatus: 'synced',
-            createdAt: DateTime.tryParse(response['created_at'] as String? ?? ''),
-            updatedAt: DateTime.tryParse(response['updated_at'] as String? ?? ''),
-          );
+          final remoteNote = FocusNote.fromMap(response).copyWith(syncStatus: 'synced');
 
           // If remote is newer or local doesn't exist, use remote
           if (localNote == null ||
@@ -200,6 +212,52 @@ class FocusSupabaseService {
     final userId = _userId;
     if (userId.isEmpty) return {};
     return _db.getNoteDates(userId, startDate, endDate);
+  }
+
+  // ──────────────────────────── User Habits ────────────────────────────
+
+  Future<FocusUserHabits?> getUserHabits() async {
+    final userId = _userId;
+    if (userId.isEmpty) return null;
+
+    final localConfig = await _db.getUserHabits(userId);
+
+    if (_initialized && _client != null) {
+      try {
+        final response = await _client!
+            .from('focus_user_habits')
+            .select()
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (response != null) {
+          final remoteConfig = FocusUserHabits.fromMap(response).copyWith(syncStatus: 'synced');
+          await _db.saveUserHabits(remoteConfig);
+          return remoteConfig;
+        }
+      } catch (e) {
+        debugPrint('Focus Supabase user habits load failed: $e');
+      }
+    }
+
+    return localConfig;
+  }
+
+  Future<void> saveUserHabits(FocusUserHabits habits) async {
+    final userId = _userId;
+    if (userId.isEmpty) return;
+
+    final config = habits.copyWith(userId: userId, syncStatus: 'pending');
+    await _db.saveUserHabits(config);
+
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('focus_user_habits').upsert(config.toSupabaseMap(), onConflict: 'user_id');
+        await _db.markUserHabitsSynced(userId);
+      } catch (e) {
+        debugPrint('Focus Supabase user habits sync failed: $e');
+      }
+    }
   }
 
   // ──────────────────────────── Heatmap ────────────────────────────
@@ -287,67 +345,24 @@ class FocusSupabaseService {
     }
   }
 
-  // ──────────────────────────── Templates ────────────────────────────
-
-  Future<String> getTemplate() async {
-    final userId = _userId;
-    if (userId.isEmpty) return defaultTemplate;
-
-    final custom = await _db.getUserTemplate(userId);
-    return custom ?? defaultTemplate;
-  }
-
-  Future<void> saveTemplate(String content) async {
-    final userId = _userId;
-    if (userId.isEmpty) return;
-    await _db.saveUserTemplate(userId, content);
-  }
-
-  // ──────────────────────────── Parsing ────────────────────────────
-
-  /// Extract task completions from markdown content.
-  /// Only items under `## Tasks` are extracted.
-  List<ExtractedTask> _extractTasks(String content) {
-    final lines = content.split('\n');
-    final tasks = <ExtractedTask>[];
-
-    for (final line in lines) {
-      final trimmed = line.trim();
-
-      // Parse checkbox items
-      final checkedMatch = RegExp(r'^- \[x\] (.+)$', caseSensitive: false).firstMatch(trimmed);
-      final uncheckedMatch = RegExp(r'^- \[ \] (.+)$').firstMatch(trimmed);
-
-      if (checkedMatch != null) {
-        final label = checkedMatch.group(1)!.trim();
-        if (label.isNotEmpty) {
-          tasks.add(ExtractedTask(
-            taskName: label,
-            normalizedName: label.toLowerCase(),
-            completed: true,
-          ));
-        }
-      } else if (uncheckedMatch != null) {
-        final label = uncheckedMatch.group(1)!.trim();
-        if (label.isNotEmpty) {
-          tasks.add(ExtractedTask(
-            taskName: label,
-            normalizedName: label.toLowerCase(),
-            completed: false,
-          ));
-        }
-      }
-    }
-
-    return tasks;
-  }
-
   // ──────────────────────────── Sync ────────────────────────────
 
   Future<void> _syncPendingData() async {
     if (!_initialized || _client == null) return;
 
     try {
+      // Sync pending user habits
+      final pendingHabits = await _db.getPendingUserHabits();
+      for (final h in pendingHabits) {
+        try {
+          await _client!.from('focus_user_habits').upsert(
+            h.toSupabaseMap(),
+            onConflict: 'user_id',
+          );
+          await _db.markUserHabitsSynced(h.userId);
+        } catch (_) {}
+      }
+
       // Sync pending notes
       final pendingNotes = await _db.getPendingNotes();
       for (final note in pendingNotes) {
@@ -390,17 +405,4 @@ class FocusSupabaseService {
   String _dateStr(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  static const String defaultTemplate = '''## Habits
-- [ ] Wake up early
-- [ ] Exercise
-- [ ] Read
-- [ ] Study
-- [ ] Sleep on time
-
-## Tasks
-- [ ] 
-
-## Journal
-
-''';
 }
