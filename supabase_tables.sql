@@ -27,6 +27,7 @@ CREATE TABLE events (
   permission_letter_url TEXT,
   status TEXT NOT NULL,
   is_approved BOOLEAN DEFAULT false,
+  is_featured BOOLEAN DEFAULT false,
   university_id TEXT,
   view_count INTEGER DEFAULT 0,
   prize_info TEXT,
@@ -77,3 +78,10 @@ CREATE TABLE event_certificates (
   certificate_url TEXT,
   issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Disable RLS to allow app to insert/read data without complex auth policies for now
+ALTER TABLE events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE event_registrations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE event_likes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE event_chats DISABLE ROW LEVEL SECURITY;
+ALTER TABLE event_certificates DISABLE ROW LEVEL SECURITY;

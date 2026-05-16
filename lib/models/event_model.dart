@@ -231,7 +231,6 @@ class EventModel {
       'permission_letter_url': permissionLetterUrl,
       'status': status.toDbString(),
       'is_approved': isApproved,
-      'is_featured': isFeatured,
       'university_id': universityId,
       'prize_info': prizeInfo,
       'requirements': requirements,
