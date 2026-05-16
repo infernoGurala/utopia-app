@@ -24,6 +24,7 @@ import 'screens/app_shell.dart';
 import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
+import 'services/focus_supabase_service.dart';
 import 'widgets/app_update_prompt.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -564,6 +565,9 @@ Future<AppInitializationState> _initializeApp() async {
         debugPrint('Failed to initialize Supabase: $e');
       }
     }());
+
+    // Initialize Focus Supabase in the background
+    unawaited(FocusSupabaseService().initialize());
 
     return const AppInitializationState(firebaseReady: true);
   } catch (e) {

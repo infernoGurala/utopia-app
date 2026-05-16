@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import 'university_screen.dart';
 import 'library_home_screen.dart';
+import 'focus_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,12 +18,13 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
+class _AppShellState extends State<AppShell> {
   int _index = 0;
-  late final AnimationController _tabAnimationController;
+  late final PageController _pageController;
 
   final List<Widget?> _screens = [
     const LibraryHomeScreen(),
+    null,
     null,
     null,
   ];
@@ -34,6 +36,9 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
           _screens[index] = const UniversityScreen();
           break;
         case 2:
+          _screens[index] = const FocusScreen();
+          break;
+        case 3:
           _screens[index] = const ProfileScreen();
           break;
       }
@@ -44,11 +49,7 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      value: 1,
-    );
+    _pageController = PageController(initialPage: _index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPopupEvent();
     });
@@ -257,7 +258,7 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _tabAnimationController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -265,8 +266,11 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
     if (nextIndex == _index) {
       return;
     }
-    _tabAnimationController.forward(from: 0);
-    setState(() => _index = nextIndex);
+    _pageController.animateToPage(
+      nextIndex,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -281,36 +285,18 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
           extendBody: true,
           body: Stack(
             children: [
-              AnimatedBuilder(
-                animation: _tabAnimationController,
-                builder: (context, child) {
-                  final opacity = Tween<double>(begin: 0.92, end: 1).evaluate(
-                    CurvedAnimation(
-                      parent: _tabAnimationController,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  );
-                  final scale = Tween<double>(begin: 0.985, end: 1).evaluate(
-                    CurvedAnimation(
-                      parent: _tabAnimationController,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  );
-                  return Opacity(
-                    opacity: opacity,
-                    child: Transform.scale(
-                      scale: scale,
-                      child: IndexedStack(
-                        index: _index,
-                        children: [
-                          _index == 0 ? _getScreen(0) : (_screens[0] ?? const SizedBox.shrink()),
-                          _index == 1 ? _getScreen(1) : (_screens[1] ?? const SizedBox.shrink()),
-                          _index == 2 ? _getScreen(2) : (_screens[2] ?? const SizedBox.shrink()),
-                        ],
-                      ),
-                    ),
-                  );
+              PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() => _index = index);
                 },
+                physics: const ClampingScrollPhysics(),
+                children: [
+                  _KeepAliveWrapper(child: _getScreen(0)),
+                  _KeepAliveWrapper(child: _getScreen(1)),
+                  _KeepAliveWrapper(child: _getScreen(2)),
+                  _KeepAliveWrapper(child: _getScreen(3)),
+                ],
               ),
               // Floating glassmorphic nav bar
               Positioned(
@@ -365,12 +351,20 @@ class _AppShellState extends State<AppShell> with TickerProviderStateMixin {
                                   onTap: () => _setIndex(1),
                                 ),
                                 _NavItem(
-                                  icon: Icons.person_outline_rounded,
-                                  activeIcon: Icons.person_rounded,
+                                  icon: Icons.local_fire_department_outlined,
+                                  activeIcon: Icons.local_fire_department_rounded,
                                   isActive: _index == 2,
                                   accent: accent,
                                   isDark: isDark,
                                   onTap: () => _setIndex(2),
+                                ),
+                                _NavItem(
+                                  icon: Icons.person_outline_rounded,
+                                  activeIcon: Icons.person_rounded,
+                                  isActive: _index == 3,
+                                  accent: accent,
+                                  isDark: isDark,
+                                  onTap: () => _setIndex(3),
                                 ),
                               ],
                             ),
@@ -454,5 +448,24 @@ class _NavItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _KeepAliveWrapper extends StatefulWidget {
+  final Widget child;
+  const _KeepAliveWrapper({required this.child});
+
+  @override
+  State<_KeepAliveWrapper> createState() => _KeepAliveWrapperState();
+}
+
+class _KeepAliveWrapperState extends State<_KeepAliveWrapper> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
