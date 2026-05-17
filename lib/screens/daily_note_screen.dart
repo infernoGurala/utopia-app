@@ -7,6 +7,7 @@ import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
 import 'heatmap_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/image_overlay_colors.dart';
 
 class DailyNoteScreen extends StatefulWidget {
   const DailyNoteScreen({super.key});
@@ -277,38 +278,35 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       endDrawer: _buildCalendarDrawer(),
       body: Stack(
         children: [
-          // Background Image (Top Half)
+          // Background Image (Extended for smooth transition)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Opacity(
-              opacity: isDark ? 0.7 : 0.9,
-              child: Image.asset(
-                bgImage,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
+            height: MediaQuery.sizeOf(context).height * 0.8,
+            child: Image.asset(
+              bgImage,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
           ),
-          // Gradient overlay for seamless blending
+          // Gradient overlay: top half clear, bottom half smooth fade
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.61,
+            height: MediaQuery.sizeOf(context).height * 0.8,
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    U.bg.withValues(alpha: 0.1),
-                    U.bg.withValues(alpha: 0.5),
+                    U.bg.withValues(alpha: 0.0),
+                    U.bg.withValues(alpha: 0.0),
                     U.bg,
                   ],
-                  stops: const [0.0, 0.6, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -398,7 +396,12 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('Daily Note', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+              Text('Daily Note', style: GoogleFonts.playfairDisplay(
+                fontSize: 24, 
+                fontWeight: FontWeight.w700, 
+                fontStyle: FontStyle.italic, 
+                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
+              )),
               const Spacer(),
               Builder(
                 builder: (ctx) => GestureDetector(
@@ -431,10 +434,20 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
           ),
           const SizedBox(height: 16),
           // Date hero
-          Text(dayFull[_selectedDate.weekday], style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: U.primary, letterSpacing: 2.5)),
+          Text(dayFull[_selectedDate.weekday], style: GoogleFonts.outfit(
+            fontSize: 11, 
+            fontWeight: FontWeight.w700, 
+            color: U.primary, 
+            letterSpacing: 2.5,
+          )),
           const SizedBox(height: 4),
           Text('${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
-            style: GoogleFonts.playfairDisplay(fontSize: 28, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 28, 
+              fontWeight: FontWeight.w700, 
+              fontStyle: FontStyle.italic, 
+              color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
+            )),
           const SizedBox(height: 12),
         ],
       ),

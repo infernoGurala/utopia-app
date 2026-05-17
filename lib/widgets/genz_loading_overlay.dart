@@ -2,8 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../main.dart';
 
 class GenZLoadingOverlay extends StatefulWidget {
   const GenZLoadingOverlay({super.key});

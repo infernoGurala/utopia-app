@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import '../theme/image_overlay_colors.dart';
 import 'daily_note_screen.dart';
 import 'heatmap_home_screen.dart';
 import 'profile_screen.dart';
@@ -65,11 +66,27 @@ class _FocusScreenState extends State<FocusScreen> {
 
   String get _bgImagePath {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'assets/welcome_bg/one_light/morning.png';
-    if (hour < 17) return 'assets/welcome_bg/one_light/afternoon.png';
-    if (hour < 20) return 'assets/welcome_bg/one_light/evening.png';
-    return 'assets/welcome_bg/one_light/night.png';
+    
+    String timeSlot;
+    if (hour < 12) timeSlot = 'morning';
+    else if (hour < 17) timeSlot = 'afternoon';
+    else if (hour < 20) timeSlot = 'evening';
+    else timeSlot = 'night';
+
+    return 'assets/welcome_bg/one_light/$timeSlot.png';
   }
+
+  Color get _onImageTitleColor =>
+      ImageOverlayColors.titleColor(appThemeNotifier.value.key);
+
+  Color get _onImageSubtitleColor =>
+      ImageOverlayColors.subtitleColor(appThemeNotifier.value.key);
+
+  Color get _greetingColor =>
+      ImageOverlayColors.greetingColor(appThemeNotifier.value.key) ?? U.text;
+
+  Color get _motivationalColor =>
+      ImageOverlayColors.quoteColor(appThemeNotifier.value.key) ?? U.sub;
 
   @override
   void initState() {
@@ -151,49 +168,34 @@ class _FocusScreenState extends State<FocusScreen> {
             top: 0,
             left: 0,
             right: 0,
-            height: screenHeight * 0.58,
-            child: ColorFiltered(
-              colorFilter: appThemeNotifier.value.isDark
-                  ? ColorFilter.mode(Colors.black.withValues(alpha: 0.45), BlendMode.srcATop)
-                  : ColorFilter.mode(Colors.white.withValues(alpha: 0.45), BlendMode.srcATop),
-              child: Image.asset(
-                _bgImagePath,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
+            height: screenHeight * 0.80,
+            child: Image.asset(
+              _bgImagePath,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
           ),
 
-          // ── Gradient overlay for readability at bottom of image ──
+          // ── Gradient: top half clear, bottom half smooth fade ──
           Positioned(
-            top: screenHeight * 0.35,
+            top: 0,
             left: 0,
             right: 0,
-            height: screenHeight * 0.25,
+            height: screenHeight * 0.80,
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.transparent,
-                    U.bg.withValues(alpha: 0.6),
-                    U.bg.withValues(alpha: 0.95),
+                    U.bg.withValues(alpha: 0.0),
+                    U.bg.withValues(alpha: 0.0),
                     U.bg,
                   ],
-                  stops: const [0.0, 0.35, 0.7, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
-          ),
-
-          // ── Background below image ──
-          Positioned(
-            top: screenHeight * 0.58,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(color: U.bg),
           ),
 
           // ── Main scrollable content ──
@@ -220,24 +222,17 @@ class _FocusScreenState extends State<FocusScreen> {
                                 style: GoogleFonts.playfairDisplay(
                                   fontSize: 42,
                                   fontWeight: FontWeight.w700,
-                                  color: U.primary,
+                                  color: _onImageTitleColor,
                                   fontStyle: FontStyle.italic,
                                   letterSpacing: -1.5,
                                   height: 1.1,
-                                  shadows: [
-                                    Shadow(
-                                      color: U.primary.withValues(alpha: 0.2),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 'Stay productive and track your habits',
                                 style: GoogleFonts.outfit(
-                                  color: U.sub,
+                                  color: _onImageSubtitleColor,
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w400,
                                 ),
@@ -312,35 +307,53 @@ class _FocusScreenState extends State<FocusScreen> {
                   ),
 
                   // ── Greeting Section ──
-                  SizedBox(height: screenHeight * 0.2),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$_greeting, $_userName',
-                          style: GoogleFonts.outfit(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: U.text,
-                            height: 1.2,
+                  SizedBox(height: screenHeight * 0.18),
+                  ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        decoration: BoxDecoration(
+                          // A very faint gradient to smooth out the text area without hard edges
+                          gradient: LinearGradient(
+                            colors: [
+                              U.surface.withValues(alpha: 0.0),
+                              U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.15),
+                              U.surface.withValues(alpha: 0.0),
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _motivationalText,
-                          style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w400,
-                            color: U.sub,
-                            height: 1.45,
-                          ),
-                        ),
-                      ],
-                    ).animate()
-                        .fadeIn(delay: 300.ms, duration: 600.ms)
-                        .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 600.ms, curve: Curves.easeOut),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$_greeting, $_userName',
+                              style: GoogleFonts.outfit(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w700,
+                                color: _greetingColor,
+                                height: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _motivationalText,
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w400,
+                                color: _motivationalColor,
+                                height: 1.45,
+                              ),
+                            ),
+                          ],
+                        ).animate()
+                            .fadeIn(delay: 300.ms, duration: 600.ms)
+                            .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 600.ms, curve: Curves.easeOut),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 28),

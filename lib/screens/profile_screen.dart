@@ -18,6 +18,7 @@ import '../services/role_service.dart';
 import 'developer_panel_screen.dart';
 import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
+import 'user_profile_screen.dart';
 import 'iaa_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -342,25 +343,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            user?.displayName ?? 'Student',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: GoogleFonts.outfit(
-                                              color: U.text,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
+                                    GestureDetector(
+                                      onTap: () {
+                                        if (user == null) return;
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => UserProfileScreen(
+                                              uid: user.uid,
+                                              displayName: user.displayName ?? 'Student',
+                                              email: user.email ?? '',
+                                              photoUrl: user.photoURL,
                                             ),
                                           ),
-                                        ),
-                                        if (_isSuperUser) ...[
-                                          const SizedBox(width: 4),
-                                          Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                                        );
+                                      },
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              user?.displayName ?? 'Student',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.outfit(
+                                                color: U.text,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          if (_isSuperUser) ...[
+                                            const SizedBox(width: 4),
+                                            const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 14),
+                                          ],
                                         ],
-                                      ],
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -459,8 +476,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       if (_isSuperUser) ...[
                         _groupedTile(
                           icon: Icons.admin_panel_settings_outlined,
-                          label: 'Admin Control Panel',
-                          sub: 'Manage announcements, notifications, and timetable',
+                          label: 'Super Controls',
+                          sub: 'Analytics, broadcasts, and app-wide settings',
                           color: U.primary,
                           onTap: () => Navigator.push(
                             context,

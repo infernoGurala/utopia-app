@@ -404,7 +404,7 @@ class _TimetableEditorScreenState extends State<TimetableEditorScreen>
       ),
       body: _loading
           ? const Center(
-              child: const UtopiaLoader(scale: 0.7),
+              child: UtopiaLoader(scale: 0.7),
             )
           : TabBarView(
               controller: _tabController,

@@ -1,17 +1,11 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 
 import '../main.dart';
-import '../services/notification_service.dart';
 import '../services/writer_firestore_service.dart';
 import '../widgets/utopia_snackbar.dart';
 import 'broadcast_screen.dart';
-import 'quotes_editor_screen.dart';
-import 'timetable_editor_screen.dart';
 
 class DeveloperPanelScreen extends StatefulWidget {
   const DeveloperPanelScreen({super.key});
@@ -21,46 +15,48 @@ class DeveloperPanelScreen extends StatefulWidget {
 }
 
 class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
-  bool _holidayLoading = true;
-  bool _holidayTomorrow = false;
-  bool _savingHoliday = false;
-  bool _sendingMorningNotification = false;
-  bool _sendingPersonalMorningNotification = false;
-  bool _sendingPersonalNotification = false;
+  // ── Analytics stats ──
+  bool _statsLoading = true;
+  int _totalAccounts = 0;
+  int _dailyActiveUsers = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadHolidayState();
+      _loadStats();
     });
   }
 
-  Future<void> _loadHolidayState() async {
+  Future<void> _loadStats() async {
     try {
-      final data = await WriterFirestoreService.fetchConfig('morning_notif');
-      final notif = data is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data)
-          : <String, dynamic>{};
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _holidayTomorrow = notif['holiday'] == true;
-        _holidayLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _holidayLoading = false;
-      });
-      showUtopiaSnackBar(
-        context,
-        message: 'Could not load holiday settings',
-        tone: UtopiaSnackBarTone.error,
+      final usersRef = FirebaseFirestore.instance.collection('users');
+
+      // Total registered accounts
+      final allUsersSnap = await usersRef.count().get();
+      final totalCount = allUsersSnap.count ?? 0;
+
+      // Daily active users — lastSeen within last 24 hours
+      final cutoff = Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(hours: 24)),
       );
+      final dauSnap = await usersRef
+          .where('lastSeen', isGreaterThan: cutoff)
+          .count()
+          .get();
+      final dauCount = dauSnap.count ?? 0;
+
+      if (mounted) {
+        setState(() {
+          _totalAccounts = totalCount;
+          _dailyActiveUsers = dauCount;
+          _statsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _statsLoading = false);
+      }
     }
   }
 
@@ -114,381 +110,174 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     }
   }
 
-  Future<void> _toggleHoliday(bool value) async {
-    if (_savingHoliday) {
-      return;
-    }
-    setState(() {
-      _savingHoliday = true;
-    });
-
-    try {
-      final data = await WriterFirestoreService.fetchConfig('morning_notif');
-      final currentData = data is Map<String, dynamic>
-          ? Map<String, dynamic>.from(data)
-          : <String, dynamic>{};
-      final nextData = Map<String, dynamic>.from(currentData);
-      nextData['holiday'] = value;
-      await WriterFirestoreService.updateConfig('morning_notif', nextData);
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _holidayTomorrow = value;
-      });
-
-      showUtopiaSnackBar(
-        context,
-        message: value ? 'Holiday set for tomorrow' : 'Holiday removed',
-        tone: UtopiaSnackBarTone.success,
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      showUtopiaSnackBar(
-        context,
-        message: 'Could not update holiday',
-        tone: UtopiaSnackBarTone.error,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _savingHoliday = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _confirmAndSendMorningNotification() async {
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            backgroundColor: U.surface,
-            title: Text(
-              'Send now?',
-              style: GoogleFonts.outfit(color: U.text),
-            ),
-            content: Text(
-              'This will send today\'s morning notification to all students immediately.',
-              style: GoogleFonts.outfit(color: U.sub),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: GoogleFonts.outfit(color: U.sub),
-                ),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: U.primary,
-                  foregroundColor: U.bg,
-                ),
-                child: const Text('Send'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (confirmed != true || !mounted) {
-        return;
-      }
-
-      setState(() {
-        _sendingMorningNotification = true;
-      });
-
-      final patDoc = await WriterFirestoreService.fetchConfig('github');
-      final pat = patDoc?['pat'] as String? ?? '';
-      const owner = 'infernoGurala';
-      const repo = 'utopia-content';
-      final url =
-          'https://api.github.com/repos/$owner/$repo/actions/workflows/morning_notification.yml/dispatches';
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $pat',
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'ref': 'main'}),
-      );
-      if (!mounted) {
-        return;
-      }
-
-      if (response.statusCode == 204) {
-        showUtopiaSnackBar(
-          context,
-          message:
-              'Morning notification triggered. Arrives in about 30 seconds',
-          tone: UtopiaSnackBarTone.success,
-        );
-      } else {
-        throw Exception(
-          'GitHub workflow dispatch failed: ${response.statusCode}',
-        );
-      }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      showUtopiaSnackBar(
-        context,
-        message: 'Could not trigger morning notification',
-        tone: UtopiaSnackBarTone.error,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _sendingMorningNotification = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _sendPersonalNotification() async {
-    if (_sendingPersonalNotification) {
-      return;
-    }
-
-    final controller = TextEditingController();
-    try {
-      final message = await showDialog<String>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            backgroundColor: U.surface,
-            title: Text(
-              'Send Personal Test',
-              style: GoogleFonts.outfit(color: U.text),
-            ),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: 200,
-              maxLines: 4,
-              minLines: 3,
-              style: GoogleFonts.outfit(color: U.text),
-              decoration: InputDecoration(
-                hintText: 'Message to send only to your device',
-                hintStyle: GoogleFonts.outfit(color: U.dim),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'Cancel',
-                  style: GoogleFonts.outfit(color: U.sub),
-                ),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, controller.text.trim()),
-                style: FilledButton.styleFrom(
-                  backgroundColor: U.primary,
-                  foregroundColor: U.bg,
-                ),
-                child: const Text('Send'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (!mounted || message == null || message.isEmpty) {
-        return;
-      }
-
-      setState(() {
-        _sendingPersonalNotification = true;
-      });
-
-      await NotificationService.sendPersonalTestNotification(message: message);
-
-      if (!mounted) {
-        return;
-      }
-
-      showUtopiaSnackBar(
-        context,
-        message: 'Personal test notification sent to your device',
-        tone: UtopiaSnackBarTone.success,
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      showUtopiaSnackBar(
-        context,
-        message: 'Could not send personal notification',
-        tone: UtopiaSnackBarTone.error,
-      );
-    } finally {
-      controller.dispose();
-      if (mounted) {
-        setState(() {
-          _sendingPersonalNotification = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _sendPersonalMorningNotification() async {
-    if (_sendingPersonalMorningNotification) {
-      return;
-    }
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('No signed-in user');
-      }
-
-      setState(() {
-        _sendingPersonalMorningNotification = true;
-      });
-
-      final patDoc = await WriterFirestoreService.fetchConfig('github');
-      final pat = patDoc?['pat'] as String? ?? '';
-      const owner = 'infernoGurala';
-      const repo = 'utopia-content';
-      const workflowFile = 'personal_morning_notification.yml';
-      const ref = 'main';
-
-      final response = await http.post(
-        Uri.parse(
-          'https://api.github.com/repos/$owner/$repo/actions/workflows/$workflowFile/dispatches',
-        ),
-        headers: {
-          'Authorization': 'Bearer $pat',
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'ref': ref,
-          'inputs': {'uid': user.uid},
-        }),
-      );
-      if (response.statusCode != 204) {
-        throw Exception(
-          'GitHub workflow dispatch failed: ${response.statusCode}',
-        );
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      showUtopiaSnackBar(
-        context,
-        message: 'Personal morning notification sent to your device',
-        tone: UtopiaSnackBarTone.success,
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      showUtopiaSnackBar(
-        context,
-        message: 'Could not send personal morning notification',
-        tone: UtopiaSnackBarTone.error,
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _sendingPersonalMorningNotification = false;
-        });
-      }
-    }
-  }
+  // ──────────────────────────────────────────────────────────────────
+  // UI Helpers
+  // ──────────────────────────────────────────────────────────────────
 
   Widget _sectionHeader(String text, {bool isFirst = false}) {
     return Padding(
-      padding: EdgeInsets.only(top: isFirst ? 0 : 16, bottom: 8),
+      padding: EdgeInsets.only(top: isFirst ? 0 : 24, bottom: 10),
       child: Text(
-        text,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: U.primary,
-          fontWeight: FontWeight.w700,
+        text.toUpperCase(),
+        style: GoogleFonts.outfit(
+          color: U.sub,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
         ),
       ),
     );
   }
 
-  Widget _toolCard({
+  Widget _buildStatsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Analytics', isFirst: true),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                icon: Icons.people_alt_rounded,
+                label: 'Total Accounts',
+                value: _statsLoading ? '—' : _totalAccounts.toString(),
+                color: U.blue,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                icon: Icons.trending_up_rounded,
+                label: 'Active Today',
+                value: _statsLoading ? '—' : _dailyActiveUsers.toString(),
+                color: U.green,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.04),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: U.sub,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionTile({
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback? onTap,
-    Widget? trailing,
+    Color? iconColor,
   }) {
-    return Card(
-      color: U.card,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: U.primary),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: U.text,
-            fontWeight: FontWeight.w600,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = iconColor ?? U.primary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: U.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.04),
+            width: 1,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: U.sub),
-        ),
-        trailing:
-            trailing ??
-            Icon(Icons.chevron_right, color: U.dim),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  Widget _holidayCard() {
-    return _toolCard(
-      icon: Icons.beach_access,
-      title: 'Tomorrow is a Holiday',
-      subtitle: 'Toggle to send holiday notification tomorrow',
-      trailing: _savingHoliday
-          ? SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: U.primary,
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: isDark ? 0.12 : 0.06),
+                borderRadius: BorderRadius.circular(10),
               ),
-            )
-          : _holidayLoading
-          ? SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: U.dim,
-              ),
-            )
-          : Switch(
-              value: _holidayTomorrow,
-              activeThumbColor: U.primary,
-              onChanged: _toggleHoliday,
+              child: Icon(icon, color: color, size: 20),
             ),
-      onTap: (_savingHoliday || _holidayLoading)
-          ? null
-          : () => _toggleHoliday(!_holidayTomorrow),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      color: U.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.outfit(
+                      color: U.dim,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: U.dim, size: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -502,124 +291,42 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
           appBar: AppBar(
             backgroundColor: U.bg,
             foregroundColor: U.text,
-            title: Row(
-              children: [
-                Icon(Icons.edit, size: 18, color: U.primary),
-                const SizedBox(width: 8),
-                const Text('Developer Mode'),
-              ],
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            title: Text(
+              'Super Controls',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+              ),
             ),
           ),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
             children: [
-              _sectionHeader('🚀 Quick Actions', isFirst: true),
-              _toolCard(
-                icon: Icons.send,
-                title: 'Send Morning Notification Now',
-                subtitle: 'Manually trigger today\'s schedule to all students',
-                trailing: _sendingMorningNotification
-                    ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: U.primary,
-                        ),
-                      )
-                    : Icon(Icons.chevron_right, color: U.dim),
-                onTap: _sendingMorningNotification
-                    ? null
-                    : _confirmAndSendMorningNotification,
-              ),
-              const SizedBox(height: 12),
-              _toolCard(
-                icon: Icons.wb_twilight_outlined,
-                title: 'Send Personal Morning Notification',
-                subtitle: 'Trigger today\'s morning notification only for you',
-                trailing: _sendingPersonalMorningNotification
-                    ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: U.primary,
-                        ),
-                      )
-                    : Icon(Icons.chevron_right, color: U.dim),
-                onTap: _sendingPersonalMorningNotification
-                    ? null
-                    : _sendPersonalMorningNotification,
-              ),
-              const SizedBox(height: 12),
-              _toolCard(
-                icon: Icons.notifications_active_outlined,
-                title: 'Send Personal Test Notification',
-                subtitle: 'Send a custom push notification only to your account',
-                trailing: _sendingPersonalNotification
-                    ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: U.primary,
-                        ),
-                      )
-                    : Icon(Icons.chevron_right, color: U.dim),
-                onTap: _sendingPersonalNotification
-                    ? null
-                    : _sendPersonalNotification,
-              ),
-              const SizedBox(height: 12),
-              _sectionHeader('📢 Announcements'),
-              _toolCard(
-                icon: Icons.campaign,
+              _buildStatsSection(),
+              _sectionHeader('Announcements'),
+              _actionTile(
+                icon: Icons.campaign_outlined,
                 title: 'Broadcast Message',
-                subtitle: 'Send urgent notification to all students',
+                subtitle: 'Send notification to all students',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const BroadcastScreen()),
                 ),
               ),
-              const SizedBox(height: 12),
-              _toolCard(
-                icon: Icons.celebration,
+              _actionTile(
+                icon: Icons.celebration_outlined,
                 title: 'Trigger Share Pop-up',
-                subtitle: 'Show share pop-up to all users on next launch',
+                subtitle: 'Show share pop-up on next launch',
                 onTap: _triggerPopupEvent,
               ),
-              const SizedBox(height: 12),
-              _toolCard(
+              _actionTile(
                 icon: Icons.web_rounded,
                 title: 'Trigger Web Pop-up',
                 subtitle: 'Show web version pop-up to all users',
                 onTap: _triggerWebPopupEvent,
               ),
-              const SizedBox(height: 12),
-              _sectionHeader('📅 Timetable'),
-              _toolCard(
-                icon: Icons.edit_calendar,
-                title: 'Edit Timetable',
-                subtitle: 'Update subjects and times for each day',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TimetableEditorScreen()),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _sectionHeader('💬 Quotes'),
-              _toolCard(
-                icon: Icons.format_quote,
-                title: 'Quotes Pool',
-                subtitle: 'Add or remove daily motivational quotes',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const QuotesEditorScreen()),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _sectionHeader('🏖️ Holiday'),
-              _holidayCard(),
             ],
           ),
         );
@@ -627,4 +334,3 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     );
   }
 }
-

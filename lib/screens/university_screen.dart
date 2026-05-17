@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
+import '../theme/image_overlay_colors.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
 import 'friends_screen.dart';
@@ -63,27 +64,24 @@ class _UniversityScreenState extends State<UniversityScreen> {
       backgroundColor: U.bg,
       body: Stack(
         children: [
-          // Background Image
+          // Background Image (Extended for smooth transition)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: Opacity(
-              opacity: isDark ? 0.3 : 0.6,
-              child: Image.asset(
-                'assets/university/background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
+            height: MediaQuery.sizeOf(context).height * 0.6,
+            child: Image.asset(
+              'assets/university/background.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
           ),
-          // Gradient fade for background
+          // Gradient overlay: top half clear, bottom half smooth fade
           Positioned(
-            top: MediaQuery.sizeOf(context).height * 0.2,
+            top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.25,
+            height: MediaQuery.sizeOf(context).height * 0.6,
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -91,8 +89,10 @@ class _UniversityScreenState extends State<UniversityScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     U.bg.withValues(alpha: 0.0),
+                    U.bg.withValues(alpha: 0.0),
                     U.bg,
                   ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -114,7 +114,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                             Text(
                               'University',
                               style: GoogleFonts.playfairDisplay(
-                                color: U.text,
+                                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
                                 fontSize: 42,
                                 fontWeight: FontWeight.w700,
                                 fontStyle: FontStyle.normal,
@@ -124,7 +124,11 @@ class _UniversityScreenState extends State<UniversityScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Explore your campus network',
-                              style: GoogleFonts.outfit(color: U.dim, fontSize: 14, fontWeight: FontWeight.w400),
+                              style: GoogleFonts.outfit(
+                                color: ImageOverlayColors.subtitleColor(appThemeNotifier.value.key),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                              ),
                             ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
                           ],
                         ),

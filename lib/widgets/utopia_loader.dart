@@ -1,7 +1,12 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 
+/// A loading bar that replicates the CSS spark/progress animation.
+/// - Grows from 0% → 100% width over 8 seconds (animFw)
+/// - Two spark "tails" flicker at the leading edge every 0.3s (coli1/coli2)
+/// - Color and track use the current app theme (U.primary)
+/// - Glow is suppressed on light themes for visibility
 class UtopiaLoader extends StatefulWidget {
   final double scale;
   final Color? color;
@@ -17,193 +22,196 @@ class UtopiaLoader extends StatefulWidget {
 }
 
 class _UtopiaLoaderState extends State<UtopiaLoader>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scrollAnimation;
-  late Animation<double> _wobbleAnimation;
+    with TickerProviderStateMixin {
+  late AnimationController _progressController;
+  late AnimationController _sparkController;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _progressController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 8),
     )..repeat();
 
-    _scrollAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: const Cubic(0.1, 0.6, 0.9, 0.4),
-    );
-
-    _wobbleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: const Cubic(0.5, 0.8, 0.5, 0.2),
-    );
+    _sparkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    )..repeat();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _progressController.dispose();
+    _sparkController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final double mainSize = 40 * widget.scale;
-    final Color textColor = widget.color ?? U.primary;
-    final Color shadowColor = textColor.withValues(alpha: 0.4);
+    final double barHeight = 2.5 * widget.scale;
+    // Extra vertical space for sparks
+    final double totalHeight = barHeight + (8.0 * widget.scale) * 2;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: mainSize * 1.825,
-          height: mainSize * 0.25,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              _buildSlice(1, 0.0, 0.1111, 20, -2.1, 0.6, mainSize, textColor, shadowColor),
-              _buildSlice(2, 0.1111, 0.2222, 16, -0.98, 0.7, mainSize, textColor, shadowColor),
-              _buildSlice(3, 0.2222, 0.3333, 13, -0.33, 0.8, mainSize, textColor, shadowColor),
-              _buildSlice(4, 0.3333, 0.4444, 11, -0.05, 0.9, mainSize, textColor, shadowColor),
-              _buildSlice(5, 0.4444, 0.5555, 10, 0.0, 1.0, mainSize, textColor, shadowColor),
-              _buildSlice(6, 0.5555, 0.6666, 11, 0.05, 0.9, mainSize, textColor, shadowColor),
-              _buildSlice(7, 0.6666, 0.7777, 13, 0.33, 0.8, mainSize, textColor, shadowColor),
-              _buildSlice(8, 0.7777, 0.8888, 16, 0.98, 0.7, mainSize, textColor, shadowColor),
-              _buildSlice(9, 0.8888, 1.0, 20, 2.1, 0.6, mainSize, textColor, shadowColor),
-            ],
-          ),
-        ),
-        const SizedBox(height: 2), 
-        Container(
-          height: mainSize * 0.0125, 
-          width: mainSize * 0.125, 
-          decoration: BoxDecoration(
-            color: textColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(mainSize * 0.0125),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: AnimatedBuilder(
-            animation: _wobbleAnimation,
-            builder: (context, child) {
-              final double t = _wobbleAnimation.value;
-              final double x = (t <= 0.5) 
-                  ? (-0.9 + (t * 2) * 1.8) 
-                  : (0.9 - (t - 0.5) * 2 * 1.8); 
-              
-              return FractionallySizedBox(
-                alignment: Alignment(x, 0),
-                widthFactor: 1.0,
-                child: Container(
-                  color: textColor,
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: appThemeNotifier,
+      builder: (context, theme, __) {
+        final Color resolvedColor = widget.color ?? U.primary;
+        final bool isDark = theme.isDark;
 
-  Widget _buildSlice(
-    int index,
-    double start,
-    double end,
-    double divisor,
-    double marginLeftEm,
-    double opacity,
-    double mainSize,
-    Color textColor,
-    Color shadowColor,
-  ) {
-    final double fontSize = mainSize / (divisor / 4);
-    final double marginLeft = marginLeftEm * (mainSize / 4);
+        return Padding(
+          // Horizontal inset so sparks at the very start/end don't clip
+          padding: EdgeInsets.symmetric(horizontal: 6.0 * widget.scale),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double maxWidth = (constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : 200.0 * widget.scale)
+                  .clamp(0.0, 120.0 * widget.scale);
 
-    return Positioned(
-      left: (mainSize * 0.9125) + marginLeft - (mainSize * 0.5), 
-      child: Opacity(
-        opacity: opacity,
-        child: ClipRect(
-          clipper: _SliceClipper(start, end),
-          child: AnimatedBuilder(
-            animation: _scrollAnimation,
-            builder: (context, child) {
-              final double scrollPos = _scrollAnimation.value;
-              final double offset = (scrollPos * 2 - 1) * mainSize * 0.5;
-
-              return Transform.translate(
-                offset: Offset(offset, 0),
-                child: ShaderMask(
-                  blendMode: BlendMode.srcIn,
-                  shaderCallback: (bounds) {
-                    return _getGradient(index, textColor, shadowColor, scrollPos).createShader(bounds);
-                  },
-                  child: Text(
-                    'LOADING',
-                    style: GoogleFonts.outfit(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w900,
+              return AnimatedBuilder(
+                animation:
+                    Listenable.merge([_progressController, _sparkController]),
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: Size(maxWidth, totalHeight),
+                    painter: _SparkLoaderPainter(
+                      progress: _progressController.value,
+                      sparkValue: _sparkController.value,
+                      color: resolvedColor,
+                      scale: widget.scale,
+                      totalHeight: totalHeight,
+                      barHeight: barHeight,
+                      isDark: isDark,
                     ),
-                  ),
-                ),
+                  );
+                },
               );
             },
           ),
-        ),
-      ),
+        );
+      },
     );
   }
-
-  LinearGradient _getGradient(int index, Color text, Color shadow, double t) {
-    final double shift = -0.98 + (t * 2.0); 
-    double s1, s2;
-    bool invert = false;
-
-    switch (index) {
-      case 1: s1 = 0.04; s2 = 0.07; break;
-      case 2: s1 = 0.09; s2 = 0.13; break;
-      case 3: s1 = 0.15; s2 = 0.18; break;
-      case 4: s1 = 0.20; s2 = 0.23; break;
-      case 5: return LinearGradient(colors: [text, text]);
-      case 6: s1 = 0.29; s2 = 0.32; invert = true; break;
-      case 7: s1 = 0.34; s2 = 0.37; invert = true; break;
-      case 8: s1 = 0.39; s2 = 0.42; invert = true; break;
-      case 9: s1 = 0.45; s2 = 0.48; invert = true; break;
-      default: return LinearGradient(colors: [text, text]);
-    }
-
-    final double p1 = (s1 + shift).clamp(0.0, 1.0);
-    final double p2 = (s2 + stopToOther(s1, s2) + shift).clamp(0.0, 1.0);
-
-    return LinearGradient(
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-      colors: invert ? [shadow, text] : [text, shadow],
-      stops: [p1, p2],
-      tileMode: TileMode.clamp,
-    );
-  }
-
-  double stopToOther(double s1, double s2) => s2 - s1;
 }
 
-class _SliceClipper extends CustomClipper<Rect> {
-  final double start;
-  final double end;
+class _SparkLoaderPainter extends CustomPainter {
+  final double progress;
+  final double sparkValue;
+  final Color color;
+  final double scale;
+  final double totalHeight;
+  final double barHeight;
+  final bool isDark;
 
-  _SliceClipper(this.start, this.end);
+  _SparkLoaderPainter({
+    required this.progress,
+    required this.sparkValue,
+    required this.color,
+    required this.scale,
+    required this.totalHeight,
+    required this.barHeight,
+    required this.isDark,
+  });
 
   @override
-  Rect getClip(Size size) {
-    return Rect.fromLTRB(
-      size.width * start,
-      0,
-      size.width * end,
-      size.height,
+  void paint(Canvas canvas, Size size) {
+    final double barY = (totalHeight - barHeight) / 2;
+    final double barWidth = size.width * progress;
+    final double radius = barHeight / 2;
+
+    // 1. Background track — more visible on light themes
+    final double trackAlpha = isDark ? 0.15 : 0.22;
+    final Paint trackPaint = Paint()
+      ..color = color.withValues(alpha: trackAlpha)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, barY, size.width, barHeight),
+        Radius.circular(radius),
+      ),
+      trackPaint,
     );
+
+    if (barWidth < 1) return;
+
+    // 2. Glow — dark themes only (light bg absorbs blur, makes it muddy)
+    if (isDark) {
+      final Paint glowPaint = Paint()
+        ..color = color.withValues(alpha: 0.45)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4.0 * scale);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, barY, barWidth, barHeight),
+          Radius.circular(radius),
+        ),
+        glowPaint,
+      );
+    }
+
+    // 3. Solid bar — slightly higher opacity on light for contrast
+    final Paint solidPaint = Paint()
+      ..color = isDark ? color : color.withValues(alpha: 0.9)
+      ..style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, barY, barWidth, barHeight),
+        Radius.circular(radius),
+      ),
+      solidPaint,
+    );
+
+    // 4. Sparks at the leading tip
+    final double tipX = barWidth;
+    final double sparkW = 6.0 * scale;
+    final double sparkH = 0.8 * scale;
+    // Sparks are more opaque on light themes to stay visible
+    final double sparkBoost = isDark ? 1.0 : 1.4;
+
+    // Spark 1 — after (coli1): rotates -45°, fades 0.7→0
+    {
+      final double opacity =
+          (0.7 * sparkBoost * (1.0 - sparkValue)).clamp(0.0, 1.0);
+      final double tx = -25.0 * scale * sparkValue;
+      final double originX = tipX + 1.5 * scale;
+      final double originY = barY + 5.0 * scale;
+
+      canvas.save();
+      canvas.translate(originX, originY);
+      canvas.rotate(-math.pi / 4);
+      canvas.translate(tx, 0);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, sparkW, sparkH),
+        Paint()..color = color.withValues(alpha: opacity),
+      );
+      canvas.restore();
+    }
+
+    // Spark 2 — before (coli2): rotates +45°, fades 1→0.7
+    {
+      final double opacity =
+          ((1.0 - 0.3 * sparkValue) * sparkBoost).clamp(0.0, 1.0);
+      final double tx = -25.0 * scale * sparkValue;
+      final double originX = tipX + 1.5 * scale;
+      final double originY = barY - 3.0 * scale;
+
+      canvas.save();
+      canvas.translate(originX, originY);
+      canvas.rotate(math.pi / 4);
+      canvas.translate(tx, 0);
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, sparkW, sparkH),
+        Paint()..color = color.withValues(alpha: opacity),
+      );
+      canvas.restore();
+    }
   }
 
   @override
-  bool shouldReclip(_SliceClipper oldClipper) =>
-      oldClipper.start != start || oldClipper.end != end;
+  bool shouldRepaint(_SparkLoaderPainter old) =>
+      old.progress != progress ||
+      old.sparkValue != sparkValue ||
+      old.color != color ||
+      old.scale != scale ||
+      old.isDark != isDark;
 }

@@ -217,7 +217,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 children: [
                                   Row(
                                     children: [
-                                      Expanded(
+                                      Flexible(
                                         child: Text(
                                           displayName,
                                           maxLines: 1,
@@ -231,7 +231,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                       ),
                                       if (userData['role'] == 'superuser') ...[
                                         const SizedBox(width: 4),
-                                        Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                                        const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 14),
                                       ],
                                     ],
                                   ),

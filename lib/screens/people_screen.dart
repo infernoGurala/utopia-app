@@ -215,7 +215,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                           final users = (snap.data?.docs ?? [])
                               .map((d) => {'uid': d.id, ...d.data()})
                               .where((u) {
-                            if (u['uid'] == _currentUid) return false;
+                            // Show self in list too
                             if (query.isEmpty) return true;
                             final name = (u['displayName'] ?? '')
                                 .toString()
@@ -366,7 +366,7 @@ class _PeopleRowState extends State<_PeopleRow> {
                 children: [
                   Row(
                     children: [
-                      Expanded(
+                      Flexible(
                         child: Text(
                           displayName,
                           maxLines: 1,
@@ -380,7 +380,7 @@ class _PeopleRowState extends State<_PeopleRow> {
                       ),
                       if (widget.user['role'] == 'superuser') ...[
                         const SizedBox(width: 4),
-                        Icon(Icons.verified_rounded, color: U.primary, size: 14),
+                        const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 14),
                       ],
                     ],
                   ),

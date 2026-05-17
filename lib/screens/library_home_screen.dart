@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
+import '../theme/image_overlay_colors.dart';
 import '../widgets/utopia_loader.dart';
 import '../services/class_service.dart';
 import '../services/supabase_global_service.dart';
@@ -210,12 +211,12 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
               ),
             ),
           ),
-          // Gradient fade for background
+          // Gradient fade — top fully clear, bottom lightly tinted (not solid)
           Positioned(
-            top: MediaQuery.sizeOf(context).height * 0.2,
+            top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.25,
+            height: MediaQuery.sizeOf(context).height * 0.45,
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -223,8 +224,10 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                   end: Alignment.bottomCenter,
                   colors: [
                     U.bg.withValues(alpha: 0.0),
-                    U.bg,
+                    U.bg.withValues(alpha: 0.0),
+                    U.bg.withValues(alpha: 0.45),
                   ],
+                  stops: const [0.0, 0.55, 1.0],
                 ),
               ),
             ),
@@ -246,7 +249,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             Text(
                               'Semesters',
                               style: GoogleFonts.playfairDisplay(
-                                color: U.text,
+                                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
                                 fontSize: 42,
                                 fontWeight: FontWeight.w700,
                                 fontStyle: FontStyle.normal,
@@ -256,7 +259,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             const SizedBox(height: 4),
                             Text(
                               'Access your academic resources',
-                              style: GoogleFonts.outfit(color: U.dim, fontSize: 14, fontWeight: FontWeight.w400),
+                              style: GoogleFonts.outfit(
+                                color: ImageOverlayColors.subtitleColor(appThemeNotifier.value.key),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w400,
+                              ),
                             ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
                           ],
                         ),
@@ -694,6 +701,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     Widget? backgroundShape,
     bool showPin = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -701,17 +710,23 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           color: U.surface,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              U.surface,
+              Color.lerp(U.surface, color, isDark ? 0.1 : 0.05) ?? U.surface,
+            ],
+          ),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.5), 
+            width: 1.0,
+          ),
           boxShadow: [
             BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -755,26 +770,22 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: U.surface,
-                        gradient: RadialGradient(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                           colors: [
-                            Colors.white,
-                            color.withValues(alpha: 0.08),
+                            color.withValues(alpha: isDark ? 0.15 : 0.1),
+                            color.withValues(alpha: isDark ? 0.05 : 0.02),
                           ]
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: color.withValues(alpha: 0.15),
-                            blurRadius: 16,
-                            spreadRadius: 2,
-                            offset: const Offset(0, 6),
-                          ),
-                          const BoxShadow(
-                            color: Colors.white,
-                            blurRadius: 12,
-                            spreadRadius: 4,
-                            offset: Offset(-4, -4),
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
                         ],
+                        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.6), width: 1),
                       ),
                       child: Center(
                         child: Icon(icon, color: color, size: 28),
@@ -822,12 +833,13 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       height: 32,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white,
+                        color: isDark ? U.surface : Colors.white,
+                        border: isDark ? Border.all(color: color.withValues(alpha: 0.3), width: 1) : null,
                         boxShadow: [
                           BoxShadow(
-                            color: color.withValues(alpha: 0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
