@@ -81,13 +81,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildProfileHeader(user),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Analytics Overview',
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAnalyticsGrid(),
+
                       const SizedBox(height: 32),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -121,41 +115,52 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
 
   Widget _buildProfileHeader(User? user) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: U.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: U.border),
+        gradient: LinearGradient(
+          colors: [U.primary, U.teal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: U.primary.withValues(alpha: 0.2),
-            backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
-            child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 32) : null,
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
+            child: CircleAvatar(
+              radius: 36,
+              backgroundColor: U.surface,
+              backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
+              child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        user?.displayName ?? 'Organizer',
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
                 Text(
-                  '${_myEvents.length} Events • ${_analytics['total_registrations'] ?? 0} Registrations',
-                  style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+                  user?.displayName ?? 'Organizer',
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
+                    style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
@@ -165,22 +170,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
   }
 
-  Widget _buildAnalyticsGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.4,
-      children: [
-        _buildStatCard('Total Registrations', '${_analytics['total_registrations'] ?? 0}', Icons.how_to_reg_rounded, U.primary),
-        _buildStatCard('Event Views', '${_analytics['total_views'] ?? 0}', Icons.visibility_rounded, U.teal),
-        _buildStatCard('Engagement', _analytics['engagement'] ?? '0%', Icons.auto_graph_rounded, U.peach),
-        _buildStatCard('Total Shares', '${_analytics['total_shares'] ?? 0}', Icons.share_rounded, U.blue),
-      ],
-    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0);
-  }
+
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Container(
@@ -255,12 +245,15 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     if (event.status == EventStatus.completed) statusColor = U.dim;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: U.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: U.border),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
       ),
       child: Column(
         children: [
@@ -307,26 +300,36 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           const SizedBox(height: 16),
           Divider(color: U.border, height: 1),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.8,
             children: [
-              Text(
-                '${event.participantCount} registered${event.participantLimit > 0 ? ' / ${event.participantLimit}' : ''}',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: U.text),
-              ),
-              Row(
-                children: [
-                  _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
-                    if (event.id == null) return;
-                    final regs = await EventService.instance.getRegistrations(event.id!);
-                    if (mounted) {
-                      _showParticipantsDialog(event.title, regs);
-                    }
-                  }),
-                  _buildIconBtn(Icons.visibility_rounded, '${event.viewCount} views', null),
-                  _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event)),
-                ],
-              ),
+              _buildEventStat('Registrations', '${event.participantCount}${event.participantLimit > 0 ? '/${event.participantLimit}' : ''}', Icons.how_to_reg_rounded, U.primary),
+              _buildEventStat('Views', '${event.viewCount}', Icons.visibility_rounded, U.teal),
+              _buildEventStat('Shares', '${event.shareCount}', Icons.share_rounded, U.blue),
+              _buildEventStat('Engagement', '${event.participantCount > 0 ? ((event.participantCount / (event.participantLimit > 0 ? event.participantLimit : 100)) * 100).round().clamp(0, 100) : 0}%', Icons.auto_graph_rounded, U.peach),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _buildIconBtn(Icons.edit_rounded, 'Edit Event', () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateEventScreen(existingEvent: event)));
+                _loadData();
+              }),
+              _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
+                if (event.id == null) return;
+                final regs = await EventService.instance.getRegistrations(event.id!);
+                if (mounted) {
+                  _showParticipantsDialog(event.title, regs);
+                }
+              }),
+              _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event), iconColor: U.red),
             ],
           ),
         ],
@@ -358,11 +361,50 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     }
   }
 
-  Widget _buildIconBtn(IconData icon, String tooltip, VoidCallback? onPressed) {
-    return IconButton(
-      icon: Icon(icon, color: U.primary, size: 20),
-      onPressed: onPressed,
-      tooltip: tooltip,
+  Widget _buildIconBtn(IconData icon, String tooltip, VoidCallback? onPressed, {Color? iconColor}) {
+    final color = iconColor ?? U.primary;
+    return Container(
+      margin: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: color, size: 20),
+        onPressed: onPressed,
+        tooltip: tooltip,
+        splashRadius: 24,
+      ),
+    );
+  }
+
+  Widget _buildEventStat(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 11, color: U.sub), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text)),
+        ],
+      ),
     );
   }
 
