@@ -10,9 +10,11 @@ import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/cloudinary_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CreateEventScreen extends StatefulWidget {
-  const CreateEventScreen({super.key});
+  final EventModel? existingEvent;
+  const CreateEventScreen({super.key, this.existingEvent});
 
   @override
   State<CreateEventScreen> createState() => _CreateEventScreenState();
@@ -21,6 +23,62 @@ class CreateEventScreen extends StatefulWidget {
 class _CreateEventScreenState extends State<CreateEventScreen> {
   int _currentStep = 0;
   bool _isPublishing = false;
+  String? _existingBannerUrl;
+  String? _existingPosterUrl;
+  String? _existingPermissionUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingEvent != null) {
+      final ev = widget.existingEvent!;
+      _titleController.text = ev.title;
+      _shortDescController.text = ev.shortDescription;
+      _conductedByController.text = ev.conductedBy;
+      _selectedCategory = ev.category;
+      
+      _venueController.text = ev.venue;
+      _participantLimitController.text = ev.participantLimit.toString();
+      _selectedDate = ev.date;
+      _registrationDeadline = ev.registrationDeadline;
+      
+      _startTime = _parseTimeOfDay(ev.startTime) ?? const TimeOfDay(hour: 10, minute: 0);
+      if (ev.endTime.isNotEmpty) _endTime = _parseTimeOfDay(ev.endTime) ?? const TimeOfDay(hour: 17, minute: 0);
+      
+      _fullDescController.text = ev.fullDescription;
+      _requirementsController.text = ev.requirements ?? '';
+      _prizeInfoController.text = ev.prizeInfo ?? '';
+      _contactController.text = ev.contactNumbers;
+      _whatsappController.text = ev.whatsappLink ?? '';
+      _participationLinkController.text = ev.participationLink ?? '';
+      _tagsController.text = ev.tags.join(', ');
+      
+      if (ev.requiresPayment && ev.feeAmount != null) {
+        _requiresPayment = true;
+        _feeAmountController.text = ev.feeAmount!;
+      }
+      _providesAttendance = ev.providesAttendance;
+      _providesCertificate = ev.providesCertificate;
+      
+      _existingBannerUrl = ev.bannerUrl;
+      _existingPosterUrl = ev.posterUrl;
+      _existingPermissionUrl = ev.permissionLetterUrl;
+    }
+  }
+
+  TimeOfDay? _parseTimeOfDay(String timeStr) {
+    try {
+      final parts = timeStr.split(RegExp(r'[:\s]'));
+      if (parts.length >= 3) {
+        int hour = int.parse(parts[0]);
+        int minute = int.parse(parts[1]);
+        if (parts[2].toLowerCase() == 'pm' && hour < 12) hour += 12;
+        if (parts[2].toLowerCase() == 'am' && hour == 12) hour = 0;
+        return TimeOfDay(hour: hour, minute: minute);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   // Step 1 — Basic Info
   final _titleController = TextEditingController();
@@ -164,13 +222,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
-    if (_bannerFile == null) {
+    if (_bannerFile == null && _existingBannerUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Banner image is required', style: GoogleFonts.outfit())),
       );
       return;
     }
-    if (_permissionFile == null) {
+    if (_permissionFile == null && _existingPermissionUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Permission letter is required', style: GoogleFonts.outfit())),
       );
@@ -201,10 +259,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         universityId = userDoc.data()?['selectedUniversityId'] as String?;
       } catch (_) {}
 
-      // Upload images
-      String? bannerUrl;
-      String? posterUrl;
-      String? permissionUrl;
+      String? bannerUrl = _existingBannerUrl;
+      String? posterUrl = _existingPosterUrl;
+      String? permissionUrl = _existingPermissionUrl;
       final fileUploadService = FileUploadService();
 
       if (_bannerFile != null) {
@@ -280,24 +337,33 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         requirements: _requirementsController.text.trim().isEmpty ? null : _requirementsController.text.trim(),
       );
 
-      final eventId = await EventService.instance.createEvent(event);
-
-      if (mounted) {
-        if (eventId != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Event submitted for approval!', style: GoogleFonts.outfit()),
-              backgroundColor: U.teal,
-            ),
-          );
-          Navigator.pop(context);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to create event. Please try again.', style: GoogleFonts.outfit()),
-              backgroundColor: U.red,
-            ),
-          );
+      if (widget.existingEvent != null) {
+        final success = await EventService.instance.updateEvent(widget.existingEvent!.id!, event.toMap());
+        if (mounted) {
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Event updated successfully!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
+            );
+            Navigator.pop(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to update event.', style: GoogleFonts.outfit()), backgroundColor: U.red),
+            );
+          }
+        }
+      } else {
+        final eventId = await EventService.instance.createEvent(event);
+        if (mounted) {
+          if (eventId != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Event submitted for approval!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
+            );
+            Navigator.pop(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to create event. Please try again.', style: GoogleFonts.outfit()), backgroundColor: U.red),
+            );
+          }
         }
       }
     } catch (e) {
@@ -344,7 +410,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Upload Event',
+          widget.existingEvent != null ? 'Edit Event' : 'Upload Event',
           style: GoogleFonts.outfit(color: U.text, fontSize: 20, fontWeight: FontWeight.w600),
         ),
       ),
@@ -382,7 +448,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: details.onStepContinue,
-                            child: Text(isLastStep ? 'Publish Event' : 'Continue'),
+                            child: Text(isLastStep ? (widget.existingEvent != null ? 'Save Changes' : 'Publish Event') : 'Continue'),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -455,11 +521,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
   }
 
-  Widget _buildImagePicker(String label, File? file, VoidCallback onTap, VoidCallback onClear, IconData icon) {
+  Widget _buildImagePicker(String label, File? file, String? existingUrl, VoidCallback onTap, VoidCallback onClear, IconData icon) {
+    final hasImage = file != null || existingUrl != null;
     return GestureDetector(
-      onTap: file == null ? onTap : null,
+      onTap: !hasImage ? onTap : null,
       child: Container(
-        height: file != null ? 160 : 100,
+        height: hasImage ? 160 : 100,
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -467,7 +534,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: U.border, style: BorderStyle.solid),
         ),
-        child: file == null
+        child: !hasImage
             ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -481,7 +548,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.file(file, fit: BoxFit.cover),
+                      child: file != null
+                          ? Image.file(file, fit: BoxFit.cover)
+                          : CachedNetworkImage(
+                              imageUrl: existingUrl!.trim().replaceFirst('http://', 'https://'),
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                   Positioned(
@@ -495,7 +567,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       ),
                     ),
                   ),
-                  Positioned(
+                  if (file != null) Positioned(
                     bottom: 8, left: 8, right: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -513,8 +585,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Widget _buildStep1() {
     return Column(
       children: [
-        _buildImagePicker('Upload Banner Image', _bannerFile, () => _pickImage(isBanner: true), () => setState(() => _bannerFile = null), Icons.add_photo_alternate_outlined),
-        _buildImagePicker('Upload Poster', _posterFile, () => _pickImage(isBanner: false), () => setState(() => _posterFile = null), Icons.image_outlined),
+        _buildImagePicker('Upload Banner Image', _bannerFile, _existingBannerUrl, () => _pickImage(isBanner: true), () => setState(() { _bannerFile = null; _existingBannerUrl = null; }), Icons.add_photo_alternate_outlined),
+        _buildImagePicker('Upload Poster', _posterFile, _existingPosterUrl, () => _pickImage(isBanner: false), () => setState(() { _posterFile = null; _existingPosterUrl = null; }), Icons.image_outlined),
         _buildField('Event Title', _titleController, icon: Icons.title_rounded),
         _buildField('Short Description', _shortDescController, maxLines: 2, hint: 'Brief one-liner about your event'),
         // Category Dropdown
@@ -652,8 +724,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _buildImagePicker(
           'Upload Permission Letter',
           _permissionFile,
+          _existingPermissionUrl,
           _pickPermissionLetter,
-          () => setState(() => _permissionFile = null),
+          () => setState(() { _permissionFile = null; _existingPermissionUrl = null; }),
           Icons.upload_file_rounded,
         ),
       ],
@@ -672,12 +745,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_bannerFile != null)
+          if (_bannerFile != null || _existingBannerUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.file(_bannerFile!, height: 120, width: double.infinity, fit: BoxFit.cover),
+              child: _bannerFile != null 
+                  ? Image.file(_bannerFile!, height: 120, width: double.infinity, fit: BoxFit.cover)
+                  : CachedNetworkImage(imageUrl: _existingBannerUrl!.trim().replaceFirst('http://', 'https://'), height: 120, width: double.infinity, fit: BoxFit.cover),
             ),
-          if (_bannerFile != null) const SizedBox(height: 16),
+          if (_bannerFile != null || _existingBannerUrl != null) const SizedBox(height: 16),
           Text(
             _titleController.text.isEmpty ? 'Untitled Event' : _titleController.text,
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: U.text),

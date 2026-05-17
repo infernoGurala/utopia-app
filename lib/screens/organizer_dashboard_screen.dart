@@ -115,41 +115,52 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
 
   Widget _buildProfileHeader(User? user) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: U.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: U.border),
+        gradient: LinearGradient(
+          colors: [U.primary, U.teal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: U.primary.withValues(alpha: 0.2),
-            backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
-            child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 32) : null,
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
+            child: CircleAvatar(
+              radius: 36,
+              backgroundColor: U.surface,
+              backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
+              child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        user?.displayName ?? 'Organizer',
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
                 Text(
-                  '${_myEvents.length} Events • ${_analytics['total_registrations'] ?? 0} Registrations',
-                  style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+                  user?.displayName ?? 'Organizer',
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
+                    style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
@@ -234,12 +245,15 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     if (event.status == EventStatus.completed) statusColor = U.dim;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: U.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: U.border),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 8)),
+        ],
       ),
       child: Column(
         children: [
@@ -304,6 +318,10 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              _buildIconBtn(Icons.edit_rounded, 'Edit Event', () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateEventScreen(existingEvent: event)));
+                _loadData();
+              }),
               _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
                 if (event.id == null) return;
                 final regs = await EventService.instance.getRegistrations(event.id!);
@@ -311,7 +329,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                   _showParticipantsDialog(event.title, regs);
                 }
               }),
-              _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event)),
+              _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event), iconColor: U.red),
             ],
           ),
         ],
@@ -343,11 +361,20 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     }
   }
 
-  Widget _buildIconBtn(IconData icon, String tooltip, VoidCallback? onPressed) {
-    return IconButton(
-      icon: Icon(icon, color: U.primary, size: 20),
-      onPressed: onPressed,
-      tooltip: tooltip,
+  Widget _buildIconBtn(IconData icon, String tooltip, VoidCallback? onPressed, {Color? iconColor}) {
+    final color = iconColor ?? U.primary;
+    return Container(
+      margin: const EdgeInsets.only(left: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: color, size: 20),
+        onPressed: onPressed,
+        tooltip: tooltip,
+        splashRadius: 24,
+      ),
     );
   }
 
@@ -355,9 +382,13 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: U.bg,
+        gradient: LinearGradient(
+          colors: [color.withValues(alpha: 0.1), color.withValues(alpha: 0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: U.border),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
