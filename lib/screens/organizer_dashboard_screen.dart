@@ -81,13 +81,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildProfileHeader(user),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Analytics Overview',
-                        style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildAnalyticsGrid(),
+
                       const SizedBox(height: 32),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -165,22 +159,7 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
   }
 
-  Widget _buildAnalyticsGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      childAspectRatio: 1.4,
-      children: [
-        _buildStatCard('Total Registrations', '${_analytics['total_registrations'] ?? 0}', Icons.how_to_reg_rounded, U.primary),
-        _buildStatCard('Event Views', '${_analytics['total_views'] ?? 0}', Icons.visibility_rounded, U.teal),
-        _buildStatCard('Engagement', _analytics['engagement'] ?? '0%', Icons.auto_graph_rounded, U.peach),
-        _buildStatCard('Total Shares', '${_analytics['total_shares'] ?? 0}', Icons.share_rounded, U.blue),
-      ],
-    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1, end: 0);
-  }
+
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Container(
@@ -307,26 +286,32 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
           const SizedBox(height: 16),
           Divider(color: U.border, height: 1),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.8,
             children: [
-              Text(
-                '${event.participantCount} registered${event.participantLimit > 0 ? ' / ${event.participantLimit}' : ''}',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: U.text),
-              ),
-              Row(
-                children: [
-                  _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
-                    if (event.id == null) return;
-                    final regs = await EventService.instance.getRegistrations(event.id!);
-                    if (mounted) {
-                      _showParticipantsDialog(event.title, regs);
-                    }
-                  }),
-                  _buildIconBtn(Icons.visibility_rounded, '${event.viewCount} views', null),
-                  _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event)),
-                ],
-              ),
+              _buildEventStat('Registrations', '${event.participantCount}${event.participantLimit > 0 ? '/${event.participantLimit}' : ''}', Icons.how_to_reg_rounded, U.primary),
+              _buildEventStat('Views', '${event.viewCount}', Icons.visibility_rounded, U.teal),
+              _buildEventStat('Shares', '${event.shareCount}', Icons.share_rounded, U.blue),
+              _buildEventStat('Engagement', '${event.participantCount > 0 ? ((event.participantCount / (event.participantLimit > 0 ? event.participantLimit : 100)) * 100).round().clamp(0, 100) : 0}%', Icons.auto_graph_rounded, U.peach),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
+                if (event.id == null) return;
+                final regs = await EventService.instance.getRegistrations(event.id!);
+                if (mounted) {
+                  _showParticipantsDialog(event.title, regs);
+                }
+              }),
+              _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event)),
             ],
           ),
         ],
@@ -363,6 +348,32 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       icon: Icon(icon, color: U.primary, size: 20),
       onPressed: onPressed,
       tooltip: tooltip,
+    );
+  }
+
+  Widget _buildEventStat(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: U.bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: U.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 14),
+              const SizedBox(width: 6),
+              Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 11, color: U.sub), maxLines: 1, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(value, style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text)),
+        ],
+      ),
     );
   }
 

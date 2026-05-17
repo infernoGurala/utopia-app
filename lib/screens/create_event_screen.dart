@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/file_upload_service.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
@@ -190,31 +191,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         throw Exception('Not signed in');
       }
 
-      // Upload images to Cloudinary
-      String? bannerUrl;
-      String? posterUrl;
-      String? permissionUrl;
-
-      if (_bannerFile != null) {
-        bannerUrl = await CloudinaryService.instance.uploadImage(
-          _bannerFile!,
-          folder: 'events/banners',
-        );
-      }
-      if (_posterFile != null) {
-        posterUrl = await CloudinaryService.instance.uploadImage(
-          _posterFile!,
-          folder: 'events/posters',
-        );
-      }
-      if (_permissionFile != null) {
-        permissionUrl = await CloudinaryService.instance.uploadImage(
-          _permissionFile!,
-          folder: 'events/permissions',
-        );
-      }
-
-      // Get university ID
+      // Get university ID first, required for FileUploadService path scoping
       String? universityId;
       try {
         final userDoc = await FirebaseFirestore.instance
@@ -223,6 +200,46 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             .get();
         universityId = userDoc.data()?['selectedUniversityId'] as String?;
       } catch (_) {}
+
+      // Upload images
+      String? bannerUrl;
+      String? posterUrl;
+      String? permissionUrl;
+      final fileUploadService = FileUploadService();
+
+      if (_bannerFile != null) {
+        try {
+          bannerUrl = await fileUploadService.uploadFile(
+            file: _bannerFile!,
+            originalFilename: _bannerFile!.path.split('/').last,
+            universityId: universityId ?? 'global',
+          );
+        } catch (e) {
+          throw Exception('Failed to upload banner image: $e');
+        }
+      }
+      if (_posterFile != null) {
+        try {
+          posterUrl = await fileUploadService.uploadFile(
+            file: _posterFile!,
+            originalFilename: _posterFile!.path.split('/').last,
+            universityId: universityId ?? 'global',
+          );
+        } catch (e) {
+          throw Exception('Failed to upload poster image: $e');
+        }
+      }
+      if (_permissionFile != null) {
+        try {
+          permissionUrl = await fileUploadService.uploadFile(
+            file: _permissionFile!,
+            originalFilename: _permissionFile!.path.split('/').last,
+            universityId: universityId ?? 'global',
+          );
+        } catch (e) {
+          throw Exception('Failed to upload permission letter: $e');
+        }
+      }
 
       // Parse tags
       final tags = _tagsController.text

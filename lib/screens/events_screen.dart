@@ -132,13 +132,13 @@ class _EventsScreenState extends State<EventsScreen> {
                         _buildHorizontalCarousel(_liveEvents),
                         const SizedBox(height: 32),
                       ],
-                      _buildSectionTitle('🔥 Trending Events'),
+                      _buildSectionTitle('Trending Events'),
                       const SizedBox(height: 16),
                       _trendingEvents.isEmpty
                           ? _buildEmptyState('No trending events yet')
                           : _buildHorizontalCarousel(_trendingEvents),
                       const SizedBox(height: 32),
-                      _buildSectionTitle('📅 Upcoming Events'),
+                      _buildSectionTitle('Upcoming Events'),
                       const SizedBox(height: 16),
                       _upcomingEvents.isEmpty
                           ? _buildEmptyState('No upcoming events')
@@ -230,25 +230,7 @@ class _EventsScreenState extends State<EventsScreen> {
         border: Border.all(color: U.border),
       ),
       child: IconButton(
-        icon: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(Icons.notifications_outlined, color: U.text),
-            Positioned(
-              right: -2,
-              top: -2,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: U.red,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: U.surface, width: 1.5),
-                ),
-              ),
-            ),
-          ],
-        ),
+        icon: Icon(Icons.notifications_outlined, color: U.text),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
@@ -552,29 +534,41 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     ),
                     child: event.bannerUrl != null && event.bannerUrl!.isNotEmpty
-                        ? ColorFiltered(
-                            colorFilter: (event.status == EventStatus.completed || event.status == EventStatus.cancelled)
-                                ? const ColorFilter.matrix([
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0.2126, 0.7152, 0.0722, 0, 0,
-                                    0,      0,      0,      1, 0,
-                                  ])
-                                : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
-                            child: CachedNetworkImage(
-                              imageUrl: event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white.withValues(alpha: 0.5),
+                        ? (event.status == EventStatus.completed || event.status == EventStatus.cancelled)
+                            ? ColorFiltered(
+                                colorFilter: const ColorFilter.matrix([
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0.2126, 0.7152, 0.0722, 0, 0,
+                                  0,      0,      0,      1, 0,
+                                ]),
+                                child: CachedNetworkImage(
+                                  imageUrl: event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white.withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  errorWidget: (_, __, ___) => Center(
+                                    child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
+                                  ),
                                 ),
-                              ),
-                              errorWidget: (_, __, ___) => Center(
-                                child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
-                              ),
-                            ),
-                          )
+                              )
+                            : CachedNetworkImage(
+                                imageUrl: event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Center(
+                                  child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
+                                ),
+                              )
                         : Center(
                             child: Icon(Icons.event_rounded, size: 48, color: Colors.white.withValues(alpha: 0.5)),
                           ),

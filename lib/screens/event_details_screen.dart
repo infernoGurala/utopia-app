@@ -227,33 +227,54 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       flexibleSpace: FlexibleSpaceBar(
         background: Hero(
           tag: 'event_banner_${_event.id ?? _event.title}',
-          child: _event.bannerUrl != null && _event.bannerUrl!.isNotEmpty
-              ? ColorFiltered(
-                  colorFilter: (_event.status == EventStatus.completed || _event.status == EventStatus.cancelled)
-                      ? const ColorFilter.matrix([
+          child: GestureDetector(
+            onTap: () {
+              if (_event.bannerUrl != null && _event.bannerUrl!.isNotEmpty) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenImageScreen(imageUrl: _event.bannerUrl!, tag: 'event_banner_${_event.id ?? _event.title}')));
+              }
+            },
+            child: _event.bannerUrl != null && _event.bannerUrl!.isNotEmpty
+                ? (_event.status == EventStatus.completed || _event.status == EventStatus.cancelled)
+                    ? ColorFiltered(
+                        colorFilter: const ColorFilter.matrix([
                           0.2126, 0.7152, 0.0722, 0, 0,
                           0.2126, 0.7152, 0.0722, 0, 0,
                           0.2126, 0.7152, 0.0722, 0, 0,
                           0,      0,      0,      1, 0,
-                        ])
-                      : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
-                  child: CachedNetworkImage(
-                    imageUrl: _event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
-                    fit: BoxFit.cover,
-                    placeholder: (_, __) => Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [U.primary.withValues(alpha: 0.8), U.teal.withValues(alpha: 0.8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        ]),
+                        child: CachedNetworkImage(
+                          imageUrl: _event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [U.primary.withValues(alpha: 0.8), U.teal.withValues(alpha: 0.8)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: Center(child: CircularProgressIndicator(color: Colors.white.withValues(alpha: 0.5), strokeWidth: 2)),
+                          ),
+                          errorWidget: (_, __, ___) => _buildDefaultBanner(),
                         ),
-                      ),
-                      child: Center(child: CircularProgressIndicator(color: Colors.white.withValues(alpha: 0.5), strokeWidth: 2)),
-                    ),
-                    errorWidget: (_, __, ___) => _buildDefaultBanner(),
-                  ),
-                )
-              : _buildDefaultBanner(),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: _event.bannerUrl!.trim().replaceFirst('http://', 'https://'),
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [U.primary.withValues(alpha: 0.8), U.teal.withValues(alpha: 0.8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                          child: Center(child: CircularProgressIndicator(color: Colors.white.withValues(alpha: 0.5), strokeWidth: 2)),
+                        ),
+                        errorWidget: (_, __, ___) => _buildDefaultBanner(),
+                      )
+                : _buildDefaultBanner(),
+          ),
         ),
       ),
     );
@@ -670,5 +691,38 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   String _formatDate(DateTime d) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+}
+
+class FullScreenImageScreen extends StatelessWidget {
+  final String imageUrl;
+  final String tag;
+
+  const FullScreenImageScreen({super.key, required this.imageUrl, required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      extendBodyBehindAppBar: true,
+      body: Center(
+        child: Hero(
+          tag: tag,
+          child: InteractiveViewer(
+            child: CachedNetworkImage(
+              imageUrl: imageUrl.trim().replaceFirst('http://', 'https://'),
+              fit: BoxFit.contain,
+              placeholder: (_, __) => const CircularProgressIndicator(color: Colors.white),
+              errorWidget: (_, __, ___) => const Icon(Icons.error, color: Colors.white),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
