@@ -56,7 +56,7 @@ class ImageOverlayColors {
   // ── One Light ── (light theme)
   static const _oneLight = {
     'morning':   _Quad(Color(0xFF0D2554), Color(0xFF2A2B33), Color(0xFF0A0C14), Color(0xFF2A2B33)), // ← change me
-    'afternoon': _Quad(Color(0xFF0D2554), Color(0xFF898AA1), Color(0xFF0A0C14), Color(0xFF2A2B33)), // ← change me
+    'afternoon': _Quad(Color(0xFF0D2554), Color(0xFF1F1F1F), Color(0xFF0A0C14), Color(0xFF1F1F1F)), // ← change me
     'evening':   _Quad(Color(0xFF4078F2), Color(0xFF98A9FA), Color(0xFFFCFDFF), Color(0xFFF5F7FF)), // ← change me
     'night':     _Quad(Color(0xFF4078F2), Color(0xFF696C77), Color(0xFFFAFAFA), Color(0xFFE5E5E6)), // ← change me
   };

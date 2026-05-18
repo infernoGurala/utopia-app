@@ -65,6 +65,19 @@ class FollowService {
             .toList());
   }
 
+  /// List of UIDs that follow [uid] (accepted only).
+  Stream<List<String>> followersUidsStream(String uid) {
+    return _db
+        .collection('follows')
+        .where('followingId', isEqualTo: uid)
+        .where('status', isEqualTo: 'accepted')
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => (d.data()['followerId'] ?? '') as String)
+            .where((id) => id.isNotEmpty)
+            .toList());
+  }
+
   /// Pending follow requests sent TO [uid] (i.e., other people who want to follow them).
   Stream<List<Map<String, dynamic>>> pendingRequestsStream(String uid) {
     return _db

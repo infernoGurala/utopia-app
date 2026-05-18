@@ -10,6 +10,7 @@ import '../main.dart';
 import '../services/follow_service.dart';
 import '../widgets/app_motion.dart';
 import 'chat_screen.dart';
+import 'followers_following_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({
@@ -73,6 +74,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       email: widget.email,
       photoUrl: widget.photoUrl,
     )));
+  }
+
+  void _navigateToFollows(bool showFollowers, String name) {
+    Navigator.of(context).push(
+      buildForwardRoute(
+        FollowersFollowingScreen(
+          uid: widget.uid,
+          displayName: name,
+          showFollowers: showFollowers,
+        ),
+      ),
+    );
   }
 
   @override
@@ -186,19 +199,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                           stream: _followService
                                               .followingCountStream(widget.uid),
                                           builder: (context, followingSnap) {
-                                            return Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.spaceAround,
-                                              children: [
-                                                _StatPill(
-                                                  count: followersSnap.data ?? 0,
-                                                  label: 'Followers',
-                                                ),
-                                                _StatPill(
-                                                  count: followingSnap.data ?? 0,
-                                                  label: 'Following',
-                                                ),
-                                              ],
+                                            return StreamBuilder<FollowStatus>(
+                                              stream: _followService.followStatusStream(_currentUid, widget.uid),
+                                              builder: (context, statusSnap) {
+                                                final status = statusSnap.data ?? FollowStatus.notFollowing;
+                                                final hasAccess = _isOwnProfile || (status == FollowStatus.following);
+                                                return Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.spaceAround,
+                                                  children: [
+                                                    _StatPill(
+                                                      count: followersSnap.data ?? 0,
+                                                      label: 'Followers',
+                                                      onTap: () => _navigateToFollows(true, displayName),
+                                                    ),
+                                                    _StatPill(
+                                                      count: followingSnap.data ?? 0,
+                                                      label: 'Following',
+                                                      onTap: () => _navigateToFollows(false, displayName),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
                                             );
                                           },
                                         );
@@ -337,20 +359,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                             const SizedBox(height: 24),
 
-                            // ── Private account notice (if not following) ───
-                            if (!_isOwnProfile)
-                              StreamBuilder<FollowStatus>(
-                                stream: _followService.followStatusStream(
-                                    _currentUid, widget.uid),
-                                builder: (context, statusSnap) {
-                                  final status = statusSnap.data ??
-                                      FollowStatus.notFollowing;
-                                  if (status == FollowStatus.following) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return _PrivateAccountNotice(status: status);
-                                },
-                              ),
+
 
                             Divider(
                               color: U.border,
@@ -372,33 +381,38 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 // ─── Sub-widgets ──────────────────────────────────────────────────────────────
 
 class _StatPill extends StatelessWidget {
-  const _StatPill({required this.count, required this.label});
+  const _StatPill({required this.count, required this.label, this.onTap});
   final int count;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          _formatCount(count),
-          style: GoogleFonts.outfit(
-            color: U.text,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatCount(count),
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            color: U.sub,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: U.sub,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -495,40 +509,4 @@ class _FollowButton extends StatelessWidget {
   }
 }
 
-class _PrivateAccountNotice extends StatelessWidget {
-  const _PrivateAccountNotice({required this.status});
-  final FollowStatus status;
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        children: [
-          Icon(
-            Icons.lock_outline_rounded,
-            color: U.dim,
-            size: 40,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Private Account',
-            style: GoogleFonts.outfit(
-              color: U.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            status == FollowStatus.requested
-                ? 'Your follow request is pending. Once accepted, you can see their content.'
-                : 'Follow this account to see their content and message them.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(color: U.sub, fontSize: 13, height: 1.5),
-          ),
-        ],
-      ),
-    );
-  }
-}

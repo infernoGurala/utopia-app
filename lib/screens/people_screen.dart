@@ -406,19 +406,20 @@ class _PeopleRowState extends State<_PeopleRow> {
             const SizedBox(width: 10),
 
             // Follow button (inline)
-            StreamBuilder<FollowStatus>(
-              stream:
-                  _followService.followStatusStream(widget.currentUid, uid),
-              builder: (context, statusSnap) {
-                final status =
-                    statusSnap.data ?? FollowStatus.notFollowing;
-                return _InlineFollowButton(
-                  status: status,
-                  loading: _loading,
-                  onTap: () => _toggleFollow(status),
-                );
-              },
-            ),
+            if (uid != widget.currentUid)
+              StreamBuilder<FollowStatus>(
+                stream:
+                    _followService.followStatusStream(widget.currentUid, uid),
+                builder: (context, statusSnap) {
+                  final status =
+                      statusSnap.data ?? FollowStatus.notFollowing;
+                  return _InlineFollowButton(
+                    status: status,
+                    loading: _loading,
+                    onTap: () => _toggleFollow(status),
+                  );
+                },
+              ),
           ],
         ),
       ),
