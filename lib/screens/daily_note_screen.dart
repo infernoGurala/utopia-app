@@ -1520,23 +1520,54 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                 selectionColor: accent.withValues(alpha: 0.15),
                 selectionHandleColor: accent,
               ),
-              child: TextField(
-                controller: _taskController,
-                style: GoogleFonts.inter(color: U.text, fontSize: 17),
-                cursorColor: accent,
-                cursorWidth: 1.5,
-                cursorRadius: const Radius.circular(10),
-                decoration: InputDecoration(
-                  hintText: 'Add a task...',
-                  hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
-                  border: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                ),
-                onSubmitted: (val) => _addTask(val),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _taskController,
+                      style: GoogleFonts.inter(color: U.text, fontSize: 17),
+                      cursorColor: accent,
+                      cursorWidth: 1.5,
+                      cursorRadius: const Radius.circular(10),
+                      decoration: InputDecoration(
+                        hintText: 'Add a task...',
+                        hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                      onSubmitted: (val) => _addTask(val),
+                    ),
+                  ),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _taskController,
+                    builder: (context, value, child) {
+                      final showButton = value.text.trim().isNotEmpty;
+                      return AnimatedOpacity(
+                        opacity: showButton ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 150),
+                        child: AnimatedScale(
+                          scale: showButton ? 1.0 : 0.8,
+                          duration: const Duration(milliseconds: 150),
+                          child: IgnorePointer(
+                            ignoring: !showButton,
+                            child: IconButton(
+                              icon: Icon(Icons.arrow_upward_rounded, color: accent, size: 22),
+                              splashColor: accent.withValues(alpha: 0.1),
+                              highlightColor: Colors.transparent,
+                              onPressed: () {
+                                _addTask(_taskController.text);
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ),
