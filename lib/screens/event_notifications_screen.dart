@@ -61,6 +61,29 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
     });
   }
 
+  Future<void> _clearAllNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    final List<String> allIdsToDismiss = [];
+    for (final event in _endingSoon) {
+      if (event.id != null) {
+        allIdsToDismiss.add(event.id!);
+      }
+    }
+    for (final event in _newEvents) {
+      if (event.id != null) {
+        allIdsToDismiss.add(event.id!);
+      }
+    }
+    if (allIdsToDismiss.isEmpty) return;
+
+    _dismissedIds.addAll(allIdsToDismiss);
+    await prefs.setStringList('dismissed_notifications', _dismissedIds);
+    setState(() {
+      _endingSoon.clear();
+      _newEvents.clear();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,6 +99,26 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
           'Notifications',
           style: GoogleFonts.outfit(color: U.text, fontSize: 20, fontWeight: FontWeight.w600),
         ),
+        actions: [
+          if (_endingSoon.isNotEmpty || _newEvents.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: TextButton(
+                onPressed: _clearAllNotifications,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text(
+                  'Clear All',
+                  style: GoogleFonts.outfit(
+                    color: U.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: UtopiaLoader(scale: 0.7))
