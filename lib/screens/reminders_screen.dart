@@ -16,7 +16,7 @@ class RemindersScreen extends StatefulWidget {
   State<RemindersScreen> createState() => _RemindersScreenState();
 }
 
-class _RemindersScreenState extends State<RemindersScreen> {
+class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingObserver {
   final _service = FocusSupabaseService();
   List<FocusReminder> _reminders = [];
   bool _loading = true;
@@ -24,6 +24,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
   DateTime _weekStart = _getWeekStart(DateTime.now());
   bool _filterActive = false;
   bool _showPast = false;
+
+  bool _hasNotificationPermission = true;
+  bool _hasAlarmPermission = true;
+  bool _checkingPermissionState = true;
 
   bool _reminderAppliesToDay(FocusReminder r, DateTime day) {
     final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
@@ -45,22 +49,36 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return DateTime(d.year, d.month, d.day).subtract(Duration(days: diff));
   }
 
-
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
     _checkPermissions();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
   Future<void> _checkPermissions() async {
-    final enabled = await NotificationService.areNotificationPermissionsEnabled();
-    if (!enabled && mounted) {
-      showUtopiaSnackBar(
-        context,
-        message: 'Notification permissions are disabled! Enable them in System Settings to get alerts.',
-        tone: UtopiaSnackBarTone.error,
-      );
+    final notifEnabled = await NotificationService.areNotificationPermissionsEnabled();
+    final alarmEnabled = await NotificationService.canScheduleExactNotifications();
+    if (mounted) {
+      setState(() {
+        _hasNotificationPermission = notifEnabled;
+        _hasAlarmPermission = alarmEnabled;
+        _checkingPermissionState = false;
+      });
     }
   }
 
@@ -164,117 +182,344 @@ class _RemindersScreenState extends State<RemindersScreen> {
     return Scaffold(
       backgroundColor: U.bg,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 12, 0),
+        child: _checkingPermissionState
+            ? const Center(child: UtopiaLoader(scale: 0.7))
+            : (!_hasNotificationPermission || !_hasAlarmPermission)
+                ? _buildPermissionBlockedScreen()
+                : _buildMainContent(),
+      ),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 12, 0),
+          child: Row(
+            children: [
+              IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.arrow_back_rounded, color: U.text)),
+              const SizedBox(width: 4),
+              Text('Reminders', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+              const Spacer(),
+              IconButton(
+                onPressed: () async {
+                  await NotificationService.sendPersonalTestNotification(
+                    message: 'Utopia reminders are working perfectly!',
+                  );
+                  if (mounted) {
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Test notification triggered!',
+                      tone: UtopiaSnackBarTone.info,
+                    );
+                  }
+                },
+                icon: Icon(Icons.notifications_active_outlined, color: U.primary, size: 22),
+                tooltip: 'Test Instant Notification',
+              ),
+              IconButton(onPressed: () => _showReminderSheet(), icon: Icon(Icons.add_rounded, color: U.primary, size: 26)),
+            ],
+          ),
+        ),
+        // Month Header + Navigation & Today Button
+        Builder(
+          builder: (context) {
+            final middleOfWeek = _weekStart.add(const Duration(days: 3));
+            const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            final monthStr = '${monthNames[middleOfWeek.month]} ${middleOfWeek.year}';
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
               child: Row(
                 children: [
-                  IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.arrow_back_rounded, color: U.text)),
-                  const SizedBox(width: 4),
-                  Text('Reminders', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
+                  Text(
+                    monthStr,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: U.text.withValues(alpha: 0.9),
+                    ),
+                  ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () async {
-                      await NotificationService.sendPersonalTestNotification(
-                        message: 'Utopia reminders are working perfectly!',
-                      );
-                      if (mounted) {
-                        showUtopiaSnackBar(
-                          context,
-                          message: 'Test notification triggered!',
-                          tone: UtopiaSnackBarTone.info,
-                        );
-                      }
-                    },
-                    icon: Icon(Icons.notifications_active_outlined, color: U.primary, size: 22),
-                    tooltip: 'Test Instant Notification',
+                    icon: Icon(Icons.chevron_left_rounded, color: U.sub, size: 20),
+                    onPressed: () => _shiftWeek(-1),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
-                  IconButton(onPressed: () => _showReminderSheet(), icon: Icon(Icons.add_rounded, color: U.primary, size: 26)),
+                  const SizedBox(width: 12),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedDay = DateTime.now();
+                        _weekStart = _getWeekStart(DateTime.now());
+                        _filterActive = true;
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: U.primary.withValues(alpha: 0.08),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Today',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: U.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: Icon(Icons.chevron_right_rounded, color: U.sub, size: 20),
+                    onPressed: () => _shiftWeek(1),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
                 ],
               ),
-            ),
-            // Month Header + Navigation & Today Button
-            Builder(
-              builder: (context) {
-                final middleOfWeek = _weekStart.add(const Duration(days: 3));
-                const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                final monthStr = '${monthNames[middleOfWeek.month]} ${middleOfWeek.year}';
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  child: Row(
-                    children: [
-                      Text(
-                        monthStr,
-                        style: GoogleFonts.outfit(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: U.text.withValues(alpha: 0.9),
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: Icon(Icons.chevron_left_rounded, color: U.sub, size: 20),
-                        onPressed: () => _shiftWeek(-1),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 12),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedDay = DateTime.now();
-                            _weekStart = _getWeekStart(DateTime.now());
-                            _filterActive = true;
-                          });
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: U.primary.withValues(alpha: 0.08),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Today',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: U.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton(
-                        icon: Icon(Icons.chevron_right_rounded, color: U.sub, size: 20),
-                        onPressed: () => _shiftWeek(1),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
+            );
+          }
+        ),
+        // Week strip
+        _buildWeekStrip(),
+        const SizedBox(height: 8),
+        // List
+        Expanded(
+          child: _loading
+              ? const Center(child: UtopiaLoader(scale: 0.7))
+              : _reminders.isEmpty
+                  ? Center(child: Text('No reminders yet. Tap + to add one.', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)))
+                  : _buildList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPermissionBlockedScreen() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // App header with Back button so they can leave the screen
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 12, 0),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.arrow_back_rounded, color: U.text),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Reminders',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  fontStyle: FontStyle.italic,
+                  color: U.text,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.45 : 0.75),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: U.border.withValues(alpha: 0.5),
+                    width: 1,
                   ),
-                );
-              }
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // A premium circular icon
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.notification_important_rounded,
+                        color: U.primary,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Enable Permissions',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: U.text,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Utopia requires notification and exact alarm permissions to trigger your focus reminders at the precise scheduled time.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        color: U.sub,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Notification permission status & button
+                    _buildPermissionStatusRow(
+                      title: 'Notification Alert Permission',
+                      description: 'Allows showing reminder alerts on your screen.',
+                      isGranted: _hasNotificationPermission,
+                      onRequest: () async {
+                        await NotificationService.requestNotificationPermissionOnly();
+                        await _checkPermissions();
+                      },
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Alarm permission status & button
+                    _buildPermissionStatusRow(
+                      title: 'Exact Alarm Permission',
+                      description: 'Allows firing notifications precisely on schedule.',
+                      isGranted: _hasAlarmPermission,
+                      onRequest: () async {
+                        await NotificationService.openExactAlarmSettings();
+                        await _checkPermissions();
+                      },
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Manual refresh button
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _checkPermissions,
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: U.border),
+                          foregroundColor: U.text,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.refresh_rounded, size: 18, color: U.text),
+                            const SizedBox(width: 8),
+                            Text(
+                              'I have granted permissions',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            // Week strip
-            _buildWeekStrip(),
-            const SizedBox(height: 8),
-            // List
-            Expanded(
-              child: _loading
-                  ? const Center(child: UtopiaLoader(scale: 0.7))
-                  : _reminders.isEmpty
-                      ? Center(child: Text('No reminders yet. Tap + to add one.', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)))
-                      : _buildList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPermissionStatusRow({
+    required String title,
+    required String description,
+    required bool isGranted,
+    required VoidCallback onRequest,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: U.card.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: U.border, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: U.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                isGranted ? Icons.check_circle_rounded : Icons.pending_rounded,
+                color: isGranted ? U.green : U.gold,
+                size: 18,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            description,
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: U.dim,
+              height: 1.3,
+            ),
+          ),
+          if (!isGranted) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton(
+                onPressed: onRequest,
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: U.primary,
+                  minimumSize: Size.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: Text(
+                  'Grant Permission',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: appThemeNotifier.value.isDark ? U.bg : Colors.white,
+                  ),
+                ),
+              ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -500,7 +745,7 @@ class _ReminderFormState extends State<_ReminderForm> {
   late final TextEditingController _labelController;
   late final TextEditingController _monthDayController;
   String _type = 'one_time';
-  DateTime _date = DateTime.now().add(const Duration(days: 1));
+  DateTime _date = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
   Set<int> _weekdays = {};
   int _monthDay = 1;
@@ -579,9 +824,11 @@ class _ReminderFormState extends State<_ReminderForm> {
             TextField(
               controller: _labelController,
               onChanged: (v) {
-                if (_errorText != null) {
-                  setState(() => _errorText = null);
-                }
+                setState(() {
+                  if (_errorText != null) {
+                    _errorText = null;
+                  }
+                });
               },
               style: GoogleFonts.outfit(color: U.text, fontSize: 16),
               decoration: InputDecoration(
@@ -589,6 +836,12 @@ class _ReminderFormState extends State<_ReminderForm> {
                 hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 14),
                 errorText: _errorText,
                 errorStyle: GoogleFonts.outfit(color: U.red, fontSize: 12),
+                suffixIcon: _labelController.text.trim().isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Icon(Icons.check_circle_outline_rounded, color: U.green, size: 20),
+                      )
+                    : null,
               ),
             ),
             const SizedBox(height: 20),
@@ -658,7 +911,7 @@ class _ReminderFormState extends State<_ReminderForm> {
         final picked = await showDatePicker(
           context: context,
           initialDate: _date,
-          firstDate: DateTime.now(),
+          firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
           lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
         );
         if (picked != null) setState(() => _date = picked);
@@ -740,7 +993,7 @@ class _ReminderFormState extends State<_ReminderForm> {
                 controller: _monthDayController,
                 onChanged: (v) {
                   final n = int.tryParse(v);
-                  if (n != null && n >= 1 && n <= 28) {
+                  if (n != null && n >= 1 && n <= 31) {
                     setState(() {
                       _monthDay = n;
                     });
@@ -749,7 +1002,7 @@ class _ReminderFormState extends State<_ReminderForm> {
               ),
             ),
             const SizedBox(width: 8),
-            Text('(1–28)', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+            Text('(1–31)', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
           ],
         ),
         const SizedBox(height: 12),

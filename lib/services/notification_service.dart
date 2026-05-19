@@ -26,7 +26,68 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!PlatformSupport.supportsNotifications) {
     return;
   }
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    
+    final title = message.notification?.title ?? message.data['title']?.toString();
+    final body = message.notification?.body ?? message.data['body']?.toString();
+    if (title == null && body == null) {
+      return;
+    }
+
+    final localNotifications = FlutterLocalNotificationsPlugin();
+    const androidSettings = AndroidInitializationSettings('ic_notification');
+    const darwinSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: darwinSettings,
+      macOS: darwinSettings,
+    );
+    await localNotifications.initialize(initSettings);
+
+    const channel = AndroidNotificationChannel(
+      'utopia_high_importance',
+      'UTOPIA Notifications',
+      description: 'Morning alerts and writer broadcasts from UTOPIA',
+      importance: Importance.high,
+    );
+
+    await localNotifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
+
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'utopia_high_importance',
+        'UTOPIA Notifications',
+        channelDescription: 'Morning alerts and writer broadcasts from UTOPIA',
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: 'ic_notification',
+        largeIcon: DrawableResourceAndroidBitmap('ic_notification_large'),
+      ),
+    );
+
+    await localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      details,
+      payload: jsonEncode({
+        'title': title,
+        'body': body,
+        'data': message.data,
+      }),
+    );
+  } catch (e) {
+    debugPrint('Error in background message handler: $e');
+  }
 }
 
 class NotificationService {
@@ -243,6 +304,26 @@ class NotificationService {
       return true;
     }
   }
+
+  static Future<void> requestNotificationPermissionOnly() async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      if (PlatformSupport.isAndroid) {
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
+            ?.requestNotificationsPermission();
+      } else if (PlatformSupport.isIOS) {
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >()
+            ?.requestPermissions(alert: true, badge: true, sound: true);
+      }
+    } catch (_) {}
+  }
+
 
   static Future<void> ensureNotificationPermissions() async {
     if (!PlatformSupport.supportsNotifications) {
@@ -665,7 +746,7 @@ class NotificationService {
   }
 
   static int _notificationIdFromUuid(String uuid) {
-    return uuid.hashCode & 0x7FFFFFFF;
+    return uuid.hashCode & 0x7FFFFFF0;
   }
 
   static Future<void> scheduleFocusReminder(FocusReminder reminder) async {

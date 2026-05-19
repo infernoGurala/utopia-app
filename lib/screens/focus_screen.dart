@@ -33,12 +33,37 @@ class _FocusScreenState extends State<FocusScreen> {
   late final String _greetingText;
 
   static const _motivationalTexts = [
-    'Small steps every day\nlead to big change.',
-    'Discipline is the bridge\nbetween goals and success.',
-    'Today is a new opportunity\nto grow stronger.',
-    'Consistency beats intensity.\nKeep showing up.',
-    'Your future self will\nthank you for this.',
-    'Progress, not perfection,\nis what matters.',
+    'If one person believes something illogical, he is called a fool – but if ten million people believe the same illogical thing, it is called religion.',
+    'It is not who you are underneath, it\'s what you do that defines you.',
+    'Nothing is permanent, except change.',
+    'Every day, people straighten up their hair. Why not the heart?',
+    'I am not what happened to me, I am what I choose to become.',
+    'When walking, walk! When eating, eat!',
+    'Do what is right, not what is popular, nor what is easy.',
+    'Ignorance is the mother of all evil.',
+    'Regret comes from missed opportunities; discipline weighs ounces, and regret weighs tons.',
+    'The more pleasure we seek, the less happy we become. ~MA',
+    'Love is enough to get everything done in life; you would need power only when you want to do something harmful.',
+    'You don\'t have to be great to start, but you have to start to be great.',
+    'Courage isn\'t having the strength to go on, it is going on when you don\'t have the strength.',
+    'Anything that makes me weak, physically, intellectually, and spiritually, I reject as poison.',
+    'The cave you fear to enter holds the treasure you seek.',
+    'You could be good today, instead you choose tomorrow.',
+    'No one can make you upset; you choose to be.',
+    'A goal without a plan is just a wish.',
+    'The self is an illusion built by mental programming.',
+    'The key to evolution is variation.',
+    'You can\'t always control what happens, but you can control how you respond; that\'s where your power is.',
+    'The only limit to our realization of tomorrow is our doubts of today.',
+    'Do not wait for permission.',
+    'What you are not changing, you are choosing.',
+    'One good book is equal to a hundred good friends, but one good friend is equal to a library.',
+    'Winners are not those who never fail but those who never quit.',
+    'If you want to shine like the sun, first burn like the sun.',
+    'The greatest sin is to think yourself weak.',
+    'Time and tide wait for no man.',
+    'The greatest disability is the mind, not the body.',
+    'Don\'t think about doing the thing; do the thing.',
   ];
 
   String _generateRandomGreeting() {
@@ -90,7 +115,7 @@ class _FocusScreenState extends State<FocusScreen> {
         'Afternoon, early achiever',
         'Doing amazing things today',
       ];
-    } else {
+    } else if (slot == 'evening') {
       variants = const [
         'Good evening',
         'Hope you had a great day',
@@ -103,7 +128,6 @@ class _FocusScreenState extends State<FocusScreen> {
         'Hope your evening is cozy',
         'Good evening, champion',
         'Time to recharge',
-        'Rest well tonight',
         'Evening, achiever',
         'You did great today',
         'Relax and reflect',
@@ -112,6 +136,27 @@ class _FocusScreenState extends State<FocusScreen> {
         'A calm evening to you',
         'Great work today',
         'Sunset vibes are here',
+      ];
+    } else {
+      variants = const [
+        'Good night',
+        'Rest well tonight',
+        'Time to wind down',
+        'Quiet night, sharp mind',
+        'Good night, champion',
+        'Sleep tight, legend',
+        'Sweet dreams',
+        'Late night grind?',
+        'Midnight focus',
+        'Working late, superstar?',
+        'Time to wrap up your day',
+        'Rest your eyes, legend',
+        'Sleep is the best meditation',
+        'Peaceful dreams ahead',
+        'Unwind and recharge',
+        'Still awake, champion?',
+        'Stars are shining, rest well',
+        'Cozy night vibes',
       ];
     }
     final index = DateTime.now().microsecondsSinceEpoch % variants.length;
@@ -131,8 +176,8 @@ class _FocusScreenState extends State<FocusScreen> {
   }
 
   String get _motivationalText {
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
-    return _motivationalTexts[dayOfYear % _motivationalTexts.length];
+    final day = DateTime.now().day;
+    return _motivationalTexts[(day - 1) % _motivationalTexts.length];
   }
 
   // Obsolete getters removed. Background and overlay colors are now calculated atomically in build()
