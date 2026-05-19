@@ -23,6 +23,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   
   bool _loading = true;
+  bool _saving = false;
   bool _allowDeleteEnabled = true;
   FocusNote? _note;
   FocusUserHabits? _userHabits;
@@ -150,6 +151,66 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     if (!mounted) return;
     setState(() => _note = updatedNote);
     _loadMonthDots();
+  }
+
+  Future<void> _manualSave() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    FocusScope.of(context).unfocus();
+
+    try {
+      await _saveNote();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            duration: const Duration(seconds: 2),
+            content: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_done_rounded, color: Color(0xFF08BB68), size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Synced perfectly to cloud!',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Manual save failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   void _selectDate(DateTime date) {
@@ -1133,6 +1194,35 @@ Future<void> _editHabits() async {
                 ),
               ),
               const Spacer(),
+              if (_saving)
+                ClipOval(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                headerButton(
+                  icon: Icons.cloud_upload_outlined,
+                  onTap: _manualSave,
+                ),
+              const SizedBox(width: 8),
               headerButton(
                 icon: Icons.calendar_today_rounded,
                 onTap: _toggleCalendar,
