@@ -65,8 +65,38 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     
     if (!mounted) return;
     setState(() {
-      _note = note ?? FocusNote(userId: _userId, date: dateStr);
       _userHabits = userHabits ?? FocusUserHabits(userId: _userId);
+      
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+      final isPast = compareDate.isBefore(todayDate);
+
+      FocusNote finalNote;
+      if (note != null) {
+        finalNote = note;
+        if (finalNote.habitsState.isEmpty && !isPast && _userHabits != null) {
+          final initialState = <String, bool>{};
+          for (final h in _userHabits!.habits) {
+            initialState[h] = false;
+          }
+          finalNote = finalNote.copyWith(habitsState: initialState);
+        }
+      } else {
+        final initialState = <String, bool>{};
+        if (!isPast && _userHabits != null) {
+          for (final h in _userHabits!.habits) {
+            initialState[h] = false;
+          }
+        }
+        finalNote = FocusNote(
+          userId: _userId,
+          date: dateStr,
+          habitsState: initialState,
+        );
+      }
+
+      _note = finalNote;
       _journalController.text = _note!.journal;
       _loading = false;
     });
@@ -662,6 +692,20 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       if (mounted) {
         setState(() {
           _userHabits = newConfig;
+
+          final today = DateTime.now();
+          final todayDate = DateTime(today.year, today.month, today.day);
+          final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+          final isPast = compareDate.isBefore(todayDate);
+
+          if (_note != null && _note!.habitsState.isEmpty && !isPast) {
+            final initialState = <String, bool>{};
+            for (final h in localHabits) {
+              initialState[h] = false;
+            }
+            _note = _note!.copyWith(habitsState: initialState);
+            _saveNote();
+          }
         });
       }
     }
@@ -1128,21 +1172,30 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     final accent = U.blue;
     final icon = Icons.track_changes_rounded;
 
-    final habits = _userHabits?.habits ?? [];
+    final habits = _note?.habitsState.keys.toList() ?? [];
     if (habits.isEmpty) {
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+      final isPast = compareDate.isBefore(todayDate);
+
       return Padding(
         padding: const EdgeInsets.only(bottom: 24, top: 12),
         child: Row(
           children: [
             Icon(icon, color: U.sub, size: 20),
             const SizedBox(width: 12),
-            Text('No habits configured', style: GoogleFonts.outfit(color: U.sub, fontSize: 15)),
-            const Spacer(),
-            TextButton(
-              onPressed: _editHabits, 
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
-              child: Text('Setup', style: GoogleFonts.outfit(color: accent, fontWeight: FontWeight.w600))
+            Text(
+              isPast ? 'No habits tracked on this day' : 'No habits configured', 
+              style: GoogleFonts.outfit(color: U.sub, fontSize: 15)
             ),
+            const Spacer(),
+            if (!isPast)
+              TextButton(
+                onPressed: _editHabits, 
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                child: Text('Setup', style: GoogleFonts.outfit(color: accent, fontWeight: FontWeight.w600))
+              ),
           ],
         ),
       );
