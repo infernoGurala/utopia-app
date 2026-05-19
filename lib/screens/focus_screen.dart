@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -215,8 +216,21 @@ class _FocusScreenState extends State<FocusScreen> {
     final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
     final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
 
-    return Scaffold(
-      backgroundColor: U.bg,
+    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
+    final isDarkTheme = appThemeNotifier.value.isDark;
+    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
+        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: U.bg,
       body: Stack(
         children: [
           // ── Background Image ──
@@ -653,8 +667,9 @@ class _FocusScreenState extends State<FocusScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _FeatureCard extends StatelessWidget {

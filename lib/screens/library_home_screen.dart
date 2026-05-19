@@ -202,11 +202,11 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                     : appThemeNotifier.value.key == 'orchid'
                         ? const Color(0xFFCBA6F7)
                         : Colors.white)
-        : ImageOverlayColors.titleColor(appThemeNotifier.value.key);
+        : ImageOverlayColors.titleColor(appThemeNotifier.value.key, 'morning');
 
     final subtitleColor = isDark
         ? U.sub
-        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key);
+        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key, 'morning');
 
     return Scaffold(
       backgroundColor: U.bg,
