@@ -21,6 +21,19 @@ class FocusSupabaseService {
 
   FocusSupabaseService._() {
     _setupConnectivityListener();
+    _setupAuthListener();
+  }
+
+  void _setupAuthListener() {
+    FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null) {
+        debugPrint('Focus Supabase: Auth state change detected (User logged in). Re-initializing and syncing...');
+        _initialized = false;
+        initialize().then((success) {
+          _syncPendingData();
+        });
+      }
+    });
   }
 
   void _setupConnectivityListener() {
@@ -251,10 +264,39 @@ class FocusSupabaseService {
     }
   }
 
-  /// Get dates that have notes
+  /// Get dates that have notes. Syncs range from Supabase in the background to update SQLite.
   Future<Set<String>> getNoteDates(String startDate, String endDate) async {
     final userId = _userId;
     if (userId.isEmpty) return {};
+
+    // Pull notes from Supabase for this date range to sync the local cache
+    if (_initialized && _client != null) {
+      try {
+        final response = await _client!
+            .from('daily_notes')
+            .select()
+            .eq('user_id', userId)
+            .gte('date', startDate)
+            .lte('date', endDate);
+
+        if (response != null) {
+          final List<dynamic> rows = response;
+          for (final row in rows) {
+            final remoteNote = FocusNote.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+            final localNote = await _db.getNote(userId, remoteNote.date);
+            if (localNote == null ||
+                (remoteNote.updatedAt != null &&
+                    localNote.updatedAt != null &&
+                    remoteNote.updatedAt!.isAfter(localNote.updatedAt!))) {
+              await _db.saveNote(remoteNote);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Focus Supabase getNoteDates sync failed: $e');
+      }
+    }
+
     return _db.getNoteDates(userId, startDate, endDate);
   }
 

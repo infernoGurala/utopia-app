@@ -973,19 +973,21 @@ Future<void> _editHabits() async {
         },
         onHorizontalDragUpdate: (details) {
           if (!_isDraggingCalendar) return;
-          _calendarController.value = (_calendarController.value - details.delta.dx / contentWidth).clamp(0.0, 1.0);
+          // Multiplying dx by 1.6 to make the slider extremely responsive and direct!
+          _calendarController.value = (_calendarController.value - (details.delta.dx * 1.6) / contentWidth).clamp(0.0, 1.0);
         },
         onHorizontalDragEnd: (details) {
           if (!_isDraggingCalendar) return;
           _isDraggingCalendar = false;
-          if (details.primaryVelocity != null && details.primaryVelocity! < -200) {
-            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-          } else if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
-            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-          } else if (_calendarController.value > 0.3) {
-            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+          // Lowered velocity trigger from 200 to 140, and value threshold from 0.3 to 0.18 for instant spring activation
+          if (details.primaryVelocity != null && details.primaryVelocity! < -140) {
+            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+          } else if (details.primaryVelocity != null && details.primaryVelocity! > 140) {
+            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+          } else if (_calendarController.value > 0.18) {
+            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
           } else {
-            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
           }
         },
         child: Stack(
@@ -1284,17 +1286,18 @@ Future<void> _editHabits() async {
             child: GestureDetector(
               onHorizontalDragStart: (_) => _calendarController.stop(),
               onHorizontalDragUpdate: (d) {
-                _calendarController.value = (_calendarController.value - d.delta.dx / contentWidth).clamp(0.0, 1.0);
+                // Increased responsiveness to 1.6x finger speed
+                _calendarController.value = (_calendarController.value - (d.delta.dx * 1.6) / contentWidth).clamp(0.0, 1.0);
               },
               onHorizontalDragEnd: (d) {
-                if (d.primaryVelocity != null && d.primaryVelocity! < -200) {
-                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-                } else if (d.primaryVelocity != null && d.primaryVelocity! > 200) {
-                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
-                } else if (_calendarController.value > 0.3) {
-                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                if (d.primaryVelocity != null && d.primaryVelocity! < -140) {
+                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+                } else if (d.primaryVelocity != null && d.primaryVelocity! > 140) {
+                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+                } else if (_calendarController.value > 0.18) {
+                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
                 } else {
-                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
                 }
               },
               onTap: _toggleCalendar,
