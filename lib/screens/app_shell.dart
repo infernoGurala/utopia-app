@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../theme/image_overlay_colors.dart';
+import 'package:flutter/services.dart';
 import 'university_screen.dart';
 import 'library_home_screen.dart';
 import 'focus_screen.dart';
@@ -274,6 +276,35 @@ class _AppShellState extends State<AppShell> {
     return ValueListenableBuilder<AppTheme>(
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
+        if (_index != 0) {
+          SystemChrome.setSystemUIOverlayStyle(
+            SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+              statusBarBrightness: theme.isDark ? Brightness.dark : Brightness.light,
+              systemNavigationBarColor: theme.surface,
+              systemNavigationBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarDividerColor: Colors.transparent,
+              systemNavigationBarContrastEnforced: false,
+            ),
+          );
+        } else {
+          final timeSlot = ImageOverlayColors.getTimeSlot();
+          final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
+          final isDarkTheme = theme.isDark;
+          final useLightStatusBarIcons = isDarkSky || isDarkTheme;
+          SystemChrome.setSystemUIOverlayStyle(
+            SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
+              statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+              systemNavigationBarColor: theme.surface,
+              systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+              systemNavigationBarDividerColor: Colors.transparent,
+            ),
+          );
+        }
+
         return Scaffold(
           backgroundColor: U.bg,
           extendBody: true,
@@ -283,6 +314,34 @@ class _AppShellState extends State<AppShell> {
                 controller: _pageController,
                 onPageChanged: (index) {
                   setState(() => _index = index);
+                  if (index != 0) {
+                    SystemChrome.setSystemUIOverlayStyle(
+                      SystemUiOverlayStyle(
+                        statusBarColor: Colors.transparent,
+                        statusBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+                        statusBarBrightness: theme.isDark ? Brightness.dark : Brightness.light,
+                        systemNavigationBarColor: theme.surface,
+                        systemNavigationBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+                        systemNavigationBarDividerColor: Colors.transparent,
+                        systemNavigationBarContrastEnforced: false,
+                      ),
+                    );
+                  } else {
+                    final timeSlot = ImageOverlayColors.getTimeSlot();
+                    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
+                    final isDarkTheme = theme.isDark;
+                    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
+                    SystemChrome.setSystemUIOverlayStyle(
+                      SystemUiOverlayStyle(
+                        statusBarColor: Colors.transparent,
+                        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
+                        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+                        systemNavigationBarColor: theme.surface,
+                        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                        systemNavigationBarDividerColor: Colors.transparent,
+                      ),
+                    );
+                  }
                 },
                 physics: const ClampingScrollPhysics(),
                 children: [

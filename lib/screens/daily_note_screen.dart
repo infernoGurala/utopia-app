@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
@@ -1034,9 +1035,18 @@ Future<void> _editHabits() async {
     final panelWidth = screenWidth * 0.85;
     final contentWidth = panelWidth - handleTouchWidth;
 
-    return Scaffold(
-      backgroundColor: U.bg,
-      body: GestureDetector(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: U.bg,
+        body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onHorizontalDragStart: (details) {
           final isOpen = _calendarController.value > 0.5;
@@ -1137,8 +1147,9 @@ Future<void> _editHabits() async {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildHeader() {
     const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

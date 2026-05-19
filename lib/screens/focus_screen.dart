@@ -30,7 +30,7 @@ class _FocusScreenState extends State<FocusScreen> {
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
-  late final String _greetingText;
+
 
   static const _motivationalTexts = [
     'If one person believes something illogical, he is called a fool – but if ten million people believe the same illogical thing, it is called religion.',
@@ -66,8 +66,7 @@ class _FocusScreenState extends State<FocusScreen> {
     'Don\'t think about doing the thing; do the thing.',
   ];
 
-  String _generateRandomGreeting() {
-    final slot = ImageOverlayColors.getTimeSlot();
+  String _generateRandomGreeting(String slot) {
     final List<String> variants;
     if (slot == 'morning') {
       variants = const [
@@ -159,7 +158,10 @@ class _FocusScreenState extends State<FocusScreen> {
         'Cozy night vibes',
       ];
     }
-    final index = DateTime.now().microsecondsSinceEpoch % variants.length;
+    final now = DateTime.now();
+    final dayIndex = now.difference(DateTime(now.year)).inDays;
+    final seed = dayIndex + now.hour;
+    final index = seed % variants.length;
     return variants[index];
   }
 
@@ -185,7 +187,6 @@ class _FocusScreenState extends State<FocusScreen> {
   @override
   void initState() {
     super.initState();
-    _greetingText = _generateRandomGreeting();
     _loadData();
     _loadQuote();
     _loadStats();
@@ -254,6 +255,7 @@ class _FocusScreenState extends State<FocusScreen> {
     final topPadding = MediaQuery.paddingOf(context).top;
 
     final timeSlot = ImageOverlayColors.getTimeSlot();
+    final greetingText = _generateRandomGreeting(timeSlot);
     final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
     final themeKey = appThemeNotifier.value.key;
     final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
@@ -264,6 +266,17 @@ class _FocusScreenState extends State<FocusScreen> {
     final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
     final isDarkTheme = appThemeNotifier.value.isDark;
     final useLightStatusBarIcons = isDarkSky || isDarkTheme;
+
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
+        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -513,7 +526,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _userName.isEmpty ? _greetingText : '$_greetingText, $_userName',
+                                      _userName.isEmpty ? greetingText : '$greetingText, $_userName',
                                       style: GoogleFonts.tiroGurmukhi(
                                         fontSize: 26,
                                         fontWeight: FontWeight.w500,

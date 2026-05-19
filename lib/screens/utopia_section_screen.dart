@@ -316,20 +316,24 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
                 children: [
                   const SizedBox(height: 24),
                   Container(
-                    width: 76,
-                    height: 76,
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
-                      color: U.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: U.primary.withValues(alpha: 0.25),
-                        width: 1.5,
-                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Icon(
-                      Icons.rocket_launch_outlined,
-                      color: U.primary,
-                      size: 34,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(40),
+                      child: Image.asset(
+                        'assets/icon_cropped.png',
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

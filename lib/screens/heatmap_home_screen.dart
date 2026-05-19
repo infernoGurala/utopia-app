@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/focus_supabase_service.dart';
@@ -67,9 +68,19 @@ class _HeatmapHomeScreenState extends State<HeatmapHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: U.bg,
-      body: SafeArea(
+    final isDark = appThemeNotifier.value.isDark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: U.bg,
+        body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -341,6 +352,7 @@ class _HeatmapHomeScreenState extends State<HeatmapHomeScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

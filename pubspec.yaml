@@ -73,6 +73,7 @@ flutter:
     - assets/university/
     - assets/semesters/
     - assets/focus screen/
+    - assets/icon_cropped.png
   fonts:
     - family: OrangeAvenue
       fonts:

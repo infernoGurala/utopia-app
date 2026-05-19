@@ -31,34 +31,34 @@ class ImageOverlayColors {
   // ── Catppuccin Latte ── (light theme)
   //                        title                subtitle             greeting             quote
   static const _catppuccinLatte = {
-    'morning':   _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
-    'afternoon': _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
-    'evening':   _Quad(Color(0xFF8855FF), Color(0xFF554477), Color(0xFF332255), Color(0xFF554477)),
-    'night':     _Quad(Color(0xFF834ACF), Color(0xFF9093B0), Color(0xFFFAF4FF), Color(0xFFD3C5E5)),
+    'morning':   _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)),
+    'afternoon': _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)),
+    'evening':   _Quad(Color(0xFFFEE8D6), Color(0xFFF2D1BA), Color(0xFFFFFFFF), Color(0xFFFEE8D6)),
+    'night':     _Quad(Color(0xFFE8E5F8), Color(0xFFCAC5E8), Color(0xFFFFFFFF), Color(0xFFE8E5F8)),
   };
 
   // ── Rosé Pine Dawn ── (light theme)
   static const _rosePineDawn = {
-    'morning':   _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)), // ← change me
-    'afternoon': _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)), // ← change me
-    'evening':   _Quad(Color(0xFF9C4B47), Color(0xFF6B403E), Color(0xFF4A2523), Color(0xFF6B403E)),
-    'night':     _Quad(Color(0xFFD7827E), Color(0xFF797593), Color(0xFFFAF4ED), Color(0xFFD8D3CD)),
+    'morning':   _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)),
+    'afternoon': _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)),
+    'evening':   _Quad(Color(0xFFFEE9E7), Color(0xFFF8CFCB), Color(0xFFFFFFFF), Color(0xFFFEE9E7)),
+    'night':     _Quad(Color(0xFFFAD1CE), Color(0xFFE8DCDA), Color(0xFFFFFFFF), Color(0xFFFAF4ED)),
   };
 
   // ── Mint Light ── (light theme)
   static const _mintLight = {
-    'morning':   _Quad(Color(0xFF072B1F), Color(0xFF0C2B22), Color(0xFF021A12), Color(0xFF043022)), // ← change me
-    'afternoon': _Quad(Color(0xFF072B1F), Color(0xFF0C2B22), Color(0xFF021A12), Color(0xFF043022)), // ← change me
-    'evening':   _Quad(Color(0xFF008055), Color(0xFF0B4D3A), Color(0xFF043325), Color(0xFF0B4D3A)),
-    'night':     _Quad(Color(0xFF1E8F6A), Color(0xFF567C65), Color(0xFFF2FBF7), Color(0xFFC6E7D5)),
+    'morning':   _Quad(Color(0xFF072B1F), Color(0xFF0C2B22), Color(0xFF021A12), Color(0xFF043022)),
+    'afternoon': _Quad(Color(0xFF072B1F), Color(0xFF0C2B22), Color(0xFF021A12), Color(0xFF043022)),
+    'evening':   _Quad(Color(0xFFD5F3E5), Color(0xFFAFE0C9), Color(0xFFFFFFFF), Color(0xFFD5F3E5)),
+    'night':     _Quad(Color(0xFFD1F2E2), Color(0xFFA3DFBE), Color(0xFFFFFFFF), Color(0xFFF2FBF7)),
   };
 
   // ── One Light ── (light theme)
   static const _oneLight = {
-    'morning':   _Quad(Color(0xFF0D2554), Color(0xFF2A2B33), Color(0xFF0A0C14), Color(0xFF2A2B33)), // ← change me
-    'afternoon': _Quad(Color(0xFF0D2554), Color(0xFF1F1F1F), Color(0xFF0A0C14), Color(0xFF1F1F1F)), // ← change me
-    'evening':   _Quad(Color(0xFF285AD4), Color(0xFF1F2F6B), Color(0xFF0F1E4A), Color(0xFF2A3D7F)),
-    'night':     _Quad(Color(0xFF4078F2), Color(0xFF696C77), Color(0xFFFAFAFA), Color(0xFFDCDCE0)),
+    'morning':   _Quad(Color(0xFF0D2554), Color(0xFF2A2B33), Color(0xFF0A0C14), Color(0xFF2A2B33)),
+    'afternoon': _Quad(Color(0xFF0D2554), Color(0xFF1F1F1F), Color(0xFF0A0C14), Color(0xFF1F1F1F)),
+    'evening':   _Quad(Color(0xFFE6EDFF), Color(0xFFB8CDFF), Color(0xFFFFFFFF), Color(0xFFE6EDFF)),
+    'night':     _Quad(Color(0xFFE3EAFA), Color(0xFFB4C8FA), Color(0xFFFFFFFF), Color(0xFFFAFAFA)),
   };
 
   // ── Orchid ── (dark theme)  — null greeting/quote → falls back to U.text/U.sub

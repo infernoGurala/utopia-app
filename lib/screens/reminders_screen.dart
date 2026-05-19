@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/utopia_loader.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -179,14 +180,25 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: U.bg,
-      body: SafeArea(
-        child: _checkingPermissionState
-            ? const Center(child: UtopiaLoader(scale: 0.7))
-            : (!_hasNotificationPermission || !_hasAlarmPermission)
-                ? _buildPermissionBlockedScreen()
-                : _buildMainContent(),
+    final isDark = appThemeNotifier.value.isDark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: U.bg,
+        body: SafeArea(
+          child: _checkingPermissionState
+              ? const Center(child: UtopiaLoader(scale: 0.7))
+              : (!_hasNotificationPermission || !_hasAlarmPermission)
+                  ? _buildPermissionBlockedScreen()
+                  : _buildMainContent(),
+        ),
       ),
     );
   }

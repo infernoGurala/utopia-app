@@ -8,14 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
 import '../services/cache_service.dart';
-import '../services/follow_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
-import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
 import 'user_profile_screen.dart';
 import 'utopia_section_screen.dart';
@@ -29,10 +26,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSuperUser = false;
-  bool _updatingName = false;
   bool _updatingTheme = false;
-  bool _updatingBio = false;
-  final FollowService _followService = FollowService();
 
   Future<void> _signOut() async {
     RoleService().clearCache();
@@ -114,85 +108,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Future<void> _editBio(String currentBio) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _updatingBio) return;
-
-    final nextBio = await showDialog<String>(
+  void _showChangePhotoDialog(BuildContext context) {
+    showDialog(
       context: context,
-      builder: (dialogContext) =>
-          _EditBioDialog(initialValue: currentBio),
-    );
-
-    if (nextBio == null || nextBio == currentBio) return;
-
-    setState(() => _updatingBio = true);
-    try {
-      await _followService.updateBio(nextBio);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: U.red,
-            content: Text(
-              'Could not update bio',
-              style: GoogleFonts.outfit(color: U.bg),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, color: U.primary, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              'Change Profile Photo',
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
             ),
+          ],
+        ),
+        content: Text(
+          'Your profile photo is linked to your Google account.\n\nTo change it:\n1. Open your Google Account settings\n2. Update your profile picture there\n3. Sign out and sign back in to UTOPIA\n\nThe new photo will appear automatically after re-login.',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              foregroundColor: U.bg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Got it', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _updatingBio = false);
-    }
+        ],
+      ),
+    );
   }
 
-  Future<void> _editDisplayName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _updatingName) {
-      return;
-    }
-
-    final nextName = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) =>
-          _EditDisplayNameDialog(initialValue: user.displayName ?? ''),
-    );
-
-    if (nextName == null || nextName.isEmpty || nextName == user.displayName) {
-      return;
-    }
-
-    setState(() => _updatingName = true);
-    try {
-      await user.updateDisplayName(nextName);
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'displayName': nextName,
-        'email': user.email ?? '',
-        'photoUrl': user.photoURL,
-        'lastSeen': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      await user.reload();
-      if (mounted) {
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: U.red,
-            content: Text(
-              'Could not update display name',
-              style: GoogleFonts.outfit(color: U.bg),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _updatingName = false);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,12 +157,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .collection('users')
               .doc(user.uid)
               .snapshots();
-    return Scaffold(
-      backgroundColor: U.bg,
-      body: SafeArea(
-        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: userDocStream,
-          builder: (context, snapshot) {
+    final isDark = appThemeNotifier.value.isDark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: U.surface,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: U.bg,
+        body: SafeArea(
+          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: userDocStream,
+            builder: (context, snapshot) {
             return ListView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
               children: [
@@ -239,24 +203,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Expanded(
                           child: Text(
                             'Profile',
-                            style: GoogleFonts.playfairDisplay(
-                              fontSize: 32,
+                            style: GoogleFonts.outfit(
+                              fontSize: 28,
                               fontWeight: FontWeight.w700,
                               color: U.text,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: -1,
-                              shadows: [
-                                Shadow(
-                                  color: U.text.withValues(alpha: 0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
+                              letterSpacing: -0.5,
                             ),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       'Manage your academic identity',
                       style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
@@ -267,227 +224,180 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     .fadeIn(duration: 500.ms, curve: Curves.easeOut)
                     .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                 const SizedBox(height: 32),
+
+                // Clean Minimal Profile Header
                 Builder(
                   builder: (context) {
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: U.card,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: U.border),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                    final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
+                    return Column(
+                      children: [
+                        Center(
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
                             children: [
                               GestureDetector(
-                                onTap: () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      backgroundColor: U.card,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                      title: Row(
-                                        children: [
-                                          Icon(Icons.info_outline_rounded, color: U.primary, size: 24),
-                                          const SizedBox(width: 10),
-                                          Text('Change Profile Photo', style: GoogleFonts.outfit(color: U.text, fontSize: 17, fontWeight: FontWeight.w700)),
-                                        ],
-                                      ),
-                                      content: Text(
-                                        'Your profile photo is linked to your Google account.\n\nTo change it:\n1. Open your Google Account settings\n2. Update your profile picture there\n3. Sign out and sign back in to UTOPIA\n\nThe new photo will appear automatically after re-login.',
-                                        style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.5),
-                                      ),
-                                      actions: [
-                                        FilledButton(
-                                          onPressed: () => Navigator.pop(ctx),
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: U.primary,
-                                            foregroundColor: U.bg,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          ),
-                                          child: Text('Got it', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                                child: CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: U.primary.withValues(
-                                    alpha: 0.15,
+                                onTap: () => _showChangePhotoDialog(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: U.primary.withValues(alpha: 0.2), width: 2),
                                   ),
-                                  backgroundImage: user?.photoURL != null
-                                      ? CachedNetworkImageProvider(user!.photoURL!)
-                                      : null,
-                                  child: user?.photoURL == null
-                                      ? Text(
-                                          (user?.displayName ?? 'U')[0]
-                                              .toUpperCase(),
-                                          style: GoogleFonts.outfit(
-                                            color: U.primary,
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        )
-                                      : null,
+                                  child: CircleAvatar(
+                                    radius: 44,
+                                    backgroundColor: U.primary.withValues(alpha: 0.1),
+                                    backgroundImage: user?.photoURL != null
+                                        ? CachedNetworkImageProvider(user!.photoURL!)
+                                        : null,
+                                    child: user?.photoURL == null
+                                        ? Text(
+                                            (user?.displayName ?? 'U')[0].toUpperCase(),
+                                            style: GoogleFonts.outfit(
+                                              color: U.primary,
+                                              fontSize: 32,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () {
-                                        if (user == null) return;
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => UserProfileScreen(
-                                              uid: user.uid,
-                                              displayName: user.displayName ?? 'Student',
-                                              email: user.email ?? '',
-                                              photoUrl: user.photoURL,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      child: Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              user?.displayName ?? 'Student',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: GoogleFonts.outfit(
-                                                color: U.text,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                          if (_isSuperUser) ...[
-                                            const SizedBox(width: 4),
-                                            const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 14),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      user?.email ?? '',
-                                      style: GoogleFonts.outfit(
-                                        color: U.sub,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    // Bio
-                                    Builder(builder: (context) {
-                                      final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
-                                      if (bio.isNotEmpty) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            bio,
-                                            style: GoogleFonts.outfit(color: U.text, fontSize: 12, height: 1.4),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        );
-                                      }
-                                      return const SizedBox.shrink();
-                                    }),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        GestureDetector(
-                                          onTap: _editDisplayName,
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.edit_outlined,
-                                                color: _updatingName ? U.dim : U.primary,
-                                                size: 14,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                _updatingName ? 'Updating...' : 'Edit name',
-                                                style: GoogleFonts.outfit(
-                                                  color: _updatingName ? U.dim : U.primary,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        GestureDetector(
-                                          onTap: () {
-                                            final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
-                                            _editBio(bio);
-                                          },
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.badge_outlined,
-                                                color: _updatingBio ? U.dim : U.teal,
-                                                size: 14,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                _updatingBio ? 'Saving...' : 'Edit bio',
-                                                style: GoogleFonts.outfit(
-                                                  color: _updatingBio ? U.dim : U.teal,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                              GestureDetector(
+                                onTap: () => _showChangePhotoDialog(context),
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: U.card,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: U.border),
+                                  ),
+                                  child: Icon(Icons.camera_alt_outlined, size: 14, color: U.primary),
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user?.displayName ?? 'Student',
+                                style: GoogleFonts.outfit(
+                                  color: U.text,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (_isSuperUser) ...[
+                              const SizedBox(width: 6),
+                              const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 16),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user?.email ?? '',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (bio.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Text(
+                              bio,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                color: U.text.withValues(alpha: 0.8),
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final updated = await showModalBottomSheet<bool>(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => _EditProfileSheet(
+                                initialName: user?.displayName ?? 'Student',
+                                initialBio: bio,
+                              ),
+                            );
+                            if (updated == true && mounted) {
+                              setState(() {});
+                            }
+                          },
+                          icon: Icon(Icons.edit_outlined, size: 14, color: U.sub),
+                          label: Text(
+                            'Edit Profile',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: U.sub,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: U.border),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            backgroundColor: U.card.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Settings & Info List
                 Container(
                   decoration: BoxDecoration(
-                    color: U.card,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: U.border),
+                    color: U.card.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: U.border.withValues(alpha: 0.8)),
                   ),
                   child: Column(
                     children: [
+                      // Public Profile
                       _groupedTile(
-                        icon: Icons.person_add_outlined,
-                        label: 'Follow Requests',
-                        sub: 'View people who want to follow you',
-                        color: U.blue,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => FollowRequestsScreen(
-                              currentUid: user?.uid ?? '',
+                        icon: Icons.public_outlined,
+                        label: 'Public Profile',
+                        sub: 'See how others view your profile',
+                        color: U.primary,
+                        onTap: () {
+                          if (user == null) return;
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => UserProfileScreen(
+                                uid: user.uid,
+                                displayName: user.displayName ?? 'Student',
+                                email: user.email ?? '',
+                                photoUrl: user.photoURL,
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                       Divider(
                         height: 1,
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-
                       // Switch Theme
                       _groupedTile(
                         icon: Icons.palette_outlined,
@@ -519,8 +429,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-
-
                       // Share This App
                       _groupedTile(
                         icon: Icons.share_outlined,
@@ -551,43 +459,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                       ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: _signOut,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: U.red,
-                    side: BorderSide(color: U.red.withValues(alpha: 0.3), width: 1),
-                    backgroundColor: U.red.withValues(alpha: 0.05),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout_outlined, size: 20, color: U.red),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Sign Out',
-                        style: GoogleFonts.outfit(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
+                
+                // Minimal Logout Button
+                Center(
+                  child: TextButton.icon(
+                    onPressed: _signOut,
+                    icon: Icon(Icons.logout_rounded, size: 16, color: U.red.withValues(alpha: 0.7)),
+                    label: Text(
+                      'Sign Out',
+                      style: GoogleFonts.outfit(
+                        color: U.red.withValues(alpha: 0.7),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Center(
                   child: Text(
                     'UTOPIA · Designed by Humans • Powered by AI',
@@ -599,10 +494,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
       ),
-    );
-  }
-
-
+    ),
+  );
+}
 
   Widget _groupedTile({
     required IconData icon,
@@ -615,19 +509,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(width: 14),
+            Icon(icon, color: color.withValues(alpha: 0.8), size: 20),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,6 +526,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     sub,
                     style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
@@ -647,7 +534,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: U.dim, size: 18),
+            Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
           ],
         ),
       ),
@@ -655,154 +542,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _EditDisplayNameDialog extends StatefulWidget {
-  const _EditDisplayNameDialog({required this.initialValue});
-
-  final String initialValue;
-
-  @override
-  State<_EditDisplayNameDialog> createState() => _EditDisplayNameDialogState();
-}
-
-class _EditDisplayNameDialogState extends State<_EditDisplayNameDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: U.card,
-      title: Text(
-        'Edit name',
-        style: GoogleFonts.outfit(
-          color: U.text,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        style: GoogleFonts.outfit(color: U.text, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Display name',
-          hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: U.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: U.primary),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          style: FilledButton.styleFrom(
-            backgroundColor: U.primary,
-            foregroundColor: U.bg,
-          ),
-          child: Text(
-            'Save',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EditBioDialog extends StatefulWidget {
-  const _EditBioDialog({required this.initialValue});
-  final String initialValue;
-
-  @override
-  State<_EditBioDialog> createState() => _EditBioDialogState();
-}
-
-class _EditBioDialogState extends State<_EditBioDialog> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: U.card,
-      title: Text(
-        'Edit bio',
-        style: GoogleFonts.outfit(
-          color: U.text,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLines: 4,
-        maxLength: 150,
-        style: GoogleFonts.outfit(color: U.text, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Tell people about yourself...',
-          hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: U.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: U.primary),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          style: FilledButton.styleFrom(
-            backgroundColor: U.primary,
-            foregroundColor: U.bg,
-          ),
-          child: Text(
-            'Save',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _ThemeStyleSheet extends StatelessWidget {
   const _ThemeStyleSheet({required this.currentKey});
@@ -1190,3 +929,229 @@ class _ThemePreviewCard extends StatelessWidget {
     );
   }
 }
+
+class _EditProfileSheet extends StatefulWidget {
+  final String initialName;
+  final String initialBio;
+
+  const _EditProfileSheet({
+    required this.initialName,
+    required this.initialBio,
+  });
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _bioController;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _bioController = TextEditingController(text: widget.initialBio);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final nextName = _nameController.text.trim();
+    final nextBio = _bioController.text.trim();
+
+    if (nextName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: U.red,
+          content: Text('Name cannot be empty', style: GoogleFonts.outfit(color: U.bg)),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Update Auth
+        await user.updateDisplayName(nextName);
+        
+        // Update Firestore users collection
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'displayName': nextName,
+          'bio': nextBio,
+          'email': user.email ?? '',
+          'photoUrl': user.photoURL,
+          'lastSeen': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        await user.reload();
+      }
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: U.red,
+            content: Text('Could not update profile', style: GoogleFonts.outfit(color: U.bg)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: U.border.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Header Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: _saving ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.outfit(
+                      color: U.sub,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Edit Profile',
+                  style: GoogleFonts.outfit(
+                    color: U.text,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(U.primary),
+                          ),
+                        )
+                      : Text(
+                          'Save',
+                          style: GoogleFonts.outfit(
+                            color: U.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Name Field
+            Text(
+              'NAME',
+              style: GoogleFonts.outfit(
+                color: U.sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              maxLength: 40,
+              style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+              cursorColor: U.primary,
+              decoration: InputDecoration(
+                hintText: 'Enter your name...',
+                hintStyle: GoogleFonts.outfit(color: U.dim),
+                counterText: '',
+                filled: true,
+                fillColor: U.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Bio Field
+            Text(
+              'BIO',
+              style: GoogleFonts.outfit(
+                color: U.sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bioController,
+              maxLines: 3,
+              maxLength: 150,
+              style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+              cursorColor: U.primary,
+              decoration: InputDecoration(
+                hintText: 'Tell us about yourself...',
+                hintStyle: GoogleFonts.outfit(color: U.dim),
+                filled: true,
+                fillColor: U.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
