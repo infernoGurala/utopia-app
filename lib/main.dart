@@ -414,7 +414,7 @@ const appThemes = [
 ];
 
 final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
-  _catppuccinLatteTheme,
+  _orchidTheme,
 );
 
 
@@ -655,7 +655,7 @@ class U {
         return theme;
       }
     }
-    return _catppuccinLatteTheme;
+    return _orchidTheme;
   }
 
   static void applyTheme(String? key) {
