@@ -196,8 +196,13 @@ class FocusSupabaseService {
           );
         }
         await _db.markCompletionsSynced(noteWithId.userId, noteWithId.date);
+        debugPrint('Focus Supabase: Successfully synced note for ${noteWithId.date} online!');
       } catch (e) {
-        debugPrint('Focus Supabase note sync failed: $e');
+        if (e is supa.PostgrestException) {
+          debugPrint('Focus Supabase note sync failed with PostgrestException: [${e.code}] ${e.message} - Details: ${e.details} - Hint: ${e.hint}');
+        } else {
+          debugPrint('Focus Supabase note sync failed: $e');
+        }
         // stays pending, will retry later
       }
     }
@@ -458,7 +463,14 @@ class FocusSupabaseService {
             onConflict: 'user_id,date',
           );
           await _db.markNoteSynced(note.userId, note.date);
-        } catch (_) {}
+          debugPrint('Focus Supabase: Successfully synced pending note for ${note.date} online!');
+        } catch (e) {
+          if (e is supa.PostgrestException) {
+            debugPrint('Focus Supabase pending note sync for ${note.date} failed with PostgrestException: [${e.code}] ${e.message} - Details: ${e.details} - Hint: ${e.hint}');
+          } else {
+            debugPrint('Focus Supabase: Pending note sync for ${note.date} failed: $e');
+          }
+        }
       }
 
       // Sync pending completions
@@ -479,7 +491,14 @@ class FocusSupabaseService {
             entry.value.map((c) => c.toSupabaseMap()).toList(),
           );
           await _db.markCompletionsSynced(parts[0], parts[1]);
-        } catch (_) {}
+          debugPrint('Focus Supabase: Successfully synced pending completions for ${parts[1]} online!');
+        } catch (e) {
+          if (e is supa.PostgrestException) {
+            debugPrint('Focus Supabase pending completions sync for ${parts[1]} failed with PostgrestException: [${e.code}] ${e.message} - Details: ${e.details} - Hint: ${e.hint}');
+          } else {
+            debugPrint('Focus Supabase: Pending completions sync for ${parts[1]} failed: $e');
+          }
+        }
       }
     } catch (e) {
       debugPrint('Focus sync failed: $e');
