@@ -59,7 +59,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       showUtopiaSnackBar(
         context,
         message: 'Notification permissions are disabled! Enable them in System Settings to get alerts.',
-        tone: UtopiaSnackBarTone.warning,
+        tone: UtopiaSnackBarTone.error,
       );
     }
   }
