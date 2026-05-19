@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -115,58 +116,49 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   }
 
   Widget _buildProfileHeader(User? user) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [U.primary, U.teal],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return ProfileHeaderBackground(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: U.surface,
+                backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
+                child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user?.displayName ?? 'Organizer',
+                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
+                      style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
-            child: CircleAvatar(
-              radius: 36,
-              backgroundColor: U.surface,
-              backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
-              child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user?.displayName ?? 'Organizer',
-                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
-                    style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
   }
@@ -774,5 +766,126 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   String _formatDate(DateTime d) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+}
+
+class ProfileHeaderBackground extends StatefulWidget {
+  final Widget child;
+  const ProfileHeaderBackground({super.key, required this.child});
+
+  @override
+  State<ProfileHeaderBackground> createState() => _ProfileHeaderBackgroundState();
+}
+
+class _ProfileHeaderBackgroundState extends State<ProfileHeaderBackground> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [U.primary, U.teal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: _MeshPainter(_controller.value),
+                );
+              },
+            ),
+          ),
+          widget.child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MeshPainter extends CustomPainter {
+  final double progress;
+  _MeshPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.fill;
+
+    // Draw wavy lines or abstract shapes
+    final path1 = Path();
+    final path2 = Path();
+
+    // Wave 1
+    path1.moveTo(0, size.height);
+    for (double x = 0; x <= size.width; x++) {
+      final y = size.height * 0.75 +
+          math.sin((x / size.width * 2 * math.pi) + (progress * 2 * math.pi)) * 18;
+      path1.lineTo(x, y);
+    }
+    path1.lineTo(size.width, size.height);
+    path1.close();
+    canvas.drawPath(path1, paint);
+
+    // Wave 2
+    paint.color = Colors.white.withValues(alpha: 0.03);
+    path2.moveTo(0, size.height);
+    for (double x = 0; x <= size.width; x++) {
+      final y = size.height * 0.55 +
+          math.cos((x / size.width * 2 * math.pi) - (progress * 2 * math.pi)) * 22;
+      path2.lineTo(x, y);
+    }
+    path2.lineTo(size.width, size.height);
+    path2.close();
+    canvas.drawPath(path2, paint);
+
+    // Draw floating blobs
+    final paintBlob = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+
+    final center1 = Offset(
+      size.width * 0.35 + math.sin(progress * 2 * math.pi) * 40,
+      size.height * 0.35 + math.cos(progress * 2 * math.pi) * 20,
+    );
+    canvas.drawCircle(center1, 55, paintBlob);
+
+    final center2 = Offset(
+      size.width * 0.8 + math.cos(progress * 2 * math.pi) * 30,
+      size.height * 0.5 + math.sin(progress * 2 * math.pi) * 30,
+    );
+    canvas.drawCircle(center2, 65, paintBlob);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MeshPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
