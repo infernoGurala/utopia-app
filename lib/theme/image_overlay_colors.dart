@@ -33,7 +33,7 @@ class ImageOverlayColors {
   static const _catppuccinLatte = {
     'morning':   _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
     'afternoon': _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
-    'evening':   _Quad(Color(0xFFBAA3FF), Color(0xFFC7C7C7), Color(0xFFE8E8E8), Color(0xFFC7C7C7)), // ← change me
+    'evening':   _Quad(Color(0xFFFDFDFC), Color(0xFFC7C7C7), Color(0xFFE8E8E8), Color(0xFFC7C7C7)), // ← change me
     'night':     _Quad(Color(0xFF834ACF), Color(0xFF9093B0), Color(0xFFDCE0E8), Color(0xFFBCC0CC)), // ← change me
   };
 
@@ -108,32 +108,41 @@ class ImageOverlayColors {
     'github-dark':      _githubDark,
   };
 
-  static String _timeSlot() {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'morning';
-    if (h < 17) return 'afternoon';
-    if (h < 20) return 'evening';
-    return 'night';
+  static String getTimeSlot() {
+    final time = DateTime.now().hour + DateTime.now().minute / 60.0;
+    if (time >= 5.0 && time < 11.5) {
+      return 'morning';
+    } else if (time >= 11.5 && time < 16.0) {
+      return 'afternoon';
+    } else if (time >= 16.0 && time < 18.5) {
+      return 'evening';
+    } else {
+      return 'night';
+    }
   }
 
   /// Title color for text overlaid on the background image.
-  static Color titleColor(String themeKey) {
-    return _map[themeKey]?[_timeSlot()]?.title ?? const Color(0xFFFFFFFF);
+  static Color titleColor(String themeKey, [String? timeSlot]) {
+    final slot = timeSlot ?? getTimeSlot();
+    return _map[themeKey]?[slot]?.title ?? const Color(0xFFFFFFFF);
   }
 
   /// Subtitle/tagline color for text overlaid on the background image.
-  static Color subtitleColor(String themeKey) {
-    return _map[themeKey]?[_timeSlot()]?.subtitle ?? const Color(0xCCFFFFFF);
+  static Color subtitleColor(String themeKey, [String? timeSlot]) {
+    final slot = timeSlot ?? getTimeSlot();
+    return _map[themeKey]?[slot]?.subtitle ?? const Color(0xCCFFFFFF);
   }
 
   /// Greeting color ("Good morning, Name"). Returns null → caller uses U.text.
-  static Color? greetingColor(String themeKey) {
-    return _map[themeKey]?[_timeSlot()]?.greeting;
+  static Color? greetingColor(String themeKey, [String? timeSlot]) {
+    final slot = timeSlot ?? getTimeSlot();
+    return _map[themeKey]?[slot]?.greeting;
   }
 
   /// Quote/motivational text color. Returns null → caller uses U.sub.
-  static Color? quoteColor(String themeKey) {
-    return _map[themeKey]?[_timeSlot()]?.quote;
+  static Color? quoteColor(String themeKey, [String? timeSlot]) {
+    final slot = timeSlot ?? getTimeSlot();
+    return _map[themeKey]?[slot]?.quote;
   }
 }
 

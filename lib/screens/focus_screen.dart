@@ -41,9 +41,9 @@ class _FocusScreenState extends State<FocusScreen> {
   ];
 
   String _generateRandomGreeting() {
-    final time = DateTime.now().hour + DateTime.now().minute / 60.0;
+    final slot = ImageOverlayColors.getTimeSlot();
     final List<String> variants;
-    if (time >= 5.0 && time < 11.5) {
+    if (slot == 'morning') {
       variants = const [
         'Rise and shine',
         'Good morning',
@@ -66,7 +66,7 @@ class _FocusScreenState extends State<FocusScreen> {
         'Rise up and thrive',
         'Hello there, sunshine',
       ];
-    } else if (time >= 11.5 && time < 16.0) {
+    } else if (slot == 'afternoon') {
       variants = const [
         'Good afternoon',
         'Hope your afternoon is great',
@@ -134,34 +134,7 @@ class _FocusScreenState extends State<FocusScreen> {
     return _motivationalTexts[dayOfYear % _motivationalTexts.length];
   }
 
-  String get _bgImagePath {
-    final time = DateTime.now().hour + DateTime.now().minute / 60.0;
-    
-    String timeSlot;
-    if (time >= 5.0 && time < 11.5) {
-      timeSlot = 'morning';
-    } else if (time >= 11.5 && time < 16.0) {
-      timeSlot = 'afternoon';
-    } else if (time >= 16.0 && time < 18.5) {
-      timeSlot = 'evening';
-    } else {
-      timeSlot = 'night';
-    }
-
-    return 'assets/welcome_bg/one_light/$timeSlot.png';
-  }
-
-  Color get _onImageTitleColor =>
-      ImageOverlayColors.titleColor(appThemeNotifier.value.key);
-
-  Color get _onImageSubtitleColor =>
-      ImageOverlayColors.subtitleColor(appThemeNotifier.value.key);
-
-  Color get _greetingColor =>
-      ImageOverlayColors.greetingColor(appThemeNotifier.value.key) ?? U.text;
-
-  Color get _motivationalColor =>
-      ImageOverlayColors.quoteColor(appThemeNotifier.value.key) ?? U.sub;
+  // Obsolete getters removed. Background and overlay colors are now calculated atomically in build()
 
   @override
   void initState() {
@@ -232,8 +205,15 @@ class _FocusScreenState extends State<FocusScreen> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
-
     final topPadding = MediaQuery.paddingOf(context).top;
+
+    final timeSlot = ImageOverlayColors.getTimeSlot();
+    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
+    final themeKey = appThemeNotifier.value.key;
+    final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
+    final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
+    final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
+    final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
 
     return Scaffold(
       backgroundColor: U.bg,
@@ -246,7 +226,7 @@ class _FocusScreenState extends State<FocusScreen> {
             right: 0,
             height: screenHeight * 0.80,
             child: Image.asset(
-              _bgImagePath,
+              bgImagePath,
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
@@ -303,7 +283,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                       fontFamily: 'OrangeAvenue',
                                       fontSize: 42,
                                       fontWeight: FontWeight.w700,
-                                      color: _onImageTitleColor,
+                                      color: onImageTitleColor,
                                       letterSpacing: -0.5,
                                       height: 1.1,
                                     ),
@@ -320,7 +300,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                           width: 22,
                                           height: 22,
                                           fit: BoxFit.contain,
-                                          color: _onImageTitleColor,
+                                          color: onImageTitleColor,
                                           colorBlendMode: BlendMode.srcIn,
                                         ),
                                       ),
@@ -332,7 +312,7 @@ class _FocusScreenState extends State<FocusScreen> {
                               Text(
                                 'Stay productive and track your habits',
                                 style: GoogleFonts.outfit(
-                                  color: _onImageSubtitleColor,
+                                  color: onImageSubtitleColor,
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w400,
                                 ),
@@ -464,7 +444,7 @@ class _FocusScreenState extends State<FocusScreen> {
                               Container(
                                 width: 3,
                                 decoration: BoxDecoration(
-                                  color: _greetingColor.withValues(alpha: 0.45),
+                                  color: greetingColor.withValues(alpha: 0.45),
                                   borderRadius: BorderRadius.circular(2),
                                 ),
                               ),
@@ -478,7 +458,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                       style: GoogleFonts.tiroGurmukhi(
                                         fontSize: 26,
                                         fontWeight: FontWeight.w500,
-                                        color: _greetingColor,
+                                        color: greetingColor,
                                         height: 1.2,
                                       ),
                                     ),
@@ -488,7 +468,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                       style: GoogleFonts.outfit(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w400,
-                                        color: _motivationalColor,
+                                        color: motivationalColor,
                                         height: 1.45,
                                       ),
                                     ),
