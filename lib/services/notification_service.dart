@@ -71,6 +71,11 @@ class NotificationService {
             requestAlertPermission: false,
             requestBadgePermission: false,
             requestSoundPermission: false,
+            notificationPresentationOptions: {
+              NotificationPresentationOption.alert,
+              NotificationPresentationOption.sound,
+              NotificationPresentationOption.badge,
+            },
           );
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
@@ -664,15 +669,22 @@ class NotificationService {
   }
 
   static Future<void> scheduleFocusReminder(FocusReminder reminder) async {
-    if (!PlatformSupport.supportsNotifications || reminder.id == null) return;
+    if (!PlatformSupport.supportsNotifications || reminder.id == null) {
+      debugPrint("NOTIF: Cannot schedule reminder. Supported: ${PlatformSupport.supportsNotifications}, ID: ${reminder.id}");
+      return;
+    }
     try {
+      debugPrint("NOTIF: Starting scheduling for reminder: ID=${reminder.id}, Label=${reminder.label}, Type=${reminder.type}, Time=${reminder.reminderTime}, Active=${reminder.isActive}");
       await initialize();
       final ist = tz.getLocation('Asia/Kolkata');
       
       // Cancel any pre-existing notifications for this reminder
       await cancelFocusReminder(reminder.id!);
 
-      if (!reminder.isActive) return;
+      if (!reminder.isActive) {
+        debugPrint("NOTIF: Reminder is inactive, skipping schedule.");
+        return;
+      }
 
       final timeParts = reminder.reminderTime.split(':');
       final hour = int.parse(timeParts[0]);
@@ -680,6 +692,7 @@ class NotificationService {
 
       final baseId = _notificationIdFromUuid(reminder.id!);
       final now = tz.TZDateTime.now(ist);
+      debugPrint("NOTIF: Hashed baseId=$baseId. Current timezone time: $now");
 
       if (reminder.type == 'one_time' && reminder.remindDate != null) {
         final dateParts = reminder.remindDate!.split('-');
@@ -688,46 +701,16 @@ class NotificationService {
         final day = int.parse(dateParts[2]);
 
         var scheduledDate = tz.TZDateTime(ist, year, month, day, hour, minute);
+        debugPrint("NOTIF: Calculated scheduled date for one_time reminder: $scheduledDate");
         if (scheduledDate.isBefore(now)) {
-          return; // Don't schedule past events
+          debugPrint("NOTIF: Scheduled date is in the past ($scheduledDate < $now), skipping scheduling.");
+          return;
         }
 
-        await _localNotifications.zonedSchedule(
-          baseId,
-          'Focus Reminder',
-          reminder.label,
-          scheduledDate,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'utopia_high_importance',
-              'UTOPIA Notifications',
-              channelDescription: 'Focus reminders and task alerts',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-        debugPrint("NOTIF: One-time reminder scheduled successfully: baseId=$baseId for date $scheduledDate");
-      } else if (reminder.type == 'weekly' && reminder.weekdays != null) {
-        for (final weekday in reminder.weekdays!) {
-          // Dart weekday: 1 = Mon, 7 = Sun. Our index: 0 = Mon, 6 = Sun.
-          final targetWeekday = weekday + 1;
-          
-          // Find the next occurrence of this weekday
-          var scheduledDate = tz.TZDateTime(ist, now.year, now.month, now.day, hour, minute);
-          while (scheduledDate.weekday != targetWeekday || scheduledDate.isBefore(now)) {
-            scheduledDate = scheduledDate.add(const Duration(days: 1));
-          }
-
-          final dayId = baseId + weekday;
+        try {
           await _localNotifications.zonedSchedule(
-            dayId,
-            'Weekly Reminder',
+            baseId,
+            'Focus Reminder',
             reminder.label,
             scheduledDate,
             NotificationDetails(
@@ -744,9 +727,93 @@ class NotificationService {
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
             uiLocalNotificationDateInterpretation:
                 UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
           );
-          debugPrint("NOTIF: Weekly reminder scheduled for weekday $weekday (dayId=$dayId) at $scheduledDate");
+          debugPrint("NOTIF: One-time reminder scheduled successfully (exact): baseId=$baseId for date $scheduledDate");
+        } catch (e) {
+          debugPrint("NOTIF: One-time exact scheduling failed ($e), falling back to inexact alarm...");
+          await _localNotifications.zonedSchedule(
+            baseId,
+            'Focus Reminder',
+            reminder.label,
+            scheduledDate,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'utopia_high_importance',
+                'UTOPIA Notifications',
+                channelDescription: 'Focus reminders and task alerts',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+              ),
+            ),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+          );
+          debugPrint("NOTIF: One-time reminder scheduled successfully (inexact): baseId=$baseId for date $scheduledDate");
+        }
+      } else if (reminder.type == 'weekly' && reminder.weekdays != null) {
+        debugPrint("NOTIF: Scheduling weekly reminder for weekdays: ${reminder.weekdays}");
+        for (final weekday in reminder.weekdays!) {
+          // Dart weekday: 1 = Mon, 7 = Sun. Our index: 0 = Mon, 6 = Sun.
+          final targetWeekday = weekday + 1;
+          
+          // Find the next occurrence of this weekday
+          var scheduledDate = tz.TZDateTime(ist, now.year, now.month, now.day, hour, minute);
+          while (scheduledDate.weekday != targetWeekday || scheduledDate.isBefore(now)) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+
+          final dayId = baseId + weekday;
+          try {
+            await _localNotifications.zonedSchedule(
+              dayId,
+              'Weekly Reminder',
+              reminder.label,
+              scheduledDate,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  'utopia_high_importance',
+                  'UTOPIA Notifications',
+                  channelDescription: 'Focus reminders and task alerts',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                ),
+              ),
+              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            );
+            debugPrint("NOTIF: Weekly reminder scheduled (exact) for weekday $weekday (dayId=$dayId) at $scheduledDate");
+          } catch (e) {
+            debugPrint("NOTIF: Weekly exact scheduling failed for weekday $weekday ($e), falling back to inexact alarm...");
+            await _localNotifications.zonedSchedule(
+              dayId,
+              'Weekly Reminder',
+              reminder.label,
+              scheduledDate,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  'utopia_high_importance',
+                  'UTOPIA Notifications',
+                  channelDescription: 'Focus reminders and task alerts',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                ),
+              ),
+              androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+              uiLocalNotificationDateInterpretation:
+                  UILocalNotificationDateInterpretation.absoluteTime,
+              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            );
+            debugPrint("NOTIF: Weekly reminder scheduled (inexact) for weekday $weekday (dayId=$dayId) at $scheduledDate");
+          }
         }
       } else if (reminder.type == 'monthly_date' && reminder.monthDay != null) {
         var scheduledDate = tz.TZDateTime(ist, now.year, now.month, reminder.monthDay!, hour, minute);
@@ -755,31 +822,58 @@ class NotificationService {
           scheduledDate = tz.TZDateTime(ist, now.year, now.month + 1, reminder.monthDay!, hour, minute);
         }
 
-        await _localNotifications.zonedSchedule(
-          baseId,
-          'Monthly Reminder',
-          reminder.label,
-          scheduledDate,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'utopia_high_importance',
-              'UTOPIA Notifications',
-              channelDescription: 'Focus reminders and task alerts',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
+        try {
+          await _localNotifications.zonedSchedule(
+            baseId,
+            'Monthly Reminder',
+            reminder.label,
+            scheduledDate,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'utopia_high_importance',
+                'UTOPIA Notifications',
+                channelDescription: 'Focus reminders and task alerts',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+              ),
             ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-        );
-        debugPrint("NOTIF: Monthly reminder scheduled successfully: baseId=$baseId at $scheduledDate");
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+          );
+          debugPrint("NOTIF: Monthly reminder scheduled successfully (exact): baseId=$baseId at $scheduledDate");
+        } catch (e) {
+          debugPrint("NOTIF: Monthly exact scheduling failed ($e), falling back to inexact alarm...");
+          await _localNotifications.zonedSchedule(
+            baseId,
+            'Monthly Reminder',
+            reminder.label,
+            scheduledDate,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'utopia_high_importance',
+                'UTOPIA Notifications',
+                channelDescription: 'Focus reminders and task alerts',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+              ),
+            ),
+            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+          );
+          debugPrint("NOTIF: Monthly reminder scheduled successfully (inexact): baseId=$baseId at $scheduledDate");
+        }
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint("NOTIF: Error scheduling focus reminder: $e");
+      debugPrint("NOTIF_STACKTRACE: $stack");
     }
   }
 
@@ -787,6 +881,7 @@ class NotificationService {
     if (!PlatformSupport.supportsNotifications) return;
     try {
       final baseId = _notificationIdFromUuid(reminderId);
+      debugPrint("NOTIF: Cancelling scheduled notifications for baseId=$baseId");
       // Cancel base ID (for one-time and monthly)
       await _localNotifications.cancel(baseId);
       // Cancel weekly weekday IDs

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../main.dart';
 import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
+import '../widgets/utopia_snackbar.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -108,6 +109,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
     );
     if (confirmed == true) {
       await _service.deleteReminder(r.id!);
+      if (mounted) {
+        showUtopiaSnackBar(context, message: 'Reminder deleted', tone: UtopiaSnackBarTone.info);
+      }
       _load();
     }
   }
@@ -123,12 +127,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
         onSave: (r) async {
           Navigator.pop(ctx);
           await _service.saveReminder(r);
+          if (mounted) {
+            showUtopiaSnackBar(context, message: 'Reminder saved successfully!', tone: UtopiaSnackBarTone.success);
+          }
           _load();
         },
         onDelete: existing != null ? () async {
           Navigator.pop(ctx);
           if (existing.id != null) {
             await _service.deleteReminder(existing.id!);
+            if (mounted) {
+              showUtopiaSnackBar(context, message: 'Reminder deleted', tone: UtopiaSnackBarTone.info);
+            }
             _load();
           }
         } : null,
