@@ -399,11 +399,11 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       onTap: onTap,
     );
   }
-
-  Future<void> _editHabits() async {
+Future<void> _editHabits() async {
     final List<String> localHabits = List<String>.from(_userHabits?.habits ?? []);
     final inputController = TextEditingController();
     bool forceApplyToday = false;
+    bool isInputFocused = false;
     final suggestions = const [
       'Drink Water 💧',
       'Read 📚',
@@ -423,8 +423,6 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
-          bool isInputFocused = false;
-
           void addHabit(String habit) {
             final trimmed = habit.trim();
             if (trimmed.isNotEmpty && !localHabits.contains(trimmed)) {
@@ -435,10 +433,118 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
             }
           }
 
+          Widget buildTomorrowPanel() {
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [U.surface, U.card],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: U.border.withValues(alpha: 0.4)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: U.blue.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.info_outline_rounded, color: U.blue, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Template Updated',
+                              style: GoogleFonts.outfit(
+                                color: U.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Changes take effect starting tomorrow.',
+                              style: GoogleFonts.outfit(
+                                color: U.sub,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_note != null && _note!.habitsState.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Divider(height: 1, color: U.border.withValues(alpha: 0.5)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Apply to Today?',
+                                style: GoogleFonts.outfit(
+                                  color: U.text,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                "Resets today's habit completion progress",
+                                style: GoogleFonts.outfit(
+                                  color: U.red.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: forceApplyToday,
+                          activeColor: U.red,
+                          activeTrackColor: U.red.withValues(alpha: 0.2),
+                          onChanged: (v) {
+                            setSheetState(() {
+                              forceApplyToday = v;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }
+
           return Padding(
             padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
             child: Container(
-              height: MediaQuery.of(ctx).size.height * 0.75,
+              height: MediaQuery.of(ctx).size.height * 0.82,
               decoration: BoxDecoration(
                 color: U.bg,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
@@ -453,80 +559,74 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                 ],
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Drag handle
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: U.dim.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(2.5),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                    child: Column(
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Container(
+                          width: 44,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: U.dim.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(2.5),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Edit Habits',
-                              style: GoogleFonts.playfairDisplay(
-                                color: U.text,
-                                fontSize: 26,
-                                fontWeight: FontWeight.w700,
-                                fontStyle: FontStyle.italic,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Edit Habits',
+                                  style: GoogleFonts.playfairDisplay(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w700,
+                                    color: U.text,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Customize daily activities to track',
+                                  style: GoogleFonts.outfit(
+                                    color: U.sub.withValues(alpha: 0.8),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Customize daily activities to track',
-                              style: GoogleFonts.outfit(
-                                color: U.sub.withValues(alpha: 0.8),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                            FilledButton(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: U.teal.withValues(alpha: 0.15),
+                                foregroundColor: U.teal,
+                                elevation: 0,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              ),
+                              onPressed: () async {
+                                Navigator.pop(ctx, forceApplyToday);
+                              },
+                              child: Text(
+                                'Done',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  letterSpacing: 0.2,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: U.blue,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          onPressed: () async {
-                            Navigator.pop(ctx, forceApplyToday);
-                          },
-                          child: Text(
-                            'Done',
-                            style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-
-                  // Add Habit Input Bar
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Focus(
@@ -578,9 +678,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                               ),
                             ),
                             IconButton(
-                              icon: Icon(Icons.add_circle_rounded, color: U.blue, size: 28),
-                              splashColor: U.blue.withValues(alpha: 0.1),
-                              highlightColor: Colors.transparent,
+                              icon: Icon(Icons.add_circle_rounded, color: U.blue, size: 22),
                               onPressed: () => addHabit(inputController.text),
                             ),
                           ],
@@ -589,23 +687,22 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Predefined suggestions label
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Text(
-                      'QUICK SUGGESTIONS',
-                      style: GoogleFonts.outfit(
-                        color: U.sub.withValues(alpha: 0.7),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.2,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'QUICK SUGGESTIONS',
+                        style: GoogleFonts.outfit(
+                          color: U.sub.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // Suggestions horizontal list
                   SizedBox(
                     height: 40,
                     child: ListView.builder(
@@ -624,14 +721,10 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
-                                color: alreadyAdded 
-                                    ? U.surface.withValues(alpha: 0.3) 
-                                    : U.card.withValues(alpha: 0.9),
+                                color: alreadyAdded ? U.surface.withValues(alpha: 0.3) : U.card.withValues(alpha: 0.9),
                                 borderRadius: BorderRadius.circular(24),
                                 border: Border.all(
-                                  color: alreadyAdded 
-                                      ? U.border.withValues(alpha: 0.2) 
-                                      : U.border.withValues(alpha: 0.7),
+                                  color: alreadyAdded ? U.border.withValues(alpha: 0.2) : U.border.withValues(alpha: 0.7),
                                   width: 1.2,
                                 ),
                               ),
@@ -658,72 +751,50 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                       },
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // List label
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'YOUR HABITS',
-                          style: GoogleFonts.outfit(
-                            color: U.sub.withValues(alpha: 0.7),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: U.surface,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: U.border.withValues(alpha: 0.5)),
-                          ),
-                          child: Text(
-                            '${localHabits.length} active',
-                            style: GoogleFonts.outfit(
-                              color: U.blue,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 12),
-
-                  // Habits list
                   Expanded(
                     child: localHabits.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: U.surface,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(Icons.track_changes_outlined, size: 36, color: U.sub.withValues(alpha: 0.5)),
+                        ? ListView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            children: [
+                              const SizedBox(height: 32),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: U.surface,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(Icons.track_changes_outlined, size: 36, color: U.sub.withValues(alpha: 0.5)),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'No habits added yet',
+                                      style: GoogleFonts.outfit(color: U.sub, fontSize: 15, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'No habits added yet',
-                                  style: GoogleFonts.outfit(color: U.sub, fontSize: 15, fontWeight: FontWeight.w500),
-                                ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 48),
+                              buildTomorrowPanel(),
+                            ],
                           )
                         : ListView.builder(
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                            itemCount: localHabits.length,
+                            itemCount: localHabits.length + 1,
                             itemBuilder: (context, index) {
+                              if (index == localHabits.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 12, bottom: 24),
+                                  child: buildTomorrowPanel(),
+                                );
+                              }
+
                               final habit = localHabits[index];
                               return Dismissible(
                                 key: Key(habit),
@@ -731,7 +802,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                                 background: Container(
                                   alignment: Alignment.centerRight,
                                   padding: const EdgeInsets.only(right: 24),
-                                  margin: const EdgeInsets.only(bottom: 12),
+                                  margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
                                     color: U.red.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(20),
@@ -744,7 +815,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                                   });
                                 },
                                 child: Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
+                                  margin: const EdgeInsets.only(bottom: 10),
                                   decoration: BoxDecoration(
                                     color: U.card,
                                     borderRadius: BorderRadius.circular(20),
@@ -777,7 +848,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                                           const SizedBox(width: 16),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
                                               child: Text(
                                                 habit,
                                                 style: GoogleFonts.outfit(
@@ -808,114 +879,6 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                               );
                             },
                           ),
-                  ),
-
-                  // Tomorrow info panel & apply to today toggle
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [U.surface, U.card],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: U.border.withValues(alpha: 0.4)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 15,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: U.blue.withValues(alpha: 0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.info_outline_rounded, color: U.blue, size: 20),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Template Updated',
-                                    style: GoogleFonts.outfit(
-                                      color: U.text,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Changes take effect starting tomorrow.',
-                                    style: GoogleFonts.outfit(
-                                      color: U.sub,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (_note != null && _note!.habitsState.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Divider(height: 1, color: U.border.withValues(alpha: 0.5)),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Apply to Today?',
-                                      style: GoogleFonts.outfit(
-                                        color: U.text,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      "Resets today's habit completion progress",
-                                      style: GoogleFonts.outfit(
-                                        color: U.red.withValues(alpha: 0.8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Switch(
-                                value: forceApplyToday,
-                                activeColor: U.red,
-                                activeTrackColor: U.red.withValues(alpha: 0.2),
-                                onChanged: (v) {
-                                  setSheetState(() {
-                                    forceApplyToday = v;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
                   ),
                 ],
               ),
