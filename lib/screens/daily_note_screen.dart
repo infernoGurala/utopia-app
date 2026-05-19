@@ -757,7 +757,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                 alignment: Alignment.centerRight,
                 color: Colors.transparent,
                 child: Container(
-                  width: 6,
+                  width: 3,
                   height: 200,
                   decoration: BoxDecoration(
                     color: U.primary.withValues(alpha: 0.9),

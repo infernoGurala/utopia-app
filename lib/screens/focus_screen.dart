@@ -299,12 +299,12 @@ class _FocusScreenState extends State<FocusScreen> {
                                 children: [
                                   Text(
                                     'Utopia',
-                                    style: GoogleFonts.playfairDisplay(
+                                    style: TextStyle(
+                                      fontFamily: 'OrangeAvenue',
                                       fontSize: 42,
                                       fontWeight: FontWeight.w700,
                                       color: _onImageTitleColor,
-                                      fontStyle: FontStyle.italic,
-                                      letterSpacing: -1.5,
+                                      letterSpacing: -0.5,
                                       height: 1.1,
                                     ),
                                   ),

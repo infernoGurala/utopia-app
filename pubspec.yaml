@@ -73,3 +73,7 @@ flutter:
     - assets/university/
     - assets/semesters/
     - assets/focus screen/
+  fonts:
+    - family: OrangeAvenue
+      fonts:
+        - asset: assets/fonts/OrangeAvenue-Regular.otf
