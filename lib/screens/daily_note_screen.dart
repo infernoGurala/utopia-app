@@ -47,6 +47,13 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
         _selectedDate.day == now.day;
   }
 
+  bool get _isFutureOrToday {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    return !selected.isBefore(today);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +161,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   void _toggleHabit(String habit) {
+    if (!_isToday) return;
     if (_note == null) return;
     final state = Map<String, bool>.from(_note!.habitsState);
     state[habit] = !(state[habit] ?? false);
@@ -173,6 +181,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   void _toggleTask(int index) {
+    if (!_isToday) return;
     if (_note == null) return;
     final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
     tasks[index]['completed'] = !(tasks[index]['completed'] == true);
@@ -1534,7 +1543,7 @@ Future<void> _editHabits() async {
               onTextTap: () => _showEditTaskSheet(i, tasks[i]['label']),
               onDelete: () => _deleteTask(i),
             ),
-          if (_isToday) ...[
+          if (_isFutureOrToday) ...[
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -1675,7 +1684,7 @@ Future<void> _editHabits() async {
           _AnimatedCheckbox(checked: checked, enabled: enabled, onTap: onTap),
           Expanded(
             child: GestureDetector(
-              onTap: enabled ? onTextTap : null,
+              onTap: _isFutureOrToday ? onTextTap : null,
               behavior: HitTestBehavior.opaque,
               child: _StrikeThroughText(
                 text: label,
@@ -1689,7 +1698,7 @@ Future<void> _editHabits() async {
               ),
             ),
           ),
-          if (isTask && onDelete != null && _allowDeleteEnabled && enabled)
+          if (isTask && onDelete != null && _allowDeleteEnabled && _isFutureOrToday)
             GestureDetector(
               onTap: onDelete,
               behavior: HitTestBehavior.opaque,
