@@ -23,6 +23,21 @@ class _RemindersScreenState extends State<RemindersScreen> {
   bool _filterActive = false;
   bool _showPast = false;
 
+  bool _reminderAppliesToDay(FocusReminder r, DateTime day) {
+    final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+    if (r.type == 'one_time') {
+      return r.remindDate == dateStr;
+    } else if (r.type == 'weekly') {
+      final index = day.weekday - 1;
+      return r.weekdays != null && r.weekdays!.contains(index);
+    } else if (r.type == 'monthly_date') {
+      if (r.monthDay != day.day) return false;
+      if (r.activeMonths == null || r.activeMonths!.isEmpty) return true;
+      return r.activeMonths!.contains(day.month);
+    }
+    return false;
+  }
+
   static DateTime _getWeekStart(DateTime d) {
     final diff = d.weekday - 1;
     return DateTime(d.year, d.month, d.day).subtract(Duration(days: diff));
@@ -142,6 +157,72 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 ],
               ),
             ),
+            // Month Header + Navigation & Today Button
+            Builder(
+              builder: (context) {
+                final middleOfWeek = _weekStart.add(const Duration(days: 3));
+                const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                final monthStr = '${monthNames[middleOfWeek.month]} ${middleOfWeek.year}';
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        monthStr,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: U.text.withValues(alpha: 0.9),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.chevron_left_rounded, color: U.sub, size: 20),
+                        onPressed: () => _shiftWeek(-1),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedDay = DateTime.now();
+                            _weekStart = _getWeekStart(DateTime.now());
+                            _filterActive = true;
+                          });
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          backgroundColor: U.primary.withValues(alpha: 0.08),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          'Today',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: U.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        icon: Icon(Icons.chevron_right_rounded, color: U.sub, size: 20),
+                        onPressed: () => _shiftWeek(1),
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            ),
             // Week strip
             _buildWeekStrip(),
             const SizedBox(height: 8),
@@ -183,7 +264,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: 40,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
                     color: isSelected ? U.primary.withValues(alpha: 0.12) : Colors.transparent,
                     borderRadius: BorderRadius.circular(12),
@@ -192,8 +273,25 @@ class _RemindersScreenState extends State<RemindersScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(dayNames[i], style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w600, color: isSelected ? U.primary : U.dim, letterSpacing: 0.5)),
-                      const SizedBox(height: 2),
-                      Text('${day.day}', style: GoogleFonts.outfit(fontSize: 15, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? U.primary : (isToday ? U.text : U.sub))),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${day.day}', 
+                        style: GoogleFonts.outfit(
+                          fontSize: 14, 
+                          fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w500, 
+                          color: isSelected ? U.primary : (isToday ? U.primary : U.sub)
+                        )
+                      ),
+                      if (isToday && !isSelected)
+                        Container(
+                          margin: const EdgeInsets.only(top: 2),
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: U.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -206,6 +304,72 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Widget _buildList() {
+    if (_filterActive) {
+      final filtered = _reminders.where((r) => _reminderAppliesToDay(r, _selectedDay)).toList();
+      const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final dateFormatted = '${_selectedDay.day} ${monthNames[_selectedDay.month]} ${_selectedDay.year}';
+
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 80),
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 16, bottom: 12),
+            child: Row(
+              children: [
+                Text(
+                  'Reminders for $dateFormatted',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: U.primary,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() => _filterActive = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: U.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Clear',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: U.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Icon(Icons.close, size: 10, color: U.primary),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 60),
+              child: Center(
+                child: Text(
+                  'No reminders scheduled for this day.',
+                  style: GoogleFonts.outfit(color: U.dim, fontSize: 14),
+                ),
+              ),
+            )
+          else
+            ...filtered.map((r) => _reminderTile(r)),
+        ],
+      );
+    }
+
     final upcoming = _upcoming;
     final recurring = _recurring;
     final past = _past;
