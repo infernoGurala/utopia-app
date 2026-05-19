@@ -434,12 +434,14 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                       } catch (_) {}
                     }
 
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
                     if (mounted) {
                       setState(() {
                         _userDisplayName = newName;
                         _userRollNumber = newRoll;
                       });
-                      Navigator.pop(dialogContext);
                       showUtopiaSnackBar(
                         context,
                         message: 'Profile updated successfully!',
@@ -447,11 +449,13 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                       );
                     }
                   } catch (e) {
-                    showUtopiaSnackBar(
-                      context,
-                      message: 'Failed to update profile: $e',
-                      tone: UtopiaSnackBarTone.error,
-                    );
+                    if (mounted) {
+                      showUtopiaSnackBar(
+                        context,
+                        message: 'Failed to update profile: $e',
+                        tone: UtopiaSnackBarTone.error,
+                      );
+                    }
                   }
                 }
               },
