@@ -459,6 +459,7 @@ class _ReminderForm extends StatefulWidget {
 
 class _ReminderFormState extends State<_ReminderForm> {
   late final TextEditingController _labelController;
+  late final TextEditingController _monthDayController;
   String _type = 'one_time';
   DateTime _date = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
@@ -466,6 +467,7 @@ class _ReminderFormState extends State<_ReminderForm> {
   int _monthDay = 1;
   Set<int> _activeMonths = {};
   bool _allMonths = true;
+  String? _errorText;
 
   @override
   void initState() {
@@ -482,6 +484,7 @@ class _ReminderFormState extends State<_ReminderForm> {
       _activeMonths = Set.from(e.activeMonths ?? []);
       _allMonths = e.activeMonths == null || e.activeMonths!.isEmpty;
     }
+    _monthDayController = TextEditingController(text: '$_monthDay');
   }
 
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -492,7 +495,18 @@ class _ReminderFormState extends State<_ReminderForm> {
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   void _save() {
-    if (_labelController.text.trim().isEmpty) return;
+    if (_labelController.text.trim().isEmpty) {
+      setState(() {
+        _errorText = 'Please enter what you want to be reminded about';
+      });
+      return;
+    }
+    if (_type == 'weekly' && _weekdays.isEmpty) {
+      setState(() {
+        _errorText = 'Please select at least one day of the week';
+      });
+      return;
+    }
     final sortedWeekdays = _type == 'weekly' ? (_weekdays.toList()..sort()) : null;
     final sortedMonths = (_type == 'monthly_date' && !_allMonths) ? (_activeMonths.toList()..sort()) : null;
     final reminder = FocusReminder(
@@ -525,10 +539,17 @@ class _ReminderFormState extends State<_ReminderForm> {
             // Label
             TextField(
               controller: _labelController,
+              onChanged: (v) {
+                if (_errorText != null) {
+                  setState(() => _errorText = null);
+                }
+              },
               style: GoogleFonts.outfit(color: U.text, fontSize: 16),
               decoration: InputDecoration(
                 hintText: 'What do you want to be reminded about?',
                 hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 14),
+                errorText: _errorText,
+                errorStyle: GoogleFonts.outfit(color: U.red, fontSize: 12),
               ),
             ),
             const SizedBox(height: 20),
@@ -677,10 +698,14 @@ class _ReminderFormState extends State<_ReminderForm> {
                 keyboardType: TextInputType.number,
                 style: GoogleFonts.outfit(color: U.text, fontSize: 15),
                 decoration: InputDecoration(hintText: '1', hintStyle: GoogleFonts.outfit(color: U.dim)),
-                controller: TextEditingController(text: '$_monthDay'),
+                controller: _monthDayController,
                 onChanged: (v) {
                   final n = int.tryParse(v);
-                  if (n != null && n >= 1 && n <= 28) _monthDay = n;
+                  if (n != null && n >= 1 && n <= 28) {
+                    setState(() {
+                      _monthDay = n;
+                    });
+                  }
                 },
               ),
             ),
@@ -790,6 +815,7 @@ class _ReminderFormState extends State<_ReminderForm> {
   @override
   void dispose() {
     _labelController.dispose();
+    _monthDayController.dispose();
     super.dispose();
   }
 }
