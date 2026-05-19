@@ -72,11 +72,12 @@ class FocusSupabaseService {
           .get();
 
       if (!doc.exists || doc.data() == null) {
-        debugPrint('Focus Supabase config not found, trying primary instance');
+        debugPrint('Focus Supabase: Firestore config [supabase-focus-1] not found. Falling back to primary instance...');
         try {
           _client = supa.Supabase.instance.client;
           _initialized = true;
           _initializing = false;
+          debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
           _syncPendingData();
           return true;
         } catch (fallbackError) {
@@ -91,11 +92,12 @@ class FocusSupabaseService {
       final anonKey = data['anon_key'] as String?;
 
       if (url == null || anonKey == null) {
-        debugPrint('Focus Supabase config missing url or anon_key, trying primary instance');
+        debugPrint('Focus Supabase config missing url or anon_key. Falling back to primary instance...');
         try {
           _client = supa.Supabase.instance.client;
           _initialized = true;
           _initializing = false;
+          debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
           _syncPendingData();
           return true;
         } catch (fallbackError) {
@@ -108,6 +110,7 @@ class FocusSupabaseService {
       _client = supa.SupabaseClient(url, anonKey);
       _initialized = true;
       _initializing = false;
+      debugPrint('Focus Supabase: Initialized successfully with dedicated project URL: $url');
 
       // Background sync of pending data
       _syncPendingData();
