@@ -11,6 +11,7 @@ import '../models/event_model.dart';
 import '../services/event_service.dart';
 import 'create_event_screen.dart';
 import '../widgets/utopia_snackbar.dart';
+import '../widgets/gradient_dot_button.dart';
 
 class OrganizerDashboardScreen extends StatefulWidget {
   const OrganizerDashboardScreen({super.key});
@@ -137,54 +138,215 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   }
 
   Widget _buildProfileHeader(User? user) {
+    final eventCount = _myEvents.length;
+    final regCount = _analytics['total_registrations'] as int? ?? 0;
+
     return ProfileHeaderBackground(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
-              child: CircleAvatar(
-                radius: 36,
-                backgroundColor: U.surface,
-                backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
-                child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
-              ),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    (_userDisplayName != null && _userDisplayName!.isNotEmpty)
-                        ? _userDisplayName!
-                        : (user?.displayName ?? 'Organizer'),
-                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  if (_userRollNumber != null && _userRollNumber!.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Roll No: $_userRollNumber',
-                        style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 520;
+            
+            final avatarWidget = Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFF472B6), Color(0xFFA78BFA), Color(0xFF22D3EE)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 36,
+                    backgroundColor: U.surface,
+                    backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
+                    child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+                  ),
+                ),
+                Positioned(
+                  bottom: -2,
+                  right: -2,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 12),
+                    ),
+                  ),
+                ),
+              ],
+            );
+
+            final nameAndRollColumn = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  (_userDisplayName != null && _userDisplayName!.isNotEmpty)
+                      ? _userDisplayName!
+                      : (user?.displayName ?? 'Organizer'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFA855F7), Color(0xFF06B6D4)],
+                    ),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                if (_userRollNumber != null && _userRollNumber!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Roll No: $_userRollNumber',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ],
+            );
+
+            final statsCapsule = Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildCapsuleItem(
+                    icon: Icons.calendar_month_rounded,
+                    value: '$eventCount',
+                    label: 'Events',
+                    iconBgColor: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      width: 1,
+                      height: 18,
+                      color: Colors.white.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  _buildCapsuleItem(
+                    icon: Icons.local_activity_rounded,
+                    value: '$regCount',
+                    label: 'Registrations',
+                    iconBgColor: const Color(0xFF06B6D4).withValues(alpha: 0.35),
+                  ),
                 ],
               ),
-            ),
-          ],
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  avatarWidget,
+                  const SizedBox(width: 20),
+                  Expanded(child: nameAndRollColumn),
+                  const SizedBox(width: 16),
+                  statsCapsule,
+                ],
+              );
+            } else {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      avatarWidget,
+                      const SizedBox(width: 18),
+                      Expanded(child: nameAndRollColumn),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Center(child: statsCapsule),
+                ],
+              );
+            }
+          },
         ),
       ),
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
+  }
+
+  Widget _buildCapsuleItem({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color iconBgColor,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconBgColor,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 14),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
   }
 
   void _showNameAndRollNumberDialog(String uid, String currentName, String currentRoll) {
@@ -980,60 +1142,69 @@ class _MeshPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = Colors.white.withValues(alpha: 0.04)
       ..style = PaintingStyle.fill;
 
-    // Draw wavy lines or abstract shapes
+    // Draw background waves/paths
     final path1 = Path();
-    final path2 = Path();
-
-    // Wave 1
     path1.moveTo(0, size.height);
     for (double x = 0; x <= size.width; x++) {
-      final y = size.height * 0.75 +
-          math.sin((x / size.width * 2 * math.pi) + (progress * 2 * math.pi)) * 18;
+      final y = size.height * 0.7 +
+          math.sin((x / size.width * 2 * math.pi) + (progress * 2 * math.pi)) * 14;
       path1.lineTo(x, y);
     }
     path1.lineTo(size.width, size.height);
     path1.close();
     canvas.drawPath(path1, paint);
 
-    // Wave 2
-    paint.color = Colors.white.withValues(alpha: 0.03);
-    path2.moveTo(0, size.height);
+    // Subtle overlay wavy lines (mesh stroke)
+    final strokePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    
+    final path2 = Path();
+    path2.moveTo(0, size.height * 0.4);
     for (double x = 0; x <= size.width; x++) {
-      final y = size.height * 0.55 +
-          math.cos((x / size.width * 2 * math.pi) - (progress * 2 * math.pi)) * 22;
+      final y = size.height * 0.4 +
+          math.cos((x / size.width * 1.5 * math.pi) - (progress * 2 * math.pi)) * 20;
       path2.lineTo(x, y);
     }
-    path2.lineTo(size.width, size.height);
-    path2.close();
-    canvas.drawPath(path2, paint);
+    canvas.drawPath(path2, strokePaint);
 
-    // Draw floating blobs
+    // Floating blurred blobs to match mockup
     final paintBlob = Paint()
-      ..color = Colors.white.withValues(alpha: 0.04)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+      ..color = Colors.white.withValues(alpha: 0.03)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
 
     final center1 = Offset(
-      size.width * 0.35 + math.sin(progress * 2 * math.pi) * 40,
-      size.height * 0.35 + math.cos(progress * 2 * math.pi) * 20,
+      size.width * 0.2 + math.sin(progress * 2 * math.pi) * 30,
+      size.height * 0.3 + math.cos(progress * 2 * math.pi) * 15,
     );
-    canvas.drawCircle(center1, 55, paintBlob);
+    canvas.drawCircle(center1, 50, paintBlob);
 
     final center2 = Offset(
-      size.width * 0.8 + math.cos(progress * 2 * math.pi) * 30,
-      size.height * 0.5 + math.sin(progress * 2 * math.pi) * 30,
+      size.width * 0.8 + math.cos(progress * 2 * math.pi) * 20,
+      size.height * 0.4 + math.sin(progress * 2 * math.pi) * 20,
     );
-    canvas.drawCircle(center2, 65, paintBlob);
+    canvas.drawCircle(center2, 60, paintBlob);
 
-    // Draw dots pattern overlay
+    // Draw dots pattern grids on left and right sides
     final dotPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
+      ..color = Colors.white.withValues(alpha: 0.12)
       ..style = PaintingStyle.fill;
     const spacing = 12.0;
     const dotRadius = 1.0;
-    for (double x = spacing / 2; x < size.width; x += spacing) {
+
+    // Left dot matrix
+    for (double x = spacing / 2; x < 65.0; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
+      }
+    }
+
+    // Right dot matrix
+    for (double x = size.width - 65.0 + spacing / 2; x < size.width; x += spacing) {
       for (double y = spacing / 2; y < size.height; y += spacing) {
         canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
       }
@@ -1044,96 +1215,4 @@ class _MeshPainter extends CustomPainter {
   bool shouldRepaint(covariant _MeshPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
-}
-
-class GradientDotButton extends StatelessWidget {
-  final VoidCallback onPressed;
-  final String label;
-  final IconData icon;
-
-  const GradientDotButton({
-    super.key,
-    required this.onPressed,
-    required this.label,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [U.primary, U.teal],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: U.primary.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _DotsPatternPainter(),
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, color: Colors.white, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DotsPatternPainter extends CustomPainter {
-  final double spacing;
-  final double dotRadius;
-  final double opacity;
-
-  _DotsPatternPainter({
-    this.spacing = 8.0,
-    this.dotRadius = 1.0,
-    this.opacity = 0.08,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: opacity)
-      ..style = PaintingStyle.fill;
-
-    for (double x = spacing / 2; x < size.width; x += spacing) {
-      for (double y = spacing / 2; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), dotRadius, paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DotsPatternPainter oldDelegate) => false;
 }
