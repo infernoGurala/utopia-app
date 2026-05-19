@@ -355,9 +355,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         final eventId = await EventService.instance.createEvent(event);
         if (mounted) {
           if (eventId != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Event submitted for approval!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
-            );
             Navigator.pop(context);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
