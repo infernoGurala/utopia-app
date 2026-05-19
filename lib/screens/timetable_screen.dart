@@ -571,10 +571,10 @@ class _TimetableScreenState extends State<TimetableScreen>
         bottom: _userTimetable == null
             ? null
             : PreferredSize(
-                preferredSize: const Size.fromHeight(58),
+                preferredSize: const Size.fromHeight(74),
                 child: Container(
                   alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(

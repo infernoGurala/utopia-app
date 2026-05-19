@@ -41,9 +41,9 @@ class _FocusScreenState extends State<FocusScreen> {
   ];
 
   String get _greeting {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
+    final time = DateTime.now().hour + DateTime.now().minute / 60.0;
+    if (time >= 5.0 && time < 11.5) return 'Good morning';
+    if (time >= 11.5 && time < 16.0) return 'Good afternoon';
     return 'Good evening';
   }
 
@@ -65,13 +65,18 @@ class _FocusScreenState extends State<FocusScreen> {
   }
 
   String get _bgImagePath {
-    final hour = DateTime.now().hour;
+    final time = DateTime.now().hour + DateTime.now().minute / 60.0;
     
     String timeSlot;
-    if (hour < 12) timeSlot = 'morning';
-    else if (hour < 17) timeSlot = 'afternoon';
-    else if (hour < 20) timeSlot = 'evening';
-    else timeSlot = 'night';
+    if (time >= 5.0 && time < 11.5) {
+      timeSlot = 'morning';
+    } else if (time >= 11.5 && time < 16.0) {
+      timeSlot = 'afternoon';
+    } else if (time >= 16.0 && time < 18.5) {
+      timeSlot = 'evening';
+    } else {
+      timeSlot = 'night';
+    }
 
     return 'assets/welcome_bg/one_light/$timeSlot.png';
   }

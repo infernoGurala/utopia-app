@@ -590,7 +590,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
                 Center(
                   child: Text(
-                    'UTOPIA · designed by Inferno',
+                    'UTOPIA · Designed by Humans • Powered by AI',
                     style: GoogleFonts.outfit(color: U.dim, fontSize: 11),
                   ),
                 ),

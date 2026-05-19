@@ -1329,7 +1329,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'UTOPIA · designed by Inferno',
+                  'UTOPIA · Designed by Humans • Powered by AI',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     color: U.dim,
