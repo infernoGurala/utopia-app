@@ -217,6 +217,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Row(
                       children: [
+                        if (Navigator.canPop(context)) ...[
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: U.card,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: U.border),
+                              ),
+                              child: Icon(
+                                Icons.arrow_back_rounded,
+                                color: U.text,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
                         Expanded(
                           child: Text(
                             'Profile',
