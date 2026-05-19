@@ -1,5 +1,5 @@
 -- Focus Daily Notes Table
-CREATE TABLE daily_notes (
+CREATE TABLE IF NOT EXISTS daily_notes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL,
   date TEXT NOT NULL,
@@ -10,10 +10,10 @@ CREATE TABLE daily_notes (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, date)
 );
-CREATE INDEX idx_dn_user_date ON daily_notes(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_dn_user_date ON daily_notes(user_id, date);
 
 -- Focus User Habits Configuration Table
-CREATE TABLE focus_user_habits (
+CREATE TABLE IF NOT EXISTS focus_user_habits (
   user_id TEXT PRIMARY KEY,
   habits JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -21,7 +21,7 @@ CREATE TABLE focus_user_habits (
 );
 
 -- Focus Habit completions Table for Heatmaps
-CREATE TABLE habit_completions (
+CREATE TABLE IF NOT EXISTS habit_completions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL,
   date TEXT NOT NULL,
@@ -31,11 +31,11 @@ CREATE TABLE habit_completions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, date, task_name)
 );
-CREATE INDEX idx_hc_user_task_date ON habit_completions(user_id, task_name, date);
-CREATE INDEX idx_hc_user_date ON habit_completions(user_id, date);
+CREATE INDEX IF NOT EXISTS idx_hc_user_task_date ON habit_completions(user_id, task_name, date);
+CREATE INDEX IF NOT EXISTS idx_hc_user_date ON habit_completions(user_id, date);
 
 -- Focus Reminders Table
-CREATE TABLE reminders (
+CREATE TABLE IF NOT EXISTS reminders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL,
   label TEXT NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE reminders (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-CREATE INDEX idx_reminders_user ON reminders(user_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(user_id, is_active);
 
 -- Disable Row Level Security (RLS) to allow offline-first sync without complex Auth wrappers for now
 ALTER TABLE daily_notes DISABLE ROW LEVEL SECURITY;
