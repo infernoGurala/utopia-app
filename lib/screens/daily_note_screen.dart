@@ -1258,33 +1258,6 @@ Future<void> _editHabits() async {
               );
             },
           ),
-          const SizedBox(height: 36),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: OutlinedButton.icon(
-              onPressed: _closeCalendar,
-              icon: Icon(Icons.arrow_forward_rounded, color: U.primary, size: 18),
-              label: Text(
-                'Slide Back',
-                style: GoogleFonts.outfit(
-                  color: U.text,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: U.border.withValues(alpha: 0.8), width: 1.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                backgroundColor: U.surface.withValues(alpha: 0.5),
-                foregroundColor: U.primary,
-                splashFactory: NoSplash.splashFactory,
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1369,10 +1342,63 @@ Future<void> _editHabits() async {
                 ],
               ),
               child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                  child: _buildCalendarBody(),
+                bottom: true,
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 96),
+                      child: _buildCalendarBody(),
+                    ),
+                    Positioned(
+                      left: 16,
+                      right: 16,
+                      bottom: 24,
+                      child: GestureDetector(
+                        onTap: _closeCalendar,
+                        child: Container(
+                          height: 56,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                U.primary.withValues(alpha: 0.12),
+                                U.primary.withValues(alpha: 0.04),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: U.primary.withValues(alpha: 0.3),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: U.primary.withValues(alpha: 0.05),
+                                blurRadius: 15,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.arrow_forward_rounded, color: U.primary, size: 20),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Slide Back',
+                                style: GoogleFonts.outfit(
+                                  color: U.text,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
