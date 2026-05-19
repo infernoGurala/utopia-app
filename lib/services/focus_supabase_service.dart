@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 import 'package:uuid/uuid.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/focus_models.dart';
 import 'focus_database_service.dart';
 
@@ -18,7 +19,23 @@ class FocusSupabaseService {
   final _db = FocusDatabaseService();
   static const _uuid = Uuid();
 
-  FocusSupabaseService._();
+  FocusSupabaseService._() {
+    _setupConnectivityListener();
+  }
+
+  void _setupConnectivityListener() {
+    Connectivity().onConnectivityChanged.listen((results) {
+      final hasConnection = results is List
+          ? results.any((r) => r != ConnectivityResult.none)
+          : results != ConnectivityResult.none;
+      if (hasConnection) {
+        debugPrint('Focus Supabase: Internet connectivity detected. Syncing pending data...');
+        initialize().then((success) {
+          _syncPendingData();
+        });
+      }
+    });
+  }
 
   factory FocusSupabaseService() {
     _instance ??= FocusSupabaseService._();
