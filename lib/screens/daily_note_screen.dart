@@ -1258,6 +1258,33 @@ Future<void> _editHabits() async {
               );
             },
           ),
+          const SizedBox(height: 36),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _closeCalendar,
+              icon: Icon(Icons.arrow_forward_rounded, color: U.primary, size: 18),
+              label: Text(
+                'Slide Back',
+                style: GoogleFonts.outfit(
+                  color: U.text,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: U.border.withValues(alpha: 0.8), width: 1.2),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                backgroundColor: U.surface.withValues(alpha: 0.5),
+                foregroundColor: U.primary,
+                splashFactory: NoSplash.splashFactory,
+              ),
+            ),
+          ),
         ],
       ),
     );
