@@ -32,8 +32,11 @@ class EventService {
   /// Update an existing event.
   Future<bool> updateEvent(String eventId, Map<String, dynamic> fields) async {
     try {
-      fields['updated_at'] = DateTime.now().toUtc().toIso8601String();
-      await _sb.from('events').update(fields).eq('id', eventId);
+      final updateData = Map<String, dynamic>.from(fields);
+      updateData.remove('id');
+      updateData.remove('created_at');
+      updateData.remove('updated_at');
+      await _sb.from('events').update(updateData).eq('id', eventId);
       return true;
     } catch (e) {
       debugPrint('Failed to update event: $e');
@@ -572,6 +575,22 @@ class EventService {
     } catch (e) {
       debugPrint('Failed to issue certificate: $e');
       return false;
+    }
+  }
+
+  /// Get certificates issued for a specific event.
+  Future<List<EventCertificate>> getEventCertificates(String eventId) async {
+    try {
+      final response = await _sb
+          .from('event_certificates')
+          .select()
+          .eq('event_id', eventId);
+      return List<Map<String, dynamic>>.from(response)
+          .map((m) => EventCertificate.fromMap(m))
+          .toList();
+    } catch (e) {
+      debugPrint('Failed to get event certificates: $e');
+      return [];
     }
   }
 }

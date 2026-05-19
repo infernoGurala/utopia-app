@@ -12,6 +12,7 @@ import 'package:utopia_app/firebase_options.dart';
 import 'package:utopia_app/main.dart';
 import 'package:utopia_app/services/platform_support.dart';
 import 'package:utopia_app/screens/chat_screen.dart';
+import 'package:utopia_app/screens/event_certificates_screen.dart';
 import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -427,6 +428,15 @@ class NotificationService {
       }
       return;
     }
+    if (type == 'certificate') {
+      final navigator = navigatorKey.currentState;
+      if (navigator != null) {
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => const EventCertificatesScreen()),
+        );
+      }
+      return;
+    }
   }
 
   static Future<bool> _openChatFromNotification({
@@ -487,6 +497,18 @@ class NotificationService {
       platformChannelSpecifics,
     );
     debugPrint("NOTIF: Test notification sent");
+  }
+
+  static Future<void> sendCertificateNotification({
+    required String title,
+    required String body,
+  }) async {
+    await initialize();
+    await _showLocalNotification(
+      title: title,
+      body: body,
+      data: const <String, dynamic>{'type': 'certificate'},
+    );
   }
 
   static Future<bool> scheduleDailyTimetableNotification({
