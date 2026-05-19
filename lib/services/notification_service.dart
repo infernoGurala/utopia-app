@@ -71,11 +71,11 @@ class NotificationService {
             requestAlertPermission: false,
             requestBadgePermission: false,
             requestSoundPermission: false,
-            notificationPresentationOptions: {
-              NotificationPresentationOption.alert,
-              NotificationPresentationOption.sound,
-              NotificationPresentationOption.badge,
-            },
+            defaultPresentAlert: true,
+            defaultPresentSound: true,
+            defaultPresentBadge: true,
+            defaultPresentBanner: true,
+            defaultPresentList: true,
           );
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
