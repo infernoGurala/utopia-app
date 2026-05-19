@@ -349,6 +349,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   Future<void> _editHabits() async {
     final List<String> localHabits = List<String>.from(_userHabits?.habits ?? []);
     final inputController = TextEditingController();
+    bool forceApplyToday = false;
     final suggestions = const [
       'Drink Water 💧',
       'Read 📚',
@@ -362,7 +363,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       'Code 💻',
     ];
 
-    await showModalBottomSheet<void>(
+    final bool? forceApply = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -442,7 +443,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           ),
                           onPressed: () async {
-                            Navigator.pop(ctx);
+                            Navigator.pop(ctx, forceApplyToday);
                           },
                           child: Text(
                             'Done',
@@ -678,6 +679,82 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                             },
                           ),
                   ),
+
+                  // Tomorrow info panel & apply to today toggle
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: U.card,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: U.blue, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Changes take effect starting tomorrow.',
+                                style: GoogleFonts.outfit(
+                                  color: U.text,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_note != null && _note!.habitsState.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Divider(height: 1, color: U.border.withValues(alpha: 0.5)),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Apply to Today?',
+                                      style: GoogleFonts.outfit(
+                                        color: U.text,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "Resets today's habit completion progress",
+                                      style: GoogleFonts.outfit(
+                                        color: U.red,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: forceApplyToday,
+                                activeColor: U.red,
+                                activeTrackColor: U.red.withValues(alpha: 0.2),
+                                onChanged: (v) {
+                                  setSheetState(() {
+                                    forceApplyToday = v;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -698,13 +775,16 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
           final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
           final isPast = compareDate.isBefore(todayDate);
 
-          if (_note != null && _note!.habitsState.isEmpty && !isPast) {
-            final initialState = <String, bool>{};
-            for (final h in localHabits) {
-              initialState[h] = false;
+          if (_note != null && !isPast) {
+            // Apply today if they selected "Apply to Today" switch, OR if today's/future note has an empty habitsState
+            if (forceApply == true || _note!.habitsState.isEmpty) {
+              final initialState = <String, bool>{};
+              for (final h in localHabits) {
+                initialState[h] = false;
+              }
+              _note = _note!.copyWith(habitsState: initialState);
+              _saveNote();
             }
-            _note = _note!.copyWith(habitsState: initialState);
-            _saveNote();
           }
         });
       }
