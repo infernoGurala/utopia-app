@@ -1375,14 +1375,13 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
             child: GestureDetector(
               onTap: onTextTap,
               behavior: HitTestBehavior.opaque,
-              child: Text(
-                label,
+              child: _StrikeThroughText(
+                text: label,
+                checked: checked,
                 style: GoogleFonts.inter(
                   fontSize: 17,
                   fontWeight: FontWeight.w400,
-                  color: checked ? U.text.withValues(alpha: 0.35) : U.text,
-                  decoration: checked ? TextDecoration.lineThrough : null,
-                  decorationColor: U.text.withValues(alpha: 0.35),
+                  color: U.text,
                   height: 1.45,
                 ),
               ),
@@ -1650,4 +1649,109 @@ class _CheckPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+class _StrikeThroughText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final bool checked;
+
+  const _StrikeThroughText({
+    required this.text,
+    required this.style,
+    required this.checked,
+  });
+
+  @override
+  State<_StrikeThroughText> createState() => _StrikeThroughTextState();
+}
+
+class _StrikeThroughTextState extends State<_StrikeThroughText> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+    if (widget.checked) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _StrikeThroughText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.checked != oldWidget.checked) {
+      if (widget.checked) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        final textColor = Color.lerp(
+          widget.style.color ?? U.text,
+          (widget.style.color ?? U.text).withValues(alpha: 0.35),
+          _animation.value,
+        )!;
+        return CustomPaint(
+          foregroundPainter: _StrikeThroughPainter(
+            progress: _animation.value,
+            color: textColor,
+          ),
+          child: Text(
+            widget.text,
+            style: widget.style.copyWith(
+              color: textColor,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StrikeThroughPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+
+  _StrikeThroughPainter({required this.progress, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress == 0.0) return;
+    
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final y = size.height * 0.52; // centered vertically for single-line text
+    final endX = size.width * progress;
+
+    canvas.drawLine(Offset(0, y), Offset(endX, y), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _StrikeThroughPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.color != color;
+  }
 }
