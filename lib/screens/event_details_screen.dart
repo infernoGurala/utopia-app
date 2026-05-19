@@ -534,7 +534,24 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           ),
           if (_event.contactNumbers.isNotEmpty) ...[
             _buildDivider(),
-            _buildInfoRow(Icons.phone_rounded, _event.contactNumbers, 'Contact organizer'),
+            _buildInfoRow(
+              Icons.phone_rounded,
+              _event.contactNumbers,
+              'Contact organizer',
+              onTap: () async {
+                try {
+                  final phone = _event.contactNumbers.replaceAll(RegExp(r'\s+'), '');
+                  final uri = Uri.parse('tel:$phone');
+                  await launchUrl(uri);
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Could not open phone dialer: $e', style: GoogleFonts.outfit())),
+                    );
+                  }
+                }
+              },
+            ),
           ],
           if (_event.registrationDeadline != null) ...[
             _buildDivider(),
