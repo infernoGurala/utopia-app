@@ -192,26 +192,44 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final titleColor = isDark
+        ? (appThemeNotifier.value.key == 'gruvbox'
+            ? const Color(0xFFFB4934)
+            : appThemeNotifier.value.key == 'everforest'
+                ? const Color(0xFFA7C080)
+                : appThemeNotifier.value.key == 'github-dark'
+                    ? const Color(0xFF58A6FF)
+                    : appThemeNotifier.value.key == 'orchid'
+                        ? const Color(0xFFCBA6F7)
+                        : Colors.white)
+        : ImageOverlayColors.titleColor(appThemeNotifier.value.key);
+
+    final subtitleColor = isDark
+        ? U.sub
+        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key);
+
     return Scaffold(
       backgroundColor: U.bg,
       body: Stack(
         children: [
-          // Background Image
+          // Background Image with dark mode blending
           Positioned(
             top: 0,
             left: 0,
             right: 0,
             height: MediaQuery.sizeOf(context).height * 0.45,
             child: Opacity(
-              opacity: isDark ? 0.3 : 0.6,
+              opacity: isDark ? 0.35 : 0.6,
               child: Image.asset(
                 'assets/semesters/background.png',
                 fit: BoxFit.cover,
                 alignment: Alignment.topCenter,
+                color: isDark ? U.bg : null,
+                colorBlendMode: isDark ? BlendMode.multiply : null,
               ),
             ),
           ),
-          // Gradient fade — top fully clear, bottom lightly tinted (not solid)
+          // Gradient fade — top fully clear/shaded, bottom solid to blend with background
           Positioned(
             top: 0,
             left: 0,
@@ -222,11 +240,17 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg.withValues(alpha: 0.45),
-                  ],
+                  colors: isDark
+                      ? [
+                          U.bg.withValues(alpha: 0.45),
+                          U.bg.withValues(alpha: 0.15),
+                          U.bg.withValues(alpha: 1.0),
+                        ]
+                      : [
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg.withValues(alpha: 1.0),
+                        ],
                   stops: const [0.0, 0.55, 1.0],
                 ),
               ),
@@ -249,7 +273,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             Text(
                               'Semesters',
                               style: GoogleFonts.playfairDisplay(
-                                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
+                                color: titleColor,
                                 fontSize: 42,
                                 fontWeight: FontWeight.w700,
                                 fontStyle: FontStyle.normal,
@@ -260,7 +284,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                             Text(
                               'Access your academic resources',
                               style: GoogleFonts.outfit(
-                                color: ImageOverlayColors.subtitleColor(appThemeNotifier.value.key),
+                                color: subtitleColor,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -383,6 +407,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       icon: Icons.people_alt_rounded,
       color: U.blue,
       topRightBracket: true,
+      showTriangle: true,
       backgroundShape: Icon(Icons.bubble_chart, size: 100, color: U.blue.withValues(alpha: 0.04)),
       onTap: () {
         Navigator.push(
@@ -700,6 +725,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     required bool topRightBracket,
     Widget? backgroundShape,
     bool showPin = false,
+    bool showTriangle = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -742,15 +768,16 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                   child: backgroundShape,
                 ),
               // Corner Bracket
-              Positioned(
-                top: 0,
-                right: topRightBracket ? 0 : null,
-                left: topRightBracket ? null : 0,
-                child: CustomPaint(
-                  size: const Size(48, 48),
-                  painter: _SolidTrianglePainter(color: color, topRight: topRightBracket),
+              if (showTriangle)
+                Positioned(
+                  top: 0,
+                  right: topRightBracket ? 0 : null,
+                  left: topRightBracket ? null : 0,
+                  child: CustomPaint(
+                    size: const Size(48, 48),
+                    painter: _SolidTrianglePainter(color: color, topRight: topRightBracket),
+                  ),
                 ),
-              ),
               if (showPin)
                 Positioned(
                   top: 14,

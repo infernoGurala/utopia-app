@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,7 +16,7 @@ class DailyNoteScreen extends StatefulWidget {
   State<DailyNoteScreen> createState() => _DailyNoteScreenState();
 }
 
-class _DailyNoteScreenState extends State<DailyNoteScreen> {
+class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderStateMixin {
   final _service = FocusSupabaseService();
   DateTime _selectedDate = DateTime.now();
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
@@ -26,10 +27,12 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   FocusUserHabits? _userHabits;
   Set<String> _noteDates = {};
   final Set<String> _collapsedSections = {};
+  bool _isDraggingCalendar = false;
 
   final _journalController = TextEditingController();
   final _taskController = TextEditingController();
   final _scrollController = ScrollController();
+  late AnimationController _calendarController;
 
   String _dateStr(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -39,6 +42,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   @override
   void initState() {
     super.initState();
+    _calendarController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _calendarController.addListener(() => setState(() {}));
     _init();
   }
 
@@ -71,6 +76,23 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
     final dates = await _service.getNoteDates(_dateStr(start), _dateStr(end));
     if (mounted) setState(() => _noteDates = dates);
+  }
+
+  void _closeCalendar() {
+    _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+  }
+
+  void _openCalendar() {
+    _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+  }
+
+  void _toggleCalendar() {
+    if (_calendarController.isAnimating) return;
+    if (_calendarController.value > 0.5) {
+      _closeCalendar();
+    } else {
+      _openCalendar();
+    }
   }
 
   Future<void> _saveNote() async {
@@ -149,7 +171,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               SwitchListTile(
                 secondary: Icon(Icons.check_circle_outline_rounded, color: U.sub, size: 22),
                 title: Text('Allow Mark Done', style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w500)),
-                subtitle: Text('Tap checkboxes to toggle completion', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
+                subtitle: Text('Tap checkboxes to toggle completion', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
                 value: _markDoneEnabled,
                 activeTrackColor: U.primary,
                 onChanged: (v) async {
@@ -159,7 +181,6 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                   setState(() {});
                 },
               ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
               _menuItem(Icons.loop_rounded, 'Edit Habits', () {
                 Navigator.pop(ctx);
                 _editHabits();
@@ -209,7 +230,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Enter one habit per line.', style: GoogleFonts.outfit(color: U.dim, fontSize: 13)),
+                child: Text('Enter one habit per line.', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
               ),
               const SizedBox(height: 8),
               Expanded(
@@ -262,6 +283,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     if (_note != null && _journalController.text != _note!.journal) {
       _saveNote();
     }
+    _calendarController.dispose();
     _journalController.dispose();
     _taskController.dispose();
     _scrollController.dispose();
@@ -272,108 +294,116 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgImage = isDark ? 'assets/daily/dark.png' : 'assets/daily/light.png';
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    const handleTouchWidth = 36.0;
+    final panelWidth = screenWidth * 0.85;
+    final contentWidth = panelWidth - handleTouchWidth;
 
     return Scaffold(
       backgroundColor: U.bg,
-      endDrawer: _buildCalendarDrawer(),
-      body: Stack(
-        children: [
-          // Background Image (Extended for smooth transition)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.8,
-            child: Image.asset(
-              bgImage,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragStart: (details) {
+          final isOpen = _calendarController.value > 0.5;
+          final startFromRight = details.globalPosition.dx > screenWidth * 0.45;
+          if (isOpen || startFromRight) {
+            _isDraggingCalendar = true;
+            _calendarController.stop();
+          } else {
+            _isDraggingCalendar = false;
+          }
+        },
+        onHorizontalDragUpdate: (details) {
+          if (!_isDraggingCalendar) return;
+          _calendarController.value = (_calendarController.value - details.delta.dx / contentWidth).clamp(0.0, 1.0);
+        },
+        onHorizontalDragEnd: (details) {
+          if (!_isDraggingCalendar) return;
+          _isDraggingCalendar = false;
+          if (details.primaryVelocity != null && details.primaryVelocity! < -200) {
+            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+          } else if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+          } else if (_calendarController.value > 0.3) {
+            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+          } else {
+            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+          }
+        },
+        child: Stack(
+          children: [
+            // Background Image (Extended for smooth transition)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.sizeOf(context).height * 0.8,
+              child: Image.asset(
+                bgImage,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
             ),
-          ),
-          // Gradient overlay: top half clear, bottom half smooth fade
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.8,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+            // Gradient overlay: top half clear, bottom half smooth fade
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.sizeOf(context).height * 0.8,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      U.bg.withValues(alpha: 0.0),
+                      U.bg.withValues(alpha: 0.0),
+                      U.bg,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
             ),
-          ),
-          
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                Expanded(child: _loading ? _buildLoading() : _buildNoteBody()),
-              ],
+            
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  Expanded(child: _loading ? _buildLoading() : _buildNoteBody()),
+                ],
+              ),
             ),
-          ),
-          // Slide bar to open calendar
-          Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Builder(
-              builder: (ctx) => GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onHorizontalDragUpdate: (details) {
-                  if (details.primaryDelta != null && details.primaryDelta! < -1) {
-                    Scaffold.of(ctx).openEndDrawer();
-                  }
-                },
-                onTap: () => Scaffold.of(ctx).openEndDrawer(),
-                child: Container(
-                  width: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.transparent, U.primary.withValues(alpha: 0.15)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      width: 10,
-                      height: 140,
-                      margin: const EdgeInsets.only(right: 2),
-                      decoration: BoxDecoration(
-                        color: U.primary.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: U.primary.withValues(alpha: 0.5),
-                            blurRadius: 12,
-                            spreadRadius: 2,
-                          ),
-                        ],
+
+            // Backdrop dimming overlay scrim
+            if (_calendarController.value > 0.0)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _closeCalendar,
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: 5 * _calendarController.value,
+                        sigmaY: 5 * _calendarController.value,
+                      ),
+                      child: Container(
+                        color: Colors.black.withValues(alpha: 0.12 * _calendarController.value),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
+            
+            // Sliding calendar panel
+            _buildSlidingCalendarPanel(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
-    const dayFull = ['', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
     const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
@@ -396,25 +426,30 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('Daily Note', style: GoogleFonts.playfairDisplay(
-                fontSize: 24, 
-                fontWeight: FontWeight.w700, 
-                fontStyle: FontStyle.italic, 
-                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
-              )),
-              const Spacer(),
-              Builder(
-                builder: (ctx) => GestureDetector(
-                  onTap: () => Scaffold.of(ctx).openEndDrawer(),
-                  child: Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: U.surface,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: U.border, width: 0.5),
-                    ),
-                    child: Icon(Icons.calendar_today_rounded, color: U.sub, size: 17),
+              GestureDetector(
+                onTap: _toggleCalendar,
+                behavior: HitTestBehavior.opaque,
+                child: Text(
+                  '${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: U.text,
+                    letterSpacing: -0.3,
                   ),
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: _toggleCalendar,
+                child: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.calendar_today_rounded, color: U.sub, size: 17),
                 ),
               ),
               const SizedBox(width: 8),
@@ -433,161 +468,230 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Date hero
-          Text(dayFull[_selectedDate.weekday], style: GoogleFonts.outfit(
-            fontSize: 11, 
-            fontWeight: FontWeight.w700, 
-            color: U.primary, 
-            letterSpacing: 2.5,
-          )),
-          const SizedBox(height: 4),
-          Text('${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 28, 
-              fontWeight: FontWeight.w700, 
-              fontStyle: FontStyle.italic, 
-              color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
-            )),
-          const SizedBox(height: 12),
         ],
       ),
     );
   }
 
-  Widget _buildCalendarDrawer() {
+  Widget _buildCalendarBody() {
     const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     final today = DateTime.now();
     final firstDayOfMonth = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
     final daysInMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0).day;
-    final firstWeekday = firstDayOfMonth.weekday; // 1 = Mon, 7 = Sun
+    final firstWeekday = firstDayOfMonth.weekday;
     final offset = firstWeekday == 7 ? 0 : firstWeekday;
 
     const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return Theme(
-      data: Theme.of(context).copyWith(
-        drawerTheme: DrawerThemeData(
-          backgroundColor: U.bg,
-          surfaceTintColor: Colors.transparent,
-        ),
-      ),
-      child: Drawer(
-        width: MediaQuery.of(context).size.width * 0.85,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Row(
-                  children: [
-                    Text(monthNames[_calendarMonth.month], style: GoogleFonts.outfit(color: U.primary, fontSize: 24, fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 8),
-                    Text('${_calendarMonth.year}', style: GoogleFonts.outfit(color: U.dim, fontSize: 24, fontWeight: FontWeight.w400)),
-                    const Spacer(),
-                    IconButton(
-                      icon: Icon(Icons.chevron_left, color: U.dim),
-                      onPressed: () {
-                        setState(() {
-                          _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1);
-                        });
-                        _loadMonthDots();
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.chevron_right, color: U.dim),
-                      onPressed: () {
-                        setState(() {
-                          _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1);
-                        });
-                        _loadMonthDots();
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                // Day headers
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: dayNames.map((d) => SizedBox(
-                    width: 36,
-                    child: Text(d, textAlign: TextAlign.center, style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1)),
-                  )).toList(),
-                ),
-                const SizedBox(height: 16),
-                // Grid
-                Expanded(
-                  child: GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 7,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 4,
-                      childAspectRatio: 0.85,
-                    ),
-                    itemCount: 42,
-                    itemBuilder: (context, index) {
-                      final dayNumber = index - offset + 1;
-                      if (dayNumber < 1 || dayNumber > daysInMonth) {
-                        return const SizedBox.shrink();
-                      }
-                      final date = DateTime(_calendarMonth.year, _calendarMonth.month, dayNumber);
-                      final isSelected = date.year == _selectedDate.year && date.month == _selectedDate.month && date.day == _selectedDate.day;
-                      final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
-                      final hasNote = _noteDates.contains(_dateStr(date));
-                      
-                      Color textColor = U.sub;
-                      if (isSelected) {
-                        textColor = U.primary;
-                      } else if (isToday) {
-                        textColor = U.text;
-                      } else if (date.isBefore(today) || isToday) {
-                        textColor = const Color(0xFF88A0B0);
-                      }
 
-                      return GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                          _selectDate(date);
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            border: isSelected ? Border.all(color: U.primary.withValues(alpha: 0.2)) : null,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('$dayNumber', style: GoogleFonts.outfit(
-                                color: textColor,
-                                fontSize: 16,
-                                fontWeight: isSelected || isToday ? FontWeight.w600 : FontWeight.w400,
-                              )),
-                              const SizedBox(height: 4),
-                              if (hasNote)
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary, shape: BoxShape.circle)),
-                                    const SizedBox(width: 2),
-                                    Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary.withValues(alpha: 0.4), shape: BoxShape.circle)),
-                                  ],
-                                )
-                              else
-                                const SizedBox(height: 4),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(monthNames[_calendarMonth.month], style: GoogleFonts.outfit(color: U.primary, fontSize: 24, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              Text('${_calendarMonth.year}', style: GoogleFonts.outfit(color: U.sub, fontSize: 24, fontWeight: FontWeight.w400)),
+              const Spacer(),
+              IconButton(
+                icon: Icon(Icons.chevron_left, color: U.sub),
+                onPressed: () {
+                  setState(() { _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month - 1); });
+                  _loadMonthDots();
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.chevron_right, color: U.sub),
+                onPressed: () {
+                  setState(() { _calendarMonth = DateTime(_calendarMonth.year, _calendarMonth.month + 1); });
+                  _loadMonthDots();
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: dayNames.map((d) => Expanded(
+              child: Center(
+                child: Text(
+                  d,
+                  style: GoogleFonts.inter(
+                    color: U.text.withValues(alpha: 0.5),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
-              ],
+              ),
+            )).toList(),
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 4,
+              childAspectRatio: 1.1,
+            ),
+            itemCount: 42,
+            itemBuilder: (context, index) {
+              final dayNumber = index - offset + 1;
+              if (dayNumber < 1 || dayNumber > daysInMonth) {
+                return const SizedBox.shrink();
+              }
+              final date = DateTime(_calendarMonth.year, _calendarMonth.month, dayNumber);
+              final isSelected = date.year == _selectedDate.year && date.month == _selectedDate.month && date.day == _selectedDate.day;
+              final isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+              final hasNote = _noteDates.contains(_dateStr(date));
+
+              Color textColor = U.text.withValues(alpha: 0.6);
+              if (isSelected) {
+                textColor = U.primary;
+              } else if (isToday) {
+                textColor = U.text;
+              } else if (date.isAfter(today)) {
+                textColor = U.text.withValues(alpha: 0.3);
+              }
+
+              return GestureDetector(
+                onTap: () {
+                  _closeCalendar();
+                  _selectDate(date);
+                },
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned.fill(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        decoration: BoxDecoration(
+                          color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: isSelected ? Border.all(color: U.primary.withValues(alpha: 0.2)) : null,
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Text('$dayNumber', style: GoogleFonts.outfit(
+                        color: textColor,
+                        fontSize: 16,
+                        fontWeight: isSelected || isToday ? FontWeight.w600 : FontWeight.w400,
+                      )),
+                    ),
+                    if (hasNote)
+                      Positioned(
+                        bottom: 4,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary, shape: BoxShape.circle)),
+                            const SizedBox(width: 2),
+                            Container(width: 4, height: 4, decoration: BoxDecoration(color: U.primary.withValues(alpha: 0.4), shape: BoxShape.circle)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlidingCalendarPanel() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    const handleTouchWidth = 36.0;
+    final panelWidth = screenWidth * 0.90;
+    final contentWidth = panelWidth - handleTouchWidth;
+    final progress = _calendarController.value;
+    final left = screenWidth - handleTouchWidth - contentWidth * progress;
+
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      left: left,
+      width: panelWidth,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.center,
+            child: GestureDetector(
+              onHorizontalDragStart: (_) => _calendarController.stop(),
+              onHorizontalDragUpdate: (d) {
+                _calendarController.value = (_calendarController.value - d.delta.dx / contentWidth).clamp(0.0, 1.0);
+              },
+              onHorizontalDragEnd: (d) {
+                if (d.primaryVelocity != null && d.primaryVelocity! < -200) {
+                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                } else if (d.primaryVelocity != null && d.primaryVelocity! > 200) {
+                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                } else if (_calendarController.value > 0.3) {
+                  _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                } else {
+                  _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+                }
+              },
+              onTap: _toggleCalendar,
+              child: Container(
+                width: handleTouchWidth,
+                height: 240,
+                alignment: Alignment.centerRight,
+                color: Colors.transparent,
+                child: Container(
+                  width: 6,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: U.primary.withValues(alpha: 0.9),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: U.primary.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
+          Expanded(
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: U.bg,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(32),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 25,
+                    spreadRadius: 2,
+                    offset: const Offset(-8, 0),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  child: _buildCalendarBody(),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -599,43 +703,37 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
   Widget _buildNoteBody() {
     return ListView(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
       children: [
-        _buildHabitsCard(),
-        const SizedBox(height: 16),
-        _buildTasksCard(),
-        const SizedBox(height: 16),
-        _buildJournalCard(),
+        _buildHabitsSection(),
+        _buildTasksSection(),
+        _buildJournalSection(),
       ],
     );
   }
 
-  Widget _buildHabitsCard() {
+  Widget _buildHabitsSection() {
     final title = 'Habits';
     final isCollapsed = _collapsedSections.contains(title);
     final accent = U.blue;
-    final icon = Icons.loop_rounded;
+    final icon = Icons.track_changes_rounded;
 
     final habits = _userHabits?.habits ?? [];
     if (habits.isEmpty) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: U.card,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: U.border, width: 0.5),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(icon, color: U.dim, size: 28),
-              const SizedBox(height: 8),
-              Text('No habits configured', style: GoogleFonts.outfit(color: U.dim)),
-              const SizedBox(height: 8),
-              TextButton(onPressed: _editHabits, child: Text('Setup Habits', style: GoogleFonts.outfit(color: accent))),
-            ],
-          ),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 24, top: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: U.sub, size: 20),
+            const SizedBox(width: 12),
+            Text('No habits configured', style: GoogleFonts.outfit(color: U.sub, fontSize: 15)),
+            const Spacer(),
+            TextButton(
+              onPressed: _editHabits, 
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+              child: Text('Setup', style: GoogleFonts.outfit(color: accent, fontWeight: FontWeight.w600))
+            ),
+          ],
         ),
       );
     }
@@ -645,7 +743,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       if (_note?.habitsState[h] == true) doneCount++;
     }
 
-    return _buildCardWrapper(
+    return _SectionWrapper(
       title: title,
       icon: icon,
       accent: accent,
@@ -653,7 +751,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       onToggle: () => setState(() {
         isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
       }),
-      subtitle: '$doneCount of ${habits.length} done',
+      subtitle: habits.isEmpty ? '0 habits' : '$doneCount/${habits.length}',
       progress: habits.isEmpty ? 0 : doneCount / habits.length,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,7 +768,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     );
   }
 
-  Widget _buildTasksCard() {
+  Widget _buildTasksSection() {
     final title = 'Tasks';
     final isCollapsed = _collapsedSections.contains(title);
     final accent = U.teal;
@@ -682,7 +780,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       if (t['completed'] == true) doneCount++;
     }
 
-    return _buildCardWrapper(
+    return _SectionWrapper(
       title: title,
       icon: icon,
       accent: accent,
@@ -690,7 +788,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
       onToggle: () => setState(() {
         isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
       }),
-      subtitle: tasks.isEmpty ? '0 tasks' : '$doneCount of ${tasks.length} done',
+      subtitle: tasks.isEmpty ? '0 tasks' : '$doneCount/${tasks.length}',
       progress: tasks.isEmpty ? 0 : doneCount / tasks.length,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -703,31 +801,50 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
               onTap: () => _toggleTask(i),
               onDelete: () => _deleteTask(i),
             ),
-          const SizedBox(height: 8),
-          // Add Task Field
-          TextField(
-            controller: _taskController,
-            style: GoogleFonts.outfit(color: U.text, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: 'Add a new task...',
-              hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 15),
-              border: InputBorder.none,
-              prefixIcon: Icon(Icons.add_rounded, color: U.dim, size: 20),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(left: BorderSide(color: accent.withValues(alpha: 0.45), width: 2)),
             ),
-            onSubmitted: (val) => _addTask(val),
+            padding: const EdgeInsets.only(left: 12),
+            child: TextSelectionTheme(
+              data: TextSelectionThemeData(
+                cursorColor: accent,
+                selectionColor: accent.withValues(alpha: 0.15),
+                selectionHandleColor: accent,
+              ),
+              child: TextField(
+                controller: _taskController,
+                style: GoogleFonts.inter(color: U.text, fontSize: 17),
+                cursorColor: accent,
+                cursorWidth: 1.5,
+                cursorRadius: const Radius.circular(10),
+                decoration: InputDecoration(
+                  hintText: 'Add a task...',
+                  hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
+                  border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
+                ),
+                onSubmitted: (val) => _addTask(val),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildJournalCard() {
+  Widget _buildJournalSection() {
     final title = 'Journal';
     final isCollapsed = _collapsedSections.contains(title);
     final accent = U.peach;
     final icon = Icons.edit_rounded;
 
-    return _buildCardWrapper(
+    return _SectionWrapper(
       title: title,
       icon: icon,
       accent: accent,
@@ -739,90 +856,38 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
         onFocusChange: (hasFocus) {
           if (!hasFocus) _saveNote();
         },
-        child: TextField(
-          controller: _journalController,
-          maxLines: null,
-          style: GoogleFonts.outfit(color: U.text, fontSize: 15, height: 1.6),
-          decoration: InputDecoration(
-            hintText: 'Write your thoughts...',
-            hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 15),
-            border: InputBorder.none,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: accent.withValues(alpha: 0.45), width: 2)),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCardWrapper({
-    required String title,
-    required IconData icon,
-    required Color accent,
-    required bool isCollapsed,
-    required VoidCallback onToggle,
-    required Widget child,
-    String? subtitle,
-    double? progress,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: U.card.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: U.border, width: 1.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: onToggle,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: accent, size: 16),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(title, style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  if (subtitle != null) ...[
-                    Text(subtitle, style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
-                    const SizedBox(width: 8),
-                  ],
-                  if (progress != null) ...[
-                    SizedBox(
-                      width: 20, height: 20,
-                      child: CircularProgressIndicator(
-                        value: progress,
-                        strokeWidth: 2.5,
-                        backgroundColor: U.border,
-                        color: accent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Icon(isCollapsed ? Icons.expand_more_rounded : Icons.expand_less_rounded, color: U.dim, size: 20),
-                ],
+          padding: const EdgeInsets.only(left: 12),
+          child: TextSelectionTheme(
+            data: TextSelectionThemeData(
+              cursorColor: accent,
+              selectionColor: accent.withValues(alpha: 0.15),
+              selectionHandleColor: accent,
+            ),
+            child: TextField(
+              controller: _journalController,
+              maxLines: null,
+              minLines: 4,
+              style: GoogleFonts.inter(color: U.text, fontSize: 17, height: 1.8),
+              cursorColor: accent,
+              cursorWidth: 1.5,
+              cursorRadius: const Radius.circular(10),
+              decoration: InputDecoration(
+                hintText: 'Write your thoughts...',
+                hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
+                border: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
               ),
             ),
           ),
-          if (!isCollapsed)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: child,
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -835,52 +900,286 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> {
     VoidCallback? onDelete,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          GestureDetector(
-            onTap: _markDoneEnabled ? onTap : null,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 20, height: 20,
-              margin: const EdgeInsets.only(top: 2, right: 10),
-              decoration: BoxDecoration(
-                color: checked ? U.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: checked ? U.primary : U.dim, width: 1.5),
-              ),
-              child: checked ? Icon(Icons.check, size: 14, color: U.bg) : null,
-            ),
-          ),
+          _AnimatedCheckbox(checked: checked, enabled: _markDoneEnabled, onTap: onTap),
           Expanded(
             child: GestureDetector(
               onTap: isTask ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => HeatmapHomeScreen(initialTask: label))) : null,
               child: Text(
                 label,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
+                style: GoogleFonts.inter(
+                  fontSize: 17,
                   fontWeight: FontWeight.w400,
-                  color: checked ? U.dim : U.text,
+                  color: checked ? U.text.withValues(alpha: 0.35) : U.text,
                   decoration: checked ? TextDecoration.lineThrough : null,
-                  decorationColor: U.dim,
-                  height: 1.5,
+                  decorationColor: U.text.withValues(alpha: 0.35),
+                  height: 1.45,
                 ),
               ),
             ),
           ),
-          if (isTask)
+          if (isTask && onDelete != null)
             GestureDetector(
               onTap: onDelete,
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.close_rounded, color: U.dim.withValues(alpha: 0.5), size: 18),
+                child: Text(
+                  'delete',
+                  style: GoogleFonts.inter(
+                    color: U.text.withValues(alpha: 0.35),
+                    fontSize: 12,
+                    letterSpacing: 0.2,
+                  ),
+                ),
               ),
             ),
           if (isTask && onDelete == null)
-            Icon(Icons.insights_rounded, color: U.dim.withValues(alpha: 0.5), size: 16),
+            Text(
+              'habit',
+              style: GoogleFonts.inter(
+                color: U.text.withValues(alpha: 0.35),
+                fontSize: 12,
+                letterSpacing: 0.2,
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+class _SectionWrapper extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final bool isCollapsed;
+  final VoidCallback onToggle;
+  final Widget child;
+  final String? subtitle;
+  final double? progress;
+
+  const _SectionWrapper({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.isCollapsed,
+    required this.onToggle,
+    required this.child,
+    this.subtitle,
+    this.progress,
+  });
+
+  @override
+  State<_SectionWrapper> createState() => _SectionWrapperState();
+}
+
+class _SectionWrapperState extends State<_SectionWrapper> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _heightFactor;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _heightFactor = _controller.drive(CurveTween(curve: Curves.easeInOutCubic));
+    _fadeAnimation = _controller.drive(CurveTween(curve: Curves.easeInOutCubic));
+    _rotationAnimation = _controller.drive(
+      Tween<double>(begin: -0.25, end: 0.0).chain(CurveTween(curve: Curves.easeInOutCubic)),
+    );
+
+    if (!widget.isCollapsed) {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _SectionWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCollapsed != oldWidget.isCollapsed) {
+      if (widget.isCollapsed) {
+        _controller.reverse();
+      } else {
+        _controller.forward();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: widget.onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Text(
+                  widget.title,
+                  style: GoogleFonts.inter(
+                    color: U.text.withValues(alpha: 0.85),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const Spacer(),
+                if (widget.subtitle != null) ...[
+                  Text(
+                    widget.subtitle!,
+                    style: GoogleFonts.inter(
+                      color: U.text.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                RotationTransition(
+                  turns: _rotationAnimation,
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: widget.accent,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return ClipRect(
+              child: Align(
+                alignment: Alignment.topLeft,
+                heightFactor: _heightFactor.value,
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: child,
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.only(left: 0, top: 4, bottom: 24),
+            child: widget.child,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnimatedCheckbox extends StatefulWidget {
+  final bool checked;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _AnimatedCheckbox({required this.checked, required this.enabled, required this.onTap});
+
+  @override
+  State<_AnimatedCheckbox> createState() => _AnimatedCheckboxState();
+}
+
+class _AnimatedCheckboxState extends State<_AnimatedCheckbox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _checkScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: const Duration(milliseconds: 400), vsync: this);
+    _checkScale = Tween<double>(begin: 10, end: 1).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    if (widget.checked) _controller.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedCheckbox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.checked != oldWidget.checked) {
+      if (widget.checked) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.enabled ? widget.onTap : null,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final isChecked = _controller.value > 0;
+          return Container(
+            width: 30,
+            height: 30,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Color.lerp(const Color(0xFFDDDDDD), const Color(0xFF08BB68), _controller.value),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Transform.scale(
+                scale: isChecked ? _checkScale.value : 10,
+                child: Opacity(
+                  opacity: isChecked ? 1 : 0,
+                  child: CustomPaint(
+                    size: const Size(14, 14),
+                    painter: _CheckPainter(),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CheckPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    path.moveTo(size.width * 0.3, size.height * 0.55);
+    path.lineTo(size.width * 0.45, size.height * 0.7);
+    path.lineTo(size.width * 0.75, size.height * 0.35);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

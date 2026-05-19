@@ -60,6 +60,22 @@ class _UniversityScreenState extends State<UniversityScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final titleColor = isDark
+        ? (appThemeNotifier.value.key == 'gruvbox'
+            ? const Color(0xFFFB4934)
+            : appThemeNotifier.value.key == 'everforest'
+                ? const Color(0xFFA7C080)
+                : appThemeNotifier.value.key == 'github-dark'
+                    ? const Color(0xFF58A6FF)
+                    : appThemeNotifier.value.key == 'orchid'
+                        ? const Color(0xFFCBA6F7)
+                        : Colors.white)
+        : ImageOverlayColors.titleColor(appThemeNotifier.value.key);
+
+    final subtitleColor = isDark
+        ? U.sub
+        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key);
+
     return Scaffold(
       backgroundColor: U.bg,
       body: Stack(
@@ -70,10 +86,15 @@ class _UniversityScreenState extends State<UniversityScreen> {
             left: 0,
             right: 0,
             height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Image.asset(
-              'assets/university/background.png',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
+            child: Opacity(
+              opacity: isDark ? 0.35 : 0.6,
+              child: Image.asset(
+                'assets/university/background.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                color: isDark ? U.bg : null,
+                colorBlendMode: isDark ? BlendMode.multiply : null,
+              ),
             ),
           ),
           // Gradient overlay: top half clear, bottom half smooth fade
@@ -87,11 +108,17 @@ class _UniversityScreenState extends State<UniversityScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg,
-                  ],
+                  colors: isDark
+                      ? [
+                          U.bg.withValues(alpha: 0.45),
+                          U.bg.withValues(alpha: 0.15),
+                          U.bg.withValues(alpha: 1.0),
+                        ]
+                      : [
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg,
+                        ],
                   stops: const [0.0, 0.5, 1.0],
                 ),
               ),
@@ -114,7 +141,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                             Text(
                               'University',
                               style: GoogleFonts.playfairDisplay(
-                                color: ImageOverlayColors.titleColor(appThemeNotifier.value.key),
+                                color: titleColor,
                                 fontSize: 42,
                                 fontWeight: FontWeight.w700,
                                 fontStyle: FontStyle.normal,
@@ -125,7 +152,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                             Text(
                               'Explore your campus network',
                               style: GoogleFonts.outfit(
-                                color: ImageOverlayColors.subtitleColor(appThemeNotifier.value.key),
+                                color: subtitleColor,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
                               ),

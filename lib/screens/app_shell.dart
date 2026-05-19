@@ -303,59 +303,60 @@ class _AppShellState extends State<AppShell> {
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
                     opacity: isKeyboardOpen ? 0.0 : 1.0,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                        child: Builder(builder: (context) {
-                          final isDark = Theme.of(context).brightness == Brightness.dark;
-                          final accent = U.primary;
-                          return Container(
-                            height: 64,
-                            decoration: BoxDecoration(
+                    child: Builder(
+                      builder: (context) {
+                        final isDark = Theme.of(context).brightness == Brightness.dark;
+                        return Container(
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: U.surface,
+                            borderRadius: BorderRadius.circular(32),
+                            border: Border.all(
                               color: isDark
-                                  ? Colors.white.withValues(alpha: 0.1)
-                                  : Colors.black.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(32),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.15)
-                                    : Colors.black.withValues(alpha: 0.1),
-                                width: 0.5,
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.black.withValues(alpha: 0.08),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 8),
                               ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _NavItem(
-                                  icon: Icons.local_fire_department_outlined,
-                                  activeIcon: Icons.local_fire_department_rounded,
-                                  isActive: _index == 0,
-                                  accent: accent,
-                                  isDark: isDark,
-                                  onTap: () => _setIndex(0),
-                                ),
-                                _NavItem(
-                                  icon: Icons.auto_stories_outlined,
-                                  activeIcon: Icons.auto_stories_rounded,
-                                  isActive: _index == 1,
-                                  accent: accent,
-                                  isDark: isDark,
-                                  onTap: () => _setIndex(1),
-                                ),
-                                _NavItem(
-                                  icon: Icons.school_outlined,
-                                  activeIcon: Icons.school_rounded,
-                                  isActive: _index == 2,
-                                  accent: accent,
-                                  isDark: isDark,
-                                  onTap: () => _setIndex(2),
-                                ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _NavItem(
+                                icon: Icons.local_fire_department_outlined,
+                                activeIcon: Icons.local_fire_department_rounded,
+                                isActive: _index == 0,
+                                accent: U.primary,
+                                isDark: isDark,
+                                onTap: () => _setIndex(0),
+                              ),
+                              _NavItem(
+                                icon: Icons.auto_stories_outlined,
+                                activeIcon: Icons.auto_stories_rounded,
+                                isActive: _index == 1,
+                                accent: U.primary,
+                                isDark: isDark,
+                                onTap: () => _setIndex(1),
+                              ),
+                              _NavItem(
+                                icon: Icons.school_outlined,
+                                activeIcon: Icons.school_rounded,
+                                isActive: _index == 2,
+                                accent: U.primary,
+                                isDark: isDark,
+                                onTap: () => _setIndex(2),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),

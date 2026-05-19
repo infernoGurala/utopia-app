@@ -430,9 +430,10 @@ void _applySystemUiForTheme(AppTheme theme) {
           usesLightIcons ? Brightness.light : Brightness.dark,
       statusBarBrightness:
           usesLightIcons ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarColor: theme.surface,
       systemNavigationBarIconBrightness:
           usesLightIcons ? Brightness.light : Brightness.dark,
+      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarContrastEnforced: false,
     ),
   );
@@ -605,8 +606,8 @@ void main() async {
   U.applyTheme(_initialAccentKey);
   await _loadAppToggleSettings();
   appInitialization = _initializeApp();
-  _applySystemUiForTheme(appThemeNotifier.value);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  _applySystemUiForTheme(appThemeNotifier.value);
   runApp(const UtopiaApp());
 }
 
@@ -849,6 +850,10 @@ class UtopiaApp extends StatelessWidget {
                     isDark ? Brightness.light : Brightness.dark,
                 statusBarBrightness:
                     isDark ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor: U.surface,
+                systemNavigationBarIconBrightness:
+                    isDark ? Brightness.light : Brightness.dark,
+                systemNavigationBarDividerColor: Colors.transparent,
               ),
               titleTextStyle: GoogleFonts.outfit(
                 color: U.text,
