@@ -18,6 +18,7 @@ import '../widgets/event_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/platform_support.dart';
 import '../services/notification_service.dart';
+import '../widgets/gradient_dot_button.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class EventsScreen extends StatefulWidget {
@@ -534,36 +535,16 @@ class _EventsScreenState extends State<EventsScreen> {
 
 
   Widget _buildUploadFAB() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: U.primary.withValues(alpha: 0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: FloatingActionButton.extended(
-        backgroundColor: U.primary,
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateEventScreen()),
-          );
-          _loadEvents();
-        },
-        icon: Icon(Icons.add_rounded, color: U.bg),
-        label: Text(
-          'Upload Event',
-          style: GoogleFonts.outfit(
-            color: U.bg,
-            fontWeight: FontWeight.w600,
-            fontSize: 15,
-          ),
-        ),
-      ),
+    return GradientDotButton(
+      onPressed: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CreateEventScreen()),
+        );
+        _loadEvents();
+      },
+      icon: Icons.add_rounded,
+      label: 'Upload Event',
     ).animate().scale(delay: 500.ms, duration: 400.ms, curve: Curves.easeOutBack);
   }
 
