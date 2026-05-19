@@ -4,6 +4,7 @@ import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/event_model.dart';
@@ -22,6 +23,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   List<EventModel> _myEvents = [];
   Map<String, dynamic> _analytics = {};
   bool _isLoading = true;
+  String? _userRollNumber;
+  String? _userDisplayName;
 
   @override
   void initState() {
@@ -39,13 +42,31 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       final results = await Future.wait([
         EventService.instance.getEventsByOrganizer(uid),
         EventService.instance.getOrganizerAnalytics(uid),
+        FirebaseFirestore.instance.collection('users').doc(uid).get(),
       ]);
+
+      final events = results[0] as List<EventModel>;
+      final analytics = results[1] as Map<String, dynamic>;
+      final userDoc = results[2] as DocumentSnapshot<Map<String, dynamic>>;
+
+      final data = userDoc.data();
+      final rollNumber = data?['rollNumber'] as String? ?? '';
+      final name = data?['displayName'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? '';
+
       if (mounted) {
         setState(() {
-          _myEvents = results[0] as List<EventModel>;
-          _analytics = results[1] as Map<String, dynamic>;
+          _myEvents = events;
+          _analytics = analytics;
+          _userRollNumber = rollNumber;
+          _userDisplayName = name;
           _isLoading = false;
         });
+
+        if (rollNumber.isEmpty || name.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showNameAndRollNumberDialog(uid, name, rollNumber);
+          });
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -137,23 +158,26 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user?.displayName ?? 'Organizer',
+                    (_userDisplayName != null && _userDisplayName!.isNotEmpty)
+                        ? _userDisplayName!
+                        : (user?.displayName ?? 'Organizer'),
                     style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(20),
+                  if (_userRollNumber != null && _userRollNumber!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Roll No: $_userRollNumber',
+                        style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
                     ),
-                    child: Text(
-                      '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
-                      style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -161,6 +185,124 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
         ),
       ),
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
+  }
+
+  void _showNameAndRollNumberDialog(String uid, String currentName, String currentRoll) {
+    final nameController = TextEditingController(text: currentName);
+    final rollController = TextEditingController(text: currentRoll);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: U.card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(
+            'Complete Profile',
+            style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700, fontSize: 20),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Please enter your name and roll number to continue.',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: nameController,
+                  style: GoogleFonts.outfit(color: U.text),
+                  decoration: InputDecoration(
+                    labelText: 'Full Name',
+                    labelStyle: GoogleFonts.outfit(color: U.sub),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary),
+                    ),
+                  ),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: rollController,
+                  style: GoogleFonts.outfit(color: U.text),
+                  decoration: InputDecoration(
+                    labelText: 'Roll Number',
+                    labelStyle: GoogleFonts.outfit(color: U.sub),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary),
+                    ),
+                  ),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Roll number is required' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  final newName = nameController.text.trim();
+                  final newRoll = rollController.text.trim();
+                  try {
+                    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+                      'displayName': newName,
+                      'rollNumber': newRoll,
+                    }, SetOptions(merge: true));
+
+                    final user = FirebaseAuth.instance.currentUser;
+                    if (user != null) {
+                      await user.updateDisplayName(newName);
+                      await user.reload();
+                    }
+
+                    if (mounted) {
+                      setState(() {
+                        _userDisplayName = newName;
+                        _userRollNumber = newRoll;
+                      });
+                      Navigator.pop(dialogContext);
+                      showUtopiaSnackBar(
+                        context,
+                        message: 'Profile updated successfully!',
+                        tone: UtopiaSnackBarTone.success,
+                      );
+                    }
+                  } catch (e) {
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Failed to update profile: $e',
+                      tone: UtopiaSnackBarTone.error,
+                    );
+                  }
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: U.primary,
+                foregroundColor: U.bg,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: Text('Save', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
 
