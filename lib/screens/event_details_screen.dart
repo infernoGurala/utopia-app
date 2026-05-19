@@ -69,6 +69,65 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     }
   }
 
+  Future<void> _showExternalRegistrationConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: U.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Confirm Registration',
+          style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Did you submit the external participation form?\n\nNote: You must submit the form to participate and be eligible to receive your certificate.',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('No', style: GoogleFonts.outfit(color: U.dim)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              foregroundColor: U.bg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Yes, Submitted', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      setState(() => _isRegistering = true);
+      try {
+        final reg = await EventService.instance.registerForEvent(_event.id!);
+        if (reg != null && mounted) {
+          setState(() => _isRegistered = true);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => QRTicketScreen(event: _event, registration: reg),
+            ),
+          );
+        }
+        _loadState(); // Refresh counts
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error registering: $e', style: GoogleFonts.outfit()), backgroundColor: U.red),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isRegistering = false);
+      }
+    }
+  }
+
   Future<void> _toggleRegistration() async {
     if (_event.id == null) return;
 
@@ -76,6 +135,11 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
       try {
         final uri = Uri.parse(_event.participationLink!);
         await launchUrl(uri, mode: LaunchMode.externalApplication);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _showExternalRegistrationConfirmDialog();
+          }
+        });
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
