@@ -382,18 +382,46 @@ class _TimetableScreenState extends State<TimetableScreen>
 
     if (dayData.slots.isEmpty || dayData.slots.every((s) => s.trim().isEmpty)) {
       return Center(
-        child: Text(
-          'No classes today!',
-          style: GoogleFonts.outfit(
-            fontSize: 18,
-            color: U.sub,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: U.teal.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.celebration_rounded,
+                size: 40,
+                color: U.teal,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No classes today!',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: U.text,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Enjoy your free time or catch up on studies.',
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                color: U.sub,
+              ),
+            ),
+          ],
+        )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.05, duration: 400.ms, curve: Curves.easeOut),
       );
     }
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -409,78 +437,101 @@ class _TimetableScreenState extends State<TimetableScreen>
         }
 
         return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? U.card : U.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: U.border.withValues(alpha: 0.9)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: U.border.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    constraints: const BoxConstraints(minWidth: 70),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: U.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: U.primary.withValues(alpha: 0.2),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Beautiful timeline period capsule
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: U.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: U.primary.withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+                ),
+                child: Text(
+                  'P${period?.period ?? index + 1}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: U.primary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Subtle colored vertical divider
+              Container(
+                width: 1.5,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: U.border.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Subject Details and Timings
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: U.text,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    const SizedBox(height: 4),
+                    Row(
                       children: [
-                        Text(
-                          'P${period?.period ?? index + 1}',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: U.primary,
-                          ),
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 13,
+                          color: U.sub,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(width: 6),
                         Text(
                           period != null
-                              ? '${period.start.split(' ').first}\n${period.end.split(' ').first}'
-                              : '--',
-                          textAlign: TextAlign.center,
+                              ? '${period.start} - ${period.end}'
+                              : 'Duration --',
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: U.primary.withValues(alpha: 0.8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: U.sub,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      subject,
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: U.text,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            )
-            .animate()
-            .fadeIn(delay: (index * 50).ms, duration: 400.ms)
-            .slideX(begin: 0.05, duration: 400.ms, curve: Curves.easeOut);
+            ],
+          ),
+        )
+        .animate()
+        .fadeIn(delay: (index * 50).ms, duration: 400.ms)
+        .slideX(begin: 0.05, duration: 400.ms, curve: Curves.easeOut);
       },
     );
   }
@@ -492,7 +543,17 @@ class _TimetableScreenState extends State<TimetableScreen>
       appBar: AppBar(
         backgroundColor: U.bg,
         foregroundColor: U.text,
-        title: const Text('Timetable'),
+        elevation: 0,
+        title: Text(
+          'Timetable',
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: U.text,
+            fontStyle: FontStyle.italic,
+            letterSpacing: -0.5,
+          ),
+        ),
         actions: [
           if (_userTimetable != null)
             IconButton(
@@ -517,9 +578,9 @@ class _TimetableScreenState extends State<TimetableScreen>
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: U.surface.withValues(alpha: 0.78),
+                      color: U.card,
                       borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: U.border),
+                      border: Border.all(color: U.border.withValues(alpha: 0.5)),
                     ),
                     child: TabBar(
                       controller: _tabController,

@@ -540,7 +540,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _groupedTile(
                         icon: Icons.rocket_launch_outlined,
                         label: 'UTOPIA',
-                        sub: 'Report bugs, developer controls, and app details',
+                        sub: 'About and development',
                         color: U.primary,
                         onTap: () => Navigator.push(
                           context,
