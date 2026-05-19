@@ -19,6 +19,7 @@ import 'package:utopia_app/widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:utopia_app/models/focus_models.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -655,6 +656,146 @@ class NotificationService {
           ?.requestExactAlarmsPermission();
     } catch (e) {
       debugPrint("NOTIF: Error opening exact alarm settings: $e");
+    }
+  }
+
+  static int _notificationIdFromUuid(String uuid) {
+    return uuid.hashCode & 0x7FFFFFFF;
+  }
+
+  static Future<void> scheduleFocusReminder(FocusReminder reminder) async {
+    if (!PlatformSupport.supportsNotifications || reminder.id == null) return;
+    try {
+      await initialize();
+      final ist = tz.getLocation('Asia/Kolkata');
+      
+      // Cancel any pre-existing notifications for this reminder
+      await cancelFocusReminder(reminder.id!);
+
+      if (!reminder.isActive) return;
+
+      final timeParts = reminder.reminderTime.split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      final baseId = _notificationIdFromUuid(reminder.id!);
+      final now = tz.TZDateTime.now(ist);
+
+      if (reminder.type == 'one_time' && reminder.remindDate != null) {
+        final dateParts = reminder.remindDate!.split('-');
+        final year = int.parse(dateParts[0]);
+        final month = int.parse(dateParts[1]);
+        final day = int.parse(dateParts[2]);
+
+        var scheduledDate = tz.TZDateTime(ist, year, month, day, hour, minute);
+        if (scheduledDate.isBefore(now)) {
+          return; // Don't schedule past events
+        }
+
+        await _localNotifications.zonedSchedule(
+          baseId,
+          'Focus Reminder',
+          reminder.label,
+          scheduledDate,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'utopia_high_importance',
+              'UTOPIA Notifications',
+              channelDescription: 'Focus reminders and task alerts',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+        debugPrint("NOTIF: One-time reminder scheduled successfully: baseId=$baseId for date $scheduledDate");
+      } else if (reminder.type == 'weekly' && reminder.weekdays != null) {
+        for (final weekday in reminder.weekdays!) {
+          // Dart weekday: 1 = Mon, 7 = Sun. Our index: 0 = Mon, 6 = Sun.
+          final targetWeekday = weekday + 1;
+          
+          // Find the next occurrence of this weekday
+          var scheduledDate = tz.TZDateTime(ist, now.year, now.month, now.day, hour, minute);
+          while (scheduledDate.weekday != targetWeekday || scheduledDate.isBefore(now)) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+
+          final dayId = baseId + weekday;
+          await _localNotifications.zonedSchedule(
+            dayId,
+            'Weekly Reminder',
+            reminder.label,
+            scheduledDate,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                'utopia_high_importance',
+                'UTOPIA Notifications',
+                channelDescription: 'Focus reminders and task alerts',
+                importance: Importance.max,
+                priority: Priority.high,
+                playSound: true,
+                enableVibration: true,
+              ),
+            ),
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
+          debugPrint("NOTIF: Weekly reminder scheduled for weekday $weekday (dayId=$dayId) at $scheduledDate");
+        }
+      } else if (reminder.type == 'monthly_date' && reminder.monthDay != null) {
+        var scheduledDate = tz.TZDateTime(ist, now.year, now.month, reminder.monthDay!, hour, minute);
+        if (scheduledDate.isBefore(now)) {
+          // Move to next month
+          scheduledDate = tz.TZDateTime(ist, now.year, now.month + 1, reminder.monthDay!, hour, minute);
+        }
+
+        await _localNotifications.zonedSchedule(
+          baseId,
+          'Monthly Reminder',
+          reminder.label,
+          scheduledDate,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              'utopia_high_importance',
+              'UTOPIA Notifications',
+              channelDescription: 'Focus reminders and task alerts',
+              importance: Importance.max,
+              priority: Priority.high,
+              playSound: true,
+              enableVibration: true,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+        );
+        debugPrint("NOTIF: Monthly reminder scheduled successfully: baseId=$baseId at $scheduledDate");
+      }
+    } catch (e) {
+      debugPrint("NOTIF: Error scheduling focus reminder: $e");
+    }
+  }
+
+  static Future<void> cancelFocusReminder(String reminderId) async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      final baseId = _notificationIdFromUuid(reminderId);
+      // Cancel base ID (for one-time and monthly)
+      await _localNotifications.cancel(baseId);
+      // Cancel weekly weekday IDs
+      for (int i = 0; i < 7; i++) {
+        await _localNotifications.cancel(baseId + i);
+      }
+      debugPrint("NOTIF: Focus reminder cancelled successfully: $reminderId (baseId=$baseId)");
+    } catch (e) {
+      debugPrint("NOTIF: Error cancelling focus reminder: $e");
     }
   }
 

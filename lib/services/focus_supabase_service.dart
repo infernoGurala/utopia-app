@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/focus_models.dart';
 import 'focus_database_service.dart';
+import 'notification_service.dart';
 
 /// Manages the dedicated Focus Supabase project.
 ///
@@ -411,6 +412,9 @@ class FocusSupabaseService {
 
     await _db.saveReminder(reminderWithId);
 
+    // Schedule local timezone-based notification
+    await NotificationService.scheduleFocusReminder(reminderWithId);
+
     if (_initialized && _client != null) {
       try {
         await _client!.from('reminders').upsert(
@@ -429,6 +433,9 @@ class FocusSupabaseService {
 
   Future<void> deleteReminder(String reminderId) async {
     await _db.deleteReminder(reminderId);
+
+    // Cancel any scheduled local notifications
+    await NotificationService.cancelFocusReminder(reminderId);
 
     if (_initialized && _client != null) {
       try {
