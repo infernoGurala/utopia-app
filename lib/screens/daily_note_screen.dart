@@ -317,55 +317,353 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   Future<void> _editHabits() async {
-    final controller = TextEditingController(text: _userHabits?.habits.join('\n') ?? '');
-    final result = await showModalBottomSheet<String>(
+    final List<String> localHabits = List<String>.from(_userHabits?.habits ?? []);
+    final inputController = TextEditingController();
+    final suggestions = const [
+      'Drink Water 💧',
+      'Read 📚',
+      'Meditation 🧘',
+      'Workout 🏋️',
+      'Sleep 8h 😴',
+      'Journal ✍️',
+      'Review Goals 🎯',
+      'Walk 10k steps 🚶',
+      'No Sugar 🍎',
+      'Code 💻',
+    ];
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: U.bg,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: SizedBox(
-          height: MediaQuery.of(ctx).size.height * 0.7,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text('Edit Habits', style: GoogleFonts.playfairDisplay(color: U.text, fontSize: 20, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
-                    const Spacer(),
-                    TextButton(onPressed: () => Navigator.pop(ctx, controller.text), child: Text('Save', style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600))),
-                  ],
-                ),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          void addHabit(String habit) {
+            final trimmed = habit.trim();
+            if (trimmed.isNotEmpty && !localHabits.contains(trimmed)) {
+              setSheetState(() {
+                localHabits.add(trimmed);
+              });
+              inputController.clear();
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              height: MediaQuery.of(ctx).size.height * 0.75,
+              decoration: BoxDecoration(
+                color: U.bg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                border: Border.all(color: U.border.withValues(alpha: 0.5)),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Enter one habit per line.', style: GoogleFonts.outfit(color: U.sub, fontSize: 13)),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: TextField(
-                    controller: controller,
-                    maxLines: null,
-                    expands: true,
-                    style: GoogleFonts.jetBrainsMono(color: U.text, fontSize: 14, height: 1.6),
-                    decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag handle
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: U.dim.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(2.5),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Edit Habits',
+                              style: GoogleFonts.playfairDisplay(
+                                color: U.text,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Customize daily activities to track',
+                              style: GoogleFonts.outfit(
+                                color: U.sub,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: U.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                          },
+                          child: Text(
+                            'Done',
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Add Habit Input Bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: U.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: U.border),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: inputController,
+                              style: GoogleFonts.outfit(color: U.text, fontSize: 16),
+                              cursorColor: U.blue,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                hintText: 'Create a custom habit...',
+                                hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 15),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onSubmitted: addHabit,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add_circle_rounded, color: U.blue, size: 28),
+                            onPressed: () => addHabit(inputController.text),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Predefined suggestions label
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'QUICK SUGGESTIONS',
+                      style: GoogleFonts.outfit(
+                        color: U.sub.withValues(alpha: 0.7),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Suggestions horizontal list
+                  SizedBox(
+                    height: 38,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: suggestions.length,
+                      itemBuilder: (context, index) {
+                        final suggestion = suggestions[index];
+                        final alreadyAdded = localHabits.contains(suggestion);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: GestureDetector(
+                            onTap: alreadyAdded ? null : () => addHabit(suggestion),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: alreadyAdded 
+                                    ? U.surface.withValues(alpha: 0.5) 
+                                    : U.surface,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: alreadyAdded 
+                                      ? U.border.withValues(alpha: 0.3) 
+                                      : U.border.withValues(alpha: 0.8),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    suggestion,
+                                    style: GoogleFonts.outfit(
+                                      color: alreadyAdded ? U.sub : U.text,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  if (alreadyAdded) ...[
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.check, color: U.sub, size: 12),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // List label
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'YOUR HABITS',
+                          style: GoogleFonts.outfit(
+                            color: U.sub.withValues(alpha: 0.7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        Text(
+                          '${localHabits.length} items',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Habits list
+                  Expanded(
+                    child: localHabits.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.track_changes_outlined, size: 48, color: U.dim.withValues(alpha: 0.5)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No habits added yet',
+                                  style: GoogleFonts.outfit(color: U.sub, fontSize: 15),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            itemCount: localHabits.length,
+                            itemBuilder: (context, index) {
+                              final habit = localHabits[index];
+                              return Dismissible(
+                                key: Key(habit),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  decoration: BoxDecoration(
+                                    color: U.red.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(Icons.delete_outline_rounded, color: U.red, size: 24),
+                                ),
+                                onDismissed: (direction) {
+                                  setSheetState(() {
+                                    localHabits.removeAt(index);
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: U.card,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: IntrinsicHeight(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 5,
+                                            color: U.blue,
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(vertical: 14),
+                                              child: Text(
+                                                habit,
+                                                style: GoogleFonts.outfit(
+                                                  color: U.text,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: Icon(Icons.delete_outline_rounded, color: U.red.withValues(alpha: 0.7), size: 22),
+                                            onPressed: () {
+                                              setSheetState(() {
+                                                localHabits.removeAt(index);
+                                              });
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
-    if (result != null && _userHabits != null) {
-      final habits = result.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      final newConfig = _userHabits!.copyWith(habits: habits);
+
+    if (_userHabits != null) {
+      final newConfig = _userHabits!.copyWith(habits: localHabits);
       await _service.saveUserHabits(newConfig);
-      setState(() => _userHabits = newConfig);
+      if (mounted) {
+        setState(() {
+          _userHabits = newConfig;
+        });
+      }
     }
   }
 

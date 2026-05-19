@@ -42,7 +42,16 @@ class FocusSupabaseService {
           .get();
 
       if (!doc.exists || doc.data() == null) {
-        debugPrint('Focus Supabase config not found');
+        debugPrint('Focus Supabase config not found, trying primary instance');
+        try {
+          _client = supa.Supabase.instance.client;
+          _initialized = true;
+          _initializing = false;
+          _syncPendingData();
+          return true;
+        } catch (fallbackError) {
+          debugPrint('Primary Supabase fallback failed: $fallbackError');
+        }
         _initializing = false;
         return false;
       }
@@ -52,7 +61,16 @@ class FocusSupabaseService {
       final anonKey = data['anon_key'] as String?;
 
       if (url == null || anonKey == null) {
-        debugPrint('Focus Supabase config missing url or anon_key');
+        debugPrint('Focus Supabase config missing url or anon_key, trying primary instance');
+        try {
+          _client = supa.Supabase.instance.client;
+          _initialized = true;
+          _initializing = false;
+          _syncPendingData();
+          return true;
+        } catch (fallbackError) {
+          debugPrint('Primary Supabase fallback failed: $fallbackError');
+        }
         _initializing = false;
         return false;
       }
@@ -66,7 +84,16 @@ class FocusSupabaseService {
 
       return true;
     } catch (e) {
-      debugPrint('Failed to initialize Focus Supabase: $e');
+      debugPrint('Failed to initialize Focus Supabase, trying primary instance: $e');
+      try {
+        _client = supa.Supabase.instance.client;
+        _initialized = true;
+        _initializing = false;
+        _syncPendingData();
+        return true;
+      } catch (fallbackError) {
+        debugPrint('Primary Supabase fallback failed: $fallbackError');
+      }
       _initializing = false;
       return false;
     }
