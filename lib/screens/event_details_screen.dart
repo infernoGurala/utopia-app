@@ -571,9 +571,31 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           return AlertDialog(
             backgroundColor: U.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(
-              '$eventTitle — Participants',
-              style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '$eventTitle — Participants',
+                    style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (regs.any((r) => !certs.any((c) => c.userId == r.userId)))
+                  TextButton.icon(
+                    onPressed: () => _awardAllConfirm(context, regs, certs, setState),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: U.primary,
+                    ),
+                    icon: Icon(Icons.select_all_rounded, size: 16),
+                    label: Text(
+                      'Select All',
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
             ),
             content: SizedBox(
               width: double.maxFinite,
@@ -663,6 +685,87 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  void _awardAllConfirm(
+    BuildContext dialogContext,
+    List<EventRegistration> regs,
+    List<EventCertificate> certs,
+    StateSetter setDialogState,
+  ) {
+    showDialog(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        backgroundColor: U.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Award All Certificates', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
+        content: Text(
+          'This will award certificates to all remaining participants. Continue?',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: U.dim)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close confirm dialog
+              
+              showDialog(
+                context: dialogContext,
+                barrierDismissible: false,
+                builder: (context) => const Center(child: UtopiaLoader(scale: 0.7)),
+              );
+
+              try {
+                final unawarded = regs.where((r) => !certs.any((c) => c.userId == r.userId)).toList();
+                if (unawarded.isNotEmpty) {
+                  final futures = unawarded.map((r) => EventService.instance.issueCertificate(
+                    eventId: _event.id!,
+                    eventTitle: _event.title,
+                    userId: r.userId,
+                    issuerName: _event.organizerName.isNotEmpty ? _event.organizerName : 'Utopia Organizer',
+                    certificateUrl: 'https://utopia-app.web.app/certificates/default.pdf',
+                  ));
+                  await Future.wait(futures);
+
+                  final updatedCerts = await EventService.instance.getEventCertificates(_event.id!);
+                  setDialogState(() {
+                    certs.clear();
+                    certs.addAll(updatedCerts);
+                  });
+                }
+                
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext); // Dismiss loader
+                  showUtopiaSnackBar(
+                    dialogContext,
+                    message: 'Successfully awarded certificates to all participants!',
+                    tone: UtopiaSnackBarTone.success,
+                  );
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext); // Dismiss loader
+                  showUtopiaSnackBar(
+                    dialogContext,
+                    message: 'Failed to award certificates: $e',
+                    tone: UtopiaSnackBarTone.error,
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              foregroundColor: U.bg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Award All', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+          ),
+        ],
       ),
     );
   }
