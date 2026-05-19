@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 import 'create_event_screen.dart';
+import '../widgets/utopia_snackbar.dart';
 
 class OrganizerDashboardScreen extends StatefulWidget {
   const OrganizerDashboardScreen({super.key});
@@ -20,6 +23,8 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   List<EventModel> _myEvents = [];
   Map<String, dynamic> _analytics = {};
   bool _isLoading = true;
+  String? _userRollNumber;
+  String? _userDisplayName;
 
   @override
   void initState() {
@@ -37,13 +42,31 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
       final results = await Future.wait([
         EventService.instance.getEventsByOrganizer(uid),
         EventService.instance.getOrganizerAnalytics(uid),
+        FirebaseFirestore.instance.collection('users').doc(uid).get(),
       ]);
+
+      final events = results[0] as List<EventModel>;
+      final analytics = results[1] as Map<String, dynamic>;
+      final userDoc = results[2] as DocumentSnapshot<Map<String, dynamic>>;
+
+      final data = userDoc.data();
+      final rollNumber = data?['rollNumber'] as String? ?? '';
+      final name = data?['displayName'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? '';
+
       if (mounted) {
         setState(() {
-          _myEvents = results[0] as List<EventModel>;
-          _analytics = results[1] as Map<String, dynamic>;
+          _myEvents = events;
+          _analytics = analytics;
+          _userRollNumber = rollNumber;
+          _userDisplayName = name;
           _isLoading = false;
         });
+
+        if (rollNumber.isEmpty || name.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showNameAndRollNumberDialog(uid, name, rollNumber);
+          });
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -90,13 +113,13 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                             'My Events',
                             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
                           ),
-                          TextButton.icon(
+                          GradientDotButton(
                             onPressed: () async {
                               await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
                               _loadData();
                             },
-                            icon: Icon(Icons.add_rounded, color: U.primary, size: 18),
-                            label: Text('Create New', style: GoogleFonts.outfit(color: U.primary)),
+                            icon: Icons.add_rounded,
+                            label: 'Create New',
                           ),
                         ],
                       ),
@@ -114,60 +137,172 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
   }
 
   Widget _buildProfileHeader(User? user) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [U.primary, U.teal],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(3),
-            decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
-            child: CircleAvatar(
-              radius: 36,
-              backgroundColor: U.surface,
-              backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
-              child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+    return ProfileHeaderBackground(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(color: Colors.white30, shape: BoxShape.circle),
+              child: CircleAvatar(
+                radius: 36,
+                backgroundColor: U.surface,
+                backgroundImage: user?.photoURL != null ? CachedNetworkImageProvider(user!.photoURL!) : null,
+                child: user?.photoURL == null ? Icon(Icons.business_center_rounded, color: U.primary, size: 36) : null,
+              ),
             ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (_userDisplayName != null && _userDisplayName!.isNotEmpty)
+                        ? _userDisplayName!
+                        : (user?.displayName ?? 'Organizer'),
+                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  if (_userRollNumber != null && _userRollNumber!.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Roll No: $_userRollNumber',
+                        style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn().slideY(begin: 0.1, end: 0);
+  }
+
+  void _showNameAndRollNumberDialog(String uid, String currentName, String currentRoll) {
+    final nameController = TextEditingController(text: currentName);
+    final rollController = TextEditingController(text: currentRoll);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: U.card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text(
+            'Complete Profile',
+            style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700, fontSize: 20),
           ),
-          const SizedBox(width: 20),
-          Expanded(
+          content: Form(
+            key: formKey,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user?.displayName ?? 'Organizer',
-                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  'Please enter your name and roll number to continue.',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(20),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: nameController,
+                  style: GoogleFonts.outfit(color: U.text),
+                  decoration: InputDecoration(
+                    labelText: 'Full Name',
+                    labelStyle: GoogleFonts.outfit(color: U.sub),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary),
+                    ),
                   ),
-                  child: Text(
-                    '${_myEvents.length} Events  •  ${_analytics['total_registrations'] ?? 0} Registrations',
-                    style: GoogleFonts.outfit(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w600),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: rollController,
+                  style: GoogleFonts.outfit(color: U.text),
+                  decoration: InputDecoration(
+                    labelText: 'Roll Number',
+                    labelStyle: GoogleFonts.outfit(color: U.sub),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary),
+                    ),
                   ),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Roll number is required' : null,
                 ),
               ],
             ),
           ),
-        ],
-      ),
-    ).animate().fadeIn().slideY(begin: 0.1, end: 0);
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                if (formKey.currentState?.validate() ?? false) {
+                  final newName = nameController.text.trim();
+                  final newRoll = rollController.text.trim();
+                  try {
+                    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+                      'displayName': newName,
+                      'rollNumber': newRoll,
+                    }, SetOptions(merge: true));
+
+                    final user = FirebaseAuth.instance.currentUser;
+                    if (user != null) {
+                      await user.updateDisplayName(newName);
+                      await user.reload();
+                    }
+
+                    if (mounted) {
+                      setState(() {
+                        _userDisplayName = newName;
+                        _userRollNumber = newRoll;
+                      });
+                      Navigator.pop(dialogContext);
+                      showUtopiaSnackBar(
+                        context,
+                        message: 'Profile updated successfully!',
+                        tone: UtopiaSnackBarTone.success,
+                      );
+                    }
+                  } catch (e) {
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Failed to update profile: $e',
+                      tone: UtopiaSnackBarTone.error,
+                    );
+                  }
+                }
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: U.primary,
+                foregroundColor: U.bg,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+              child: Text('Save', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
 
@@ -324,9 +459,27 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               }),
               _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
                 if (event.id == null) return;
-                final regs = await EventService.instance.getRegistrations(event.id!);
-                if (mounted) {
-                  _showParticipantsDialog(event.title, regs);
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: UtopiaLoader(scale: 0.7)),
+                );
+                try {
+                  final regs = await EventService.instance.getRegistrations(event.id!);
+                  final certs = await EventService.instance.getEventCertificates(event.id!);
+                  if (mounted) {
+                    Navigator.pop(context); // Dismiss loader
+                    _showParticipantsDialog(event, regs, certs);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Dismiss loader
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Error loading participants: $e',
+                      tone: UtopiaSnackBarTone.error,
+                    );
+                  }
                 }
               }),
               _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event), iconColor: U.red),
@@ -408,45 +561,346 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     );
   }
 
-  void _showParticipantsDialog(String eventTitle, List<EventRegistration> regs) {
+  void _showParticipantsDialog(
+    EventModel event,
+    List<EventRegistration> regs,
+    List<EventCertificate> initialCerts,
+  ) {
+    final certs = List<EventCertificate>.from(initialCerts);
+
     showDialog(
       context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: U.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    '${event.title} — Participants',
+                    style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (regs.any((r) => !certs.any((c) => c.userId == r.userId)))
+                  TextButton.icon(
+                    onPressed: () => _awardAllConfirm(context, event, regs, certs, setState),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: U.primary,
+                    ),
+                    icon: Icon(Icons.select_all_rounded, size: 16),
+                    label: Text(
+                      'Select All',
+                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 350,
+              child: regs.isEmpty
+                  ? Center(child: Text('No registrations yet', style: GoogleFonts.outfit(color: U.sub)))
+                  : ListView.builder(
+                      itemCount: regs.length,
+                      itemBuilder: (context, index) {
+                        final r = regs[index];
+                        final isIssued = certs.any((c) => c.userId == r.userId);
+                        
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: U.primary.withValues(alpha: 0.1),
+                            child: Text(
+                              r.userName.isNotEmpty ? r.userName[0].toUpperCase() : '?',
+                              style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          title: Text(
+                            r.userName,
+                            style: GoogleFonts.outfit(color: U.text, fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Row(
+                            children: [
+                              Text(r.ticketId ?? '', style: GoogleFonts.outfit(color: U.dim, fontSize: 11)),
+                              const SizedBox(width: 6),
+                              if (r.checkedIn)
+                                Icon(Icons.check_circle_rounded, color: U.teal, size: 14)
+                              else
+                                Icon(Icons.circle_outlined, color: U.dim, size: 14),
+                            ],
+                          ),
+                          trailing: isIssued
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: U.teal.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: U.teal.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.verified_user_rounded, color: U.teal, size: 12),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Issued',
+                                        style: GoogleFonts.outfit(color: U.teal, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : TextButton.icon(
+                                  onPressed: () => _awardCertificatePrompt(context, event, r, (newCert) {
+                                    setState(() {
+                                      certs.add(newCert);
+                                    });
+                                  }),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    backgroundColor: U.primary.withValues(alpha: 0.1),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    foregroundColor: U.primary,
+                                  ),
+                                  icon: Icon(Icons.workspace_premium_rounded, size: 14),
+                                  label: Text(
+                                    'Award',
+                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close', style: GoogleFonts.outfit(color: U.primary)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _awardAllConfirm(
+    BuildContext dialogContext,
+    EventModel event,
+    List<EventRegistration> regs,
+    List<EventCertificate> certs,
+    StateSetter setDialogState,
+  ) {
+    showDialog(
+      context: dialogContext,
       builder: (context) => AlertDialog(
         backgroundColor: U.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('$eventTitle — Participants', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: regs.isEmpty
-              ? Center(child: Text('No registrations yet', style: GoogleFonts.outfit(color: U.sub)))
-              : ListView.builder(
-                  itemCount: regs.length,
-                  itemBuilder: (context, index) {
-                    final r = regs[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: U.primary.withValues(alpha: 0.1),
-                        child: Text(
-                          r.userName.isNotEmpty ? r.userName[0].toUpperCase() : '?',
-                          style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      title: Text(r.userName, style: GoogleFonts.outfit(color: U.text)),
-                      subtitle: Text(r.ticketId ?? '', style: GoogleFonts.outfit(color: U.dim, fontSize: 11)),
-                      trailing: r.checkedIn
-                          ? Icon(Icons.check_circle_rounded, color: U.teal, size: 20)
-                          : Icon(Icons.circle_outlined, color: U.dim, size: 20),
-                    );
-                  },
-                ),
+        title: Text('Award All Certificates', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
+        content: Text(
+          'This will award certificates to all remaining participants. Continue?',
+          style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.outfit(color: U.primary)),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: U.dim)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close confirm dialog
+              
+              showDialog(
+                context: dialogContext,
+                barrierDismissible: false,
+                builder: (context) => const Center(child: UtopiaLoader(scale: 0.7)),
+              );
+
+              try {
+                final unawarded = regs.where((r) => !certs.any((c) => c.userId == r.userId)).toList();
+                if (unawarded.isNotEmpty) {
+                  final futures = unawarded.map((r) => EventService.instance.issueCertificate(
+                    eventId: event.id!,
+                    eventTitle: event.title,
+                    userId: r.userId,
+                    issuerName: event.organizerName.isNotEmpty ? event.organizerName : 'Utopia Organizer',
+                    certificateUrl: 'https://utopia-app.web.app/certificates/default.pdf',
+                  ));
+                  await Future.wait(futures);
+
+                  final updatedCerts = await EventService.instance.getEventCertificates(event.id!);
+                  setDialogState(() {
+                    certs.clear();
+                    certs.addAll(updatedCerts);
+                  });
+                }
+                
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext); // Dismiss loader
+                  showUtopiaSnackBar(
+                    dialogContext,
+                    message: 'Successfully awarded certificates to all participants!',
+                    tone: UtopiaSnackBarTone.success,
+                  );
+                }
+              } catch (e) {
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext); // Dismiss loader
+                  showUtopiaSnackBar(
+                    dialogContext,
+                    message: 'Failed to award certificates: $e',
+                    tone: UtopiaSnackBarTone.error,
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              foregroundColor: U.bg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Award All', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _awardCertificatePrompt(
+    BuildContext dialogContext,
+    EventModel event,
+    EventRegistration registration,
+    Function(EventCertificate) onIssued,
+  ) {
+    final urlController = TextEditingController();
+    bool issuing = false;
+
+    showDialog(
+      context: dialogContext,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPromptState) {
+          return AlertDialog(
+            backgroundColor: U.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              'Award Certificate',
+              style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Issue a certificate of participation to ${registration.userName}.',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  enabled: !issuing,
+                  style: GoogleFonts.outfit(color: U.text, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Certificate URL (Optional)',
+                    hintText: 'e.g. https://drive.google.com/...',
+                    labelStyle: GoogleFonts.outfit(color: U.text, fontSize: 12),
+                    hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 12),
+                    filled: true,
+                    fillColor: U.card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary, width: 1.2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: issuing ? null : () => Navigator.pop(context),
+                child: Text('Cancel', style: GoogleFonts.outfit(color: U.dim)),
+              ),
+              FilledButton(
+                onPressed: issuing
+                    ? null
+                    : () async {
+                        setPromptState(() => issuing = true);
+                        try {
+                          final certUrl = urlController.text.trim().isNotEmpty
+                              ? urlController.text.trim()
+                              : 'https://utopia-app.web.app/certificates/default.pdf';
+                          
+                          final success = await EventService.instance.issueCertificate(
+                            eventId: event.id!,
+                            eventTitle: event.title,
+                            userId: registration.userId,
+                            issuerName: event.organizerName.isNotEmpty ? event.organizerName : 'Utopia Organizer',
+                            certificateUrl: certUrl,
+                          );
+
+                          if (success) {
+                            final newCert = EventCertificate(
+                              eventId: event.id!,
+                              eventTitle: event.title,
+                              userId: registration.userId,
+                              issuerName: event.organizerName.isNotEmpty ? event.organizerName : 'Utopia Organizer',
+                              certificateUrl: certUrl,
+                              issuedAt: DateTime.now(),
+                            );
+                            onIssued(newCert);
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close award prompt
+                              showUtopiaSnackBar(
+                                dialogContext,
+                                message: 'Certificate awarded to ${registration.userName} successfully!',
+                                tone: UtopiaSnackBarTone.success,
+                              );
+                            }
+                          } else {
+                            throw Exception('Database insertion returned false');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            setPromptState(() => issuing = false);
+                            showUtopiaSnackBar(
+                              context,
+                              message: 'Failed to issue certificate: $e',
+                              tone: UtopiaSnackBarTone.error,
+                            );
+                          }
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: U.primary,
+                  foregroundColor: U.bg,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: issuing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text('Award', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -455,4 +909,229 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[d.month - 1]} ${d.day}, ${d.year}';
   }
+}
+
+class ProfileHeaderBackground extends StatefulWidget {
+  final Widget child;
+  const ProfileHeaderBackground({super.key, required this.child});
+
+  @override
+  State<ProfileHeaderBackground> createState() => _ProfileHeaderBackgroundState();
+}
+
+class _ProfileHeaderBackgroundState extends State<ProfileHeaderBackground> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [U.primary, U.teal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(color: U.primary.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12)),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: _MeshPainter(_controller.value),
+                );
+              },
+            ),
+          ),
+          widget.child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MeshPainter extends CustomPainter {
+  final double progress;
+  _MeshPainter(this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.fill;
+
+    // Draw wavy lines or abstract shapes
+    final path1 = Path();
+    final path2 = Path();
+
+    // Wave 1
+    path1.moveTo(0, size.height);
+    for (double x = 0; x <= size.width; x++) {
+      final y = size.height * 0.75 +
+          math.sin((x / size.width * 2 * math.pi) + (progress * 2 * math.pi)) * 18;
+      path1.lineTo(x, y);
+    }
+    path1.lineTo(size.width, size.height);
+    path1.close();
+    canvas.drawPath(path1, paint);
+
+    // Wave 2
+    paint.color = Colors.white.withValues(alpha: 0.03);
+    path2.moveTo(0, size.height);
+    for (double x = 0; x <= size.width; x++) {
+      final y = size.height * 0.55 +
+          math.cos((x / size.width * 2 * math.pi) - (progress * 2 * math.pi)) * 22;
+      path2.lineTo(x, y);
+    }
+    path2.lineTo(size.width, size.height);
+    path2.close();
+    canvas.drawPath(path2, paint);
+
+    // Draw floating blobs
+    final paintBlob = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+
+    final center1 = Offset(
+      size.width * 0.35 + math.sin(progress * 2 * math.pi) * 40,
+      size.height * 0.35 + math.cos(progress * 2 * math.pi) * 20,
+    );
+    canvas.drawCircle(center1, 55, paintBlob);
+
+    final center2 = Offset(
+      size.width * 0.8 + math.cos(progress * 2 * math.pi) * 30,
+      size.height * 0.5 + math.sin(progress * 2 * math.pi) * 30,
+    );
+    canvas.drawCircle(center2, 65, paintBlob);
+
+    // Draw dots pattern overlay
+    final dotPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.fill;
+    const spacing = 12.0;
+    const dotRadius = 1.0;
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MeshPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+class GradientDotButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final String label;
+  final IconData icon;
+
+  const GradientDotButton({
+    super.key,
+    required this.onPressed,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [U.primary, U.teal],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: U.primary.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DotsPatternPainter(),
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DotsPatternPainter extends CustomPainter {
+  final double spacing;
+  final double dotRadius;
+  final double opacity;
+
+  _DotsPatternPainter({
+    this.spacing = 8.0,
+    this.dotRadius = 1.0,
+    this.opacity = 0.08,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: opacity)
+      ..style = PaintingStyle.fill;
+
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotsPatternPainter oldDelegate) => false;
 }

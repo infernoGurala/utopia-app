@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EventCertificatesScreen extends StatefulWidget {
   const EventCertificatesScreen({super.key});
@@ -103,12 +104,21 @@ class _EventCertificatesScreenState extends State<EventCertificatesScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            // Could open certificate URL if available
+          onTap: () async {
             if (cert.certificateUrl != null && cert.certificateUrl!.isNotEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Opening certificate...', style: GoogleFonts.outfit())),
-              );
+              try {
+                final uri = Uri.parse(cert.certificateUrl!);
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Could not open certificate URL: $e', style: GoogleFonts.outfit()),
+                      backgroundColor: U.red,
+                    ),
+                  );
+                }
+              }
             }
           },
           borderRadius: BorderRadius.circular(16),

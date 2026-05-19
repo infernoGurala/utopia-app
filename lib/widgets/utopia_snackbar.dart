@@ -7,6 +7,8 @@ void showUtopiaSnackBar(
   BuildContext context, {
   required String message,
   UtopiaSnackBarTone tone = UtopiaSnackBarTone.info,
+  String? actionLabel,
+  VoidCallback? onActionPressed,
 }) {
   final messenger = ScaffoldMessenger.of(context);
   messenger.hideCurrentSnackBar();
@@ -38,7 +40,7 @@ void showUtopiaSnackBar(
       elevation: 0,
       backgroundColor: Colors.transparent,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      duration: const Duration(milliseconds: 2200),
+      duration: actionLabel != null ? const Duration(milliseconds: 4000) : const Duration(milliseconds: 2200),
       content: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
@@ -68,6 +70,32 @@ void showUtopiaSnackBar(
                 ),
               ),
             ),
+            if (actionLabel != null && onActionPressed != null) ...[
+              const SizedBox(width: 12),
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  onActionPressed();
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: iconColor.withValues(alpha: 0.12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  foregroundColor: iconColor,
+                ),
+                child: Text(
+                  actionLabel,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

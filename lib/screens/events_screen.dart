@@ -15,6 +15,10 @@ import 'organizer_dashboard_screen.dart';
 import 'event_certificates_screen.dart';
 import 'saved_events_screen.dart';
 import '../widgets/event_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/platform_support.dart';
+import '../services/notification_service.dart';
+import '../widgets/utopia_snackbar.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -46,11 +50,55 @@ class _EventsScreenState extends State<EventsScreen> {
     super.initState();
     _loadEvents();
     _checkRole();
+    _checkForNewCertificates();
   }
 
   Future<void> _checkRole() async {
     final isSuper = await RoleService().isSuperUser();
     if (mounted) setState(() => _isSuperUser = isSuper);
+  }
+
+  Future<void> _checkForNewCertificates() async {
+    try {
+      final certs = await EventService.instance.getMyCertificates();
+      if (certs.isEmpty) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final knownCertIds = prefs.getStringList('known_certificate_ids') ?? [];
+
+      final newCerts = certs.where((c) => c.id != null && !knownCertIds.contains(c.id)).toList();
+
+      if (newCerts.isNotEmpty) {
+        final updatedIds = List<String>.from(knownCertIds)..addAll(newCerts.map((c) => c.id!));
+        await prefs.setStringList('known_certificate_ids', updatedIds);
+
+        if (mounted) {
+          for (final cert in newCerts) {
+            if (PlatformSupport.supportsNotifications) {
+              await NotificationService.sendCertificateNotification(
+                title: '🏆 Certificate Received!',
+                body: 'You received a certificate for participating in "${cert.eventTitle}"!',
+              );
+            }
+            
+            showUtopiaSnackBar(
+              context,
+              message: '🏆 New Certificate Awarded: "${cert.eventTitle}"!',
+              tone: UtopiaSnackBarTone.success,
+              actionLabel: 'View',
+              onActionPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EventCertificatesScreen()),
+                );
+              },
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to check for new certificates: $e');
+    }
   }
 
   @override

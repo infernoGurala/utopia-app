@@ -222,6 +222,24 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
+    final contactNum = _contactController.text.trim();
+    final digitsOnly = contactNum.replaceAll(RegExp(r'\D'), '');
+    String cleanNum = digitsOnly;
+    if (digitsOnly.length == 12 && digitsOnly.startsWith('91')) {
+      cleanNum = digitsOnly.substring(2);
+    }
+    if (cleanNum.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Contact number must be exactly 10 digits', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
+    if (_participationLinkController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Participation link is required (e.g. Microsoft Form link)', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
     if (_bannerFile == null && _existingBannerUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Banner image is required', style: GoogleFonts.outfit())),
@@ -355,9 +373,6 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         final eventId = await EventService.instance.createEvent(event);
         if (mounted) {
           if (eventId != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Event submitted for approval!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
-            );
             Navigator.pop(context);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -682,7 +697,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _buildField('Prize Information', _prizeInfoController, maxLines: 2, icon: Icons.emoji_events_rounded, hint: 'e.g. ₹10,000 prize pool'),
         _buildField('Contact Numbers', _contactController, icon: Icons.phone_rounded),
         _buildField('WhatsApp Group Link', _whatsappController, icon: Icons.link_rounded),
-        _buildField('Participation Link', _participationLinkController, icon: Icons.open_in_new_rounded, hint: 'External registration link'),
+        _buildField('Participation Link *', _participationLinkController, icon: Icons.open_in_new_rounded, hint: 'e.g. Microsoft participation link (required)'),
         _buildField('Tags (comma separated)', _tagsController, icon: Icons.tag_rounded, hint: 'e.g. coding, web, flutter'),
       ],
     ).animate().fadeIn();
