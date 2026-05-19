@@ -457,29 +457,46 @@ class _FocusScreenState extends State<FocusScreen> {
                             end: Alignment.centerRight,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _userName.isEmpty ? _greetingText : '$_greetingText, $_userName',
-                              style: GoogleFonts.gayathri(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w700,
-                                color: _greetingColor,
-                                height: 1.2,
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(
+                                width: 3,
+                                decoration: BoxDecoration(
+                                  color: _greetingColor.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _motivationalText,
-                              style: GoogleFonts.outfit(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w400,
-                                color: _motivationalColor,
-                                height: 1.45,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _userName.isEmpty ? _greetingText : '$_greetingText, $_userName',
+                                      style: GoogleFonts.tiroGurmukhi(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w500,
+                                        color: _greetingColor,
+                                        height: 1.2,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _motivationalText,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w400,
+                                        color: _motivationalColor,
+                                        height: 1.45,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ).animate()
                             .fadeIn(delay: 300.ms, duration: 600.ms)
                             .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 600.ms, curve: Curves.easeOut),
