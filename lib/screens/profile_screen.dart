@@ -259,7 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     Text(
                       'Manage your academic identity',
-                      style: GoogleFonts.outfit(color: U.dim, fontSize: 13),
+                      style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
                     ),
                   ],
                 )

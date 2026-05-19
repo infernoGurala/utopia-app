@@ -8,6 +8,7 @@ import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
 import 'heatmap_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/utopia_loader.dart';
 import '../theme/image_overlay_colors.dart';
 
 class DailyNoteScreen extends StatefulWidget {
@@ -150,6 +151,116 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     _note = _note!.copyWith(tasks: tasks);
     setState(() {});
     _saveNote();
+  }
+
+  void _editTask(int index, String newLabel) {
+    if (_note == null || newLabel.trim().isEmpty) return;
+    final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
+    tasks[index]['label'] = newLabel.trim();
+    _note = _note!.copyWith(tasks: tasks);
+    setState(() {});
+    _saveNote();
+  }
+
+  void _showEditTaskSheet(int index, String currentLabel) {
+    final controller = TextEditingController(text: currentLabel);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            decoration: BoxDecoration(
+              color: U.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(color: U.border.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Edit Task',
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: U.text,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: U.sub),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: U.card,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: U.border),
+                  ),
+                  child: TextField(
+                    controller: controller,
+                    autofocus: true,
+                    style: GoogleFonts.outfit(color: U.text, fontSize: 16),
+                    cursorColor: U.teal,
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Enter task label',
+                      hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 16),
+                    ),
+                    onSubmitted: (val) {
+                      if (val.trim().isNotEmpty) {
+                        _editTask(index, val);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: U.teal,
+                      foregroundColor: U.bg,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed: () {
+                      if (controller.text.trim().isNotEmpty) {
+                        _editTask(index, controller.text);
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: Text(
+                      'Save Changes',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showMenu() {
@@ -698,7 +809,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   Widget _buildLoading() {
-    return Center(child: CircularProgressIndicator(strokeWidth: 2, color: U.primary));
+    return const Center(child: UtopiaLoader(scale: 0.7));
   }
 
   Widget _buildNoteBody() {
@@ -763,6 +874,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
               checked: _note?.habitsState[habit] == true,
               isTask: false,
               onTap: () => _toggleHabit(habit),
+              onTextTap: null,
             ),
         ],
       ),
@@ -800,6 +912,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
               checked: tasks[i]['completed'] == true,
               isTask: true,
               onTap: () => _toggleTask(i),
+              onTextTap: () => _showEditTaskSheet(i, tasks[i]['label']),
               onDelete: () => _deleteTask(i),
             ),
           const SizedBox(height: 12),
@@ -898,6 +1011,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     required bool checked,
     required bool isTask,
     required VoidCallback onTap,
+    required VoidCallback? onTextTap,
     VoidCallback? onDelete,
   }) {
     return Padding(
@@ -908,7 +1022,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
           _AnimatedCheckbox(checked: checked, enabled: _markDoneEnabled, onTap: onTap),
           Expanded(
             child: GestureDetector(
-              onTap: isTask ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => HeatmapHomeScreen(initialTask: label))) : null,
+              onTap: onTextTap,
+              behavior: HitTestBehavior.opaque,
               child: Text(
                 label,
                 style: GoogleFonts.inter(

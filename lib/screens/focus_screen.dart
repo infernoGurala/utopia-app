@@ -252,7 +252,38 @@ class _FocusScreenState extends State<FocusScreen> {
                         GestureDetector(
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                            PageRouteBuilder(
+                              opaque: false,
+                              pageBuilder: (context, animation, secondaryAnimation) => const ProfileScreen(),
+                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                final slideAnimation = Tween<Offset>(
+                                  begin: const Offset(0.0, 0.12),
+                                  end: Offset.zero,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                  ),
+                                );
+                                final fadeAnimation = Tween<double>(
+                                  begin: 0.0,
+                                  end: 1.0,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOut,
+                                  ),
+                                );
+                                return FadeTransition(
+                                  opacity: fadeAnimation,
+                                  child: SlideTransition(
+                                    position: slideAnimation,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              transitionDuration: const Duration(milliseconds: 380),
+                            ),
                           ),
                           child: Stack(
                             alignment: Alignment.center,
