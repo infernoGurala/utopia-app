@@ -220,7 +220,7 @@ class NotificationService {
     }
   }
 
-  static Future<bool> _areNotificationPermissionsEnabled() async {
+  static Future<bool> areNotificationPermissionsEnabled() async {
     if (!PlatformSupport.supportsNotifications) {
       return false;
     }
@@ -254,7 +254,7 @@ class NotificationService {
 
     _checkingNotificationPermission = true;
     try {
-      final enabled = await _areNotificationPermissionsEnabled();
+      final enabled = await areNotificationPermissionsEnabled();
       if (enabled) {
         return;
       }
@@ -722,6 +722,8 @@ class NotificationService {
                 priority: Priority.high,
                 playSound: true,
                 enableVibration: true,
+                icon: 'ic_notification',
+                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
               ),
             ),
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -745,6 +747,8 @@ class NotificationService {
                 priority: Priority.high,
                 playSound: true,
                 enableVibration: true,
+                icon: 'ic_notification',
+                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
               ),
             ),
             androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -781,6 +785,8 @@ class NotificationService {
                   priority: Priority.high,
                   playSound: true,
                   enableVibration: true,
+                  icon: 'ic_notification',
+                  largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -805,6 +811,8 @@ class NotificationService {
                   priority: Priority.high,
                   playSound: true,
                   enableVibration: true,
+                  icon: 'ic_notification',
+                  largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
                 ),
               ),
               androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -837,6 +845,8 @@ class NotificationService {
                 priority: Priority.high,
                 playSound: true,
                 enableVibration: true,
+                icon: 'ic_notification',
+                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
               ),
             ),
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -861,6 +871,8 @@ class NotificationService {
                 priority: Priority.high,
                 playSound: true,
                 enableVibration: true,
+                icon: 'ic_notification',
+                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
               ),
             ),
             androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,

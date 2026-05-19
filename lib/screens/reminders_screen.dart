@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
 import '../widgets/utopia_snackbar.dart';
+import '../services/notification_service.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -49,6 +50,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
   void initState() {
     super.initState();
     _load();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    final enabled = await NotificationService.areNotificationPermissionsEnabled();
+    if (!enabled && mounted) {
+      showUtopiaSnackBar(
+        context,
+        message: 'Notification permissions are disabled! Enable them in System Settings to get alerts.',
+        tone: UtopiaSnackBarTone.warning,
+      );
+    }
   }
 
   Future<void> _load() async {
@@ -163,6 +176,22 @@ class _RemindersScreenState extends State<RemindersScreen> {
                   const SizedBox(width: 4),
                   Text('Reminders', style: GoogleFonts.playfairDisplay(fontSize: 24, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, color: U.text)),
                   const Spacer(),
+                  IconButton(
+                    onPressed: () async {
+                      await NotificationService.sendPersonalTestNotification(
+                        message: 'Utopia reminders are working perfectly!',
+                      );
+                      if (mounted) {
+                        showUtopiaSnackBar(
+                          context,
+                          message: 'Test notification triggered!',
+                          tone: UtopiaSnackBarTone.info,
+                        );
+                      }
+                    },
+                    icon: Icon(Icons.notifications_active_outlined, color: U.primary, size: 22),
+                    tooltip: 'Test Instant Notification',
+                  ),
                   IconButton(onPressed: () => _showReminderSheet(), icon: Icon(Icons.add_rounded, color: U.primary, size: 26)),
                 ],
               ),
