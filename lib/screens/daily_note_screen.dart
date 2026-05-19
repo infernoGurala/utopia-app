@@ -405,6 +405,31 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
 
   Widget _buildHeader() {
     const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    Widget headerButton({required IconData icon, required VoidCallback onTap}) {
+      return GestureDetector(
+        onTap: onTap,
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  width: 0.5,
+                ),
+              ),
+              child: Icon(icon, color: U.text.withValues(alpha: 0.8), size: 19),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
       child: Column(
@@ -413,17 +438,9 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
           // Top bar
           Row(
             children: [
-              GestureDetector(
+              headerButton(
+                icon: Icons.arrow_back_rounded,
                 onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: U.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: U.border, width: 0.5),
-                  ),
-                  child: Icon(Icons.arrow_back_rounded, color: U.text, size: 18),
-                ),
               ),
               const SizedBox(width: 12),
               GestureDetector(
@@ -431,39 +448,23 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
                 behavior: HitTestBehavior.opaque,
                 child: Text(
                   '${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
                     fontWeight: FontWeight.w600,
-                    color: U.text,
-                    letterSpacing: -0.3,
+                    color: U.text.withValues(alpha: 0.95),
+                    letterSpacing: -0.2,
                   ),
                 ),
               ),
               const Spacer(),
-              GestureDetector(
+              headerButton(
+                icon: Icons.calendar_today_rounded,
                 onTap: _toggleCalendar,
-                child: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: U.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: U.border, width: 0.5),
-                  ),
-                  child: Icon(Icons.calendar_today_rounded, color: U.sub, size: 17),
-                ),
               ),
               const SizedBox(width: 8),
-              GestureDetector(
+              headerButton(
+                icon: Icons.settings_outlined,
                 onTap: _showMenu,
-                child: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: U.surface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: U.border, width: 0.5),
-                  ),
-                  child: Icon(Icons.settings_outlined, color: U.sub, size: 17),
-                ),
               ),
             ],
           ),
@@ -927,10 +928,10 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
               child: Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Text(
-                  'delete',
+                  'x',
                   style: GoogleFonts.inter(
                     color: U.text.withValues(alpha: 0.35),
-                    fontSize: 12,
+                    fontSize: 14,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -1140,6 +1141,7 @@ class _AnimatedCheckboxState extends State<_AnimatedCheckbox> with SingleTickerP
             width: 30,
             height: 30,
             margin: const EdgeInsets.only(right: 12),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: Color.lerp(const Color(0xFFDDDDDD), const Color(0xFF08BB68), _controller.value),
               borderRadius: BorderRadius.circular(10),

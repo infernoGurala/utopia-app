@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
 import '../theme/image_overlay_colors.dart';
+import 'iaa_screen.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
 import 'friends_screen.dart';
@@ -193,33 +194,11 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           ),
                         ),
                         _UniversityCard(
-                          title: 'Friends',
-                          subtitle: 'Connect with\nyour peers',
-                          icon: Icons.groups_outlined,
-                          color: U.peach,
-                          delay: 150,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const FriendsScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Docs',
-                          subtitle: 'Access important\nresources',
-                          icon: Icons.description_outlined,
-                          color: const Color(0xFF7C6AF7),
-                          delay: 200,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const DocsScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
                           title: 'People',
                           subtitle: 'Explore the\ncampus community',
                           icon: Icons.public_outlined,
                           color: U.blue,
-                          delay: 250,
+                          delay: 150,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -232,11 +211,22 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           ),
                         ),
                         _UniversityCard(
+                          title: 'Friends',
+                          subtitle: 'Connect with\nyour peers',
+                          icon: Icons.groups_outlined,
+                          color: U.peach,
+                          delay: 200,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const FriendsScreen()),
+                          ),
+                        ),
+                        _UniversityCard(
                           title: 'Events',
                           subtitle: 'Campus happenings\nand activities',
                           icon: Icons.event_available_outlined,
                           color: const Color(0xFF10B981), // green
-                          delay: 300,
+                          delay: 250,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const EventsScreen()),
@@ -247,7 +237,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           subtitle: 'Chat with students\nand groups',
                           icon: Icons.forum_outlined,
                           color: U.teal,
-                          delay: 350,
+                          delay: 300,
                           onTap: () async {
                             if (_universityId.isNotEmpty) {
                               await Navigator.push(
@@ -260,11 +250,33 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           },
                         ),
                         _UniversityCard(
+                          title: 'Docs',
+                          subtitle: 'Access important\nresources',
+                          icon: Icons.description_outlined,
+                          color: const Color(0xFF7C6AF7),
+                          delay: 350,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const DocsScreen()),
+                          ),
+                        ),
+                        _UniversityCard(
+                          title: 'IAA',
+                          subtitle: 'Ask your academic\nAI assistant',
+                          icon: Icons.auto_awesome_rounded,
+                          color: const Color(0xFF7F77DD),
+                          delay: 400,
+                          onTap: () => Navigator.push(
+                            context,
+                            IAAScreen.route(),
+                          ),
+                        ),
+                        _UniversityCard(
                           title: 'Map',
                           subtitle: 'Navigate campus\neasily',
                           icon: Icons.map_outlined,
                           color: U.red,
-                          delay: 400,
+                          delay: 450,
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const MapScreen()),

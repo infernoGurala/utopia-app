@@ -363,7 +363,7 @@ class _FocusScreenState extends State<FocusScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       children: [
-                        // Top row: Daily Note + Activity
+                        // Top row: Daily Note + Reminders
                         Row(
                           children: [
                             Expanded(
@@ -384,35 +384,35 @@ class _FocusScreenState extends State<FocusScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: _FeatureCard(
-                                title: 'Activity',
-                                description: 'Track your habits\nand progress',
-                                icon: Icons.grid_view_rounded,
-                                iconColor: U.peach,
-                                statLabel: '$_activeHabits habits active',
-                                statColor: U.peach,
+                                title: 'Reminders',
+                                description: 'Stay on top of your\nimportant tasks',
+                                icon: Icons.notifications_outlined,
+                                iconColor: U.lavender,
+                                statLabel: '$_upcomingReminders upcoming',
+                                statColor: U.lavender,
                                 delay: 500,
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
+                                  MaterialPageRoute(builder: (_) => const RemindersScreen()),
                                 ).then((_) => _loadData()),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        // Bottom row: Reminders (full width)
+                        // Bottom row: Activity (full width)
                         _FeatureCard(
-                          title: 'Reminders',
-                          description: 'Stay on top of your\nimportant tasks',
-                          icon: Icons.notifications_outlined,
-                          iconColor: U.lavender,
-                          statLabel: '$_upcomingReminders upcoming',
-                          statColor: U.lavender,
+                          title: 'Activity',
+                          description: 'Track your habits\nand progress',
+                          icon: Icons.grid_view_rounded,
+                          iconColor: U.peach,
+                          statLabel: '$_activeHabits habits active',
+                          statColor: U.peach,
                           delay: 600,
                           isWide: true,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                            MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
                           ).then((_) => _loadData()),
                         ),
                       ],
@@ -602,24 +602,28 @@ class _FeatureCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
+                  color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.22 : 0.15),
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.35 : 0.25),
+                    width: 1,
+                  ),
                 ),
                 child: Icon(icon, color: iconColor, size: 22),
               ),
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: U.surface.withValues(alpha: 0.7),
+                  color: Colors.white.withValues(alpha: 0.18),
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: U.border.withValues(alpha: 0.5),
+                    color: Colors.white.withValues(alpha: 0.12),
                     width: 0.5,
                   ),
                 ),
                 child: Icon(
                   Icons.chevron_right_rounded,
-                  color: U.dim,
+                  color: U.text.withValues(alpha: 0.8),
                   size: 16,
                 ),
               ),
@@ -682,8 +686,12 @@ class _FeatureCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
+            color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.22 : 0.15),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.35 : 0.25),
+              width: 1,
+            ),
           ),
           child: Icon(icon, color: iconColor, size: 24),
         ),
@@ -736,16 +744,16 @@ class _FeatureCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(7),
           decoration: BoxDecoration(
-            color: U.surface.withValues(alpha: 0.7),
+            color: Colors.white.withValues(alpha: 0.18),
             shape: BoxShape.circle,
             border: Border.all(
-              color: U.border.withValues(alpha: 0.5),
+              color: Colors.white.withValues(alpha: 0.12),
               width: 0.5,
             ),
           ),
           child: Icon(
             Icons.chevron_right_rounded,
-            color: U.dim,
+            color: U.text.withValues(alpha: 0.8),
             size: 16,
           ),
         ),

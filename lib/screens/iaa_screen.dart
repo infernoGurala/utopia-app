@@ -654,7 +654,7 @@ class _IAAScreenState extends State<IAAScreen> {
 
   Widget _buildComposer(TextTheme textTheme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
       decoration: BoxDecoration(
         color: _backgroundColor,
       ),
@@ -685,31 +685,43 @@ class _IAAScreenState extends State<IAAScreen> {
                     vertical: 12,
                   ),
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
                 ),
                 onSubmitted: _sendMessage,
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: _initialized && !_isLoading
-                  ? U.primary
-                  : U.card,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: _initialized && !_isLoading
-                  ? () => _sendMessage(_controller.text)
-                  : null,
-              icon: Icon(
-                _isLoading
-                    ? Icons.more_horiz_rounded
-                    : Icons.send_rounded,
-                color: Colors.white,
-                size: 20,
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: _initialized && !_isLoading
+                ? () => _sendMessage(_controller.text)
+                : null,
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: _initialized && !_isLoading
+                    ? U.primary
+                    : U.card,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: U.primary.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Icon(
+                  _isLoading
+                      ? Icons.more_horiz_rounded
+                      : Icons.send_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),

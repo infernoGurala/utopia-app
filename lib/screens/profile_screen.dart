@@ -15,11 +15,11 @@ import '../services/cache_service.dart';
 import '../services/follow_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
-import 'developer_panel_screen.dart';
 import 'follow_requests_screen.dart';
 import 'university_selection_screen.dart';
 import 'user_profile_screen.dart';
-import 'iaa_screen.dart';
+import 'utopia_section_screen.dart';
+
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -96,30 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _launchBugReport() async {
-    final Uri emailLaunchUri = Uri(
-      scheme: 'mailto',
-      path: 'johnmosesg150@gmail.com',
-      query: 'subject=UTOPIA Bug Report / Suggestion',
-    );
-    try {
-      if (!await launchUrl(emailLaunchUri)) {
-        throw Exception('Could not launch email');
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: U.red,
-            content: Text(
-              'Could not open email app. Please email johnmosesg150@gmail.com directly.',
-              style: GoogleFonts.outfit(color: U.bg, fontSize: 13),
-            ),
-          ),
-        );
-      }
-    }
-  }
 
   void _restartApp() async {
     try {
@@ -473,25 +449,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Column(
                     children: [
-                      if (_isSuperUser) ...[
-                        _groupedTile(
-                          icon: Icons.admin_panel_settings_outlined,
-                          label: 'Super Controls',
-                          sub: 'Analytics, broadcasts, and app-wide settings',
-                          color: U.primary,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const DeveloperPanelScreen(),
-                            ),
-                          ),
-                        ),
-                        Divider(
-                          height: 1,
-                          thickness: 0.5,
-                          color: U.border.withValues(alpha: 0.5),
-                        ),
-                      ],
                       _groupedTile(
                         icon: Icons.person_add_outlined,
                         label: 'Follow Requests',
@@ -543,19 +500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // IAA Assistant
-                      _groupedTile(
-                        icon: Icons.auto_awesome_rounded,
-                        label: 'Intelligent Academic Assistant',
-                        sub: 'Get AI-powered insights',
-                        color: const Color(0xFF7F77DD),
-                        onTap: () => Navigator.of(context).push(IAAScreen.route()),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
 
                       // Share This App
                       _groupedTile(
@@ -572,13 +517,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Report Bugs & Suggestions
+                      // UTOPIA Section
                       _groupedTile(
-                        icon: Icons.bug_report_outlined,
-                        label: 'Report Bugs & Suggestions',
-                        sub: 'Help us improve UTOPIA',
-                        color: U.teal,
-                        onTap: _launchBugReport,
+                        icon: Icons.rocket_launch_outlined,
+                        label: 'UTOPIA',
+                        sub: 'Report bugs, developer controls, and app details',
+                        color: U.primary,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UtopiaSectionScreen(
+                              initialIsSuperUser: _isSuperUser,
+                            ),
+                          ),
+                        ),
                       ),
                       Divider(
                         height: 1,

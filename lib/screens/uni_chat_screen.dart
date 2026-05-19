@@ -264,34 +264,81 @@ class _UniChatScreenState extends State<UniChatScreen> {
             ),
           ),
           Container(
-            color: U.card,
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 8,
-              bottom: MediaQuery.paddingOf(context).bottom + 8,
+            color: U.bg,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              MediaQuery.paddingOf(context).bottom + 16,
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    style: GoogleFonts.outfit(color: U.text),
-                    decoration: InputDecoration(
-                      hintText: 'Message everyone...',
-                      hintStyle: GoogleFonts.outfit(color: U.sub),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: U.card,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 5,
+                      style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+                      decoration: InputDecoration(
+                        hintText: 'Message everyone...',
+                        hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+                        filled: true,
+                        fillColor: Colors.transparent,
+                        prefixIcon: Icon(Icons.forum_outlined, color: U.teal, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                      ),
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
                 ),
-                IconButton(
-                  onPressed: _send,
-                  icon: _sending 
-                      ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: U.primary, strokeWidth: 2))
-                      : Icon(Icons.send, color: U.primary),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: _send,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: U.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: U.primary.withValues(alpha: 0.15),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: _sending
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                    ),
+                  ),
                 ),
               ],
             ),
