@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -30,6 +29,7 @@ class _FocusScreenState extends State<FocusScreen> {
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
+  late final String _greetingText;
 
   static const _motivationalTexts = [
     'Small steps every day\nlead to big change.',
@@ -40,11 +40,81 @@ class _FocusScreenState extends State<FocusScreen> {
     'Progress, not perfection,\nis what matters.',
   ];
 
-  String get _greeting {
+  String _generateRandomGreeting() {
     final time = DateTime.now().hour + DateTime.now().minute / 60.0;
-    if (time >= 5.0 && time < 11.5) return 'Good morning';
-    if (time >= 11.5 && time < 16.0) return 'Good afternoon';
-    return 'Good evening';
+    final List<String> variants;
+    if (time >= 5.0 && time < 11.5) {
+      variants = const [
+        'Rise and shine',
+        'Good morning',
+        'Top of the morning',
+        'Have a beautiful morning',
+        'Wishing you a bright morning',
+        'Wake up and conquer',
+        'Hello, early bird',
+        'A fresh start today',
+        'Time to shine',
+        'Good morning, champion',
+        'Hope your day starts great',
+        'Good morning, legend',
+        'Start with a smile',
+        'Embrace the fresh day',
+        'Morning, superstar',
+        'Ready for a great day?',
+        'A beautiful morning to you',
+        'Make today count',
+        'Rise up and thrive',
+        'Hello there, sunshine',
+      ];
+    } else if (time >= 11.5 && time < 16.0) {
+      variants = const [
+        'Good afternoon',
+        'Hope your afternoon is great',
+        'Good afternoon, legend',
+        'Happy midday',
+        'Keep going strong',
+        'Crushing your day?',
+        'Stay focused this afternoon',
+        'A wonderful afternoon to you',
+        'Enjoy this beautiful afternoon',
+        'Afternoon, superstar',
+        'Halfway to your goals',
+        'Keep up the great momentum',
+        'Midday motivation is here',
+        'Hope your day is productive',
+        'Taking a breath?',
+        'Good afternoon, champion',
+        'Stay energized',
+        'Make the rest of the day count',
+        'Afternoon, early achiever',
+        'Doing amazing things today',
+      ];
+    } else {
+      variants = const [
+        'Good evening',
+        'Hope you had a great day',
+        'Good evening, legend',
+        'Unwind and relax',
+        'Time to ease into the evening',
+        'A peaceful evening to you',
+        'Evening, superstar',
+        'Reflect on today\'s wins',
+        'Hope your evening is cozy',
+        'Good evening, champion',
+        'Time to recharge',
+        'Rest well tonight',
+        'Evening, achiever',
+        'You did great today',
+        'Relax and reflect',
+        'Cozy evening vibes',
+        'Enjoy your evening rest',
+        'A calm evening to you',
+        'Great work today',
+        'Sunset vibes are here',
+      ];
+    }
+    final index = DateTime.now().microsecondsSinceEpoch % variants.length;
+    return variants[index];
   }
 
   String get _userName {
@@ -96,6 +166,7 @@ class _FocusScreenState extends State<FocusScreen> {
   @override
   void initState() {
     super.initState();
+    _greetingText = _generateRandomGreeting();
     _loadData();
     _loadQuote();
     _loadStats();
@@ -222,16 +293,40 @@ class _FocusScreenState extends State<FocusScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Utopia',
-                                style: GoogleFonts.playfairDisplay(
-                                  fontSize: 42,
-                                  fontWeight: FontWeight.w700,
-                                  color: _onImageTitleColor,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: -1.5,
-                                  height: 1.1,
-                                ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Utopia',
+                                    style: GoogleFonts.playfairDisplay(
+                                      fontSize: 42,
+                                      fontWeight: FontWeight.w700,
+                                      color: _onImageTitleColor,
+                                      fontStyle: FontStyle.italic,
+                                      letterSpacing: -1.5,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 0),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Transform.rotate(
+                                      angle: 30 * 3.1415926535 / 180,
+                                      child: Transform.scale(
+                                        scaleX: -1,
+                                        child: Image.asset(
+                                          'assets/focus screen/leaves.png',
+                                          width: 22,
+                                          height: 22,
+                                          fit: BoxFit.contain,
+                                          color: _onImageTitleColor,
+                                          colorBlendMode: BlendMode.srcIn,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -366,8 +461,8 @@ class _FocusScreenState extends State<FocusScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$_greeting, $_userName',
-                              style: GoogleFonts.outfit(
+                              _userName.isEmpty ? _greetingText : '$_greetingText, $_userName',
+                              style: GoogleFonts.gayathri(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w700,
                                 color: _greetingColor,
