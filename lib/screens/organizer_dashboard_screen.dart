@@ -92,13 +92,13 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
                             'My Events',
                             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: U.text),
                           ),
-                          TextButton.icon(
+                          GradientDotButton(
                             onPressed: () async {
                               await Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateEventScreen()));
                               _loadData();
                             },
-                            icon: Icon(Icons.add_rounded, color: U.primary, size: 18),
-                            label: Text('Create New', style: GoogleFonts.outfit(color: U.primary)),
+                            icon: Icons.add_rounded,
+                            label: 'Create New',
                           ),
                         ],
                       ),
@@ -882,10 +882,114 @@ class _MeshPainter extends CustomPainter {
       size.height * 0.5 + math.sin(progress * 2 * math.pi) * 30,
     );
     canvas.drawCircle(center2, 65, paintBlob);
+
+    // Draw dots pattern overlay
+    final dotPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.05)
+      ..style = PaintingStyle.fill;
+    const spacing = 12.0;
+    const dotRadius = 1.0;
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant _MeshPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
+}
+
+class GradientDotButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final String label;
+  final IconData icon;
+
+  const GradientDotButton({
+    super.key,
+    required this.onPressed,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [U.primary, U.teal],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: U.primary.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _DotsPatternPainter(),
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white, size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DotsPatternPainter extends CustomPainter {
+  final double spacing;
+  final double dotRadius;
+  final double opacity;
+
+  _DotsPatternPainter({
+    this.spacing = 8.0,
+    this.dotRadius = 1.0,
+    this.opacity = 0.08,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: opacity)
+      ..style = PaintingStyle.fill;
+
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotsPatternPainter oldDelegate) => false;
 }
