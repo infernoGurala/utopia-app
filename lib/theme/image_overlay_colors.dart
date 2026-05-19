@@ -33,7 +33,7 @@ class ImageOverlayColors {
   static const _catppuccinLatte = {
     'morning':   _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
     'afternoon': _Quad(Color(0xFF211047), Color(0xFF141438), Color(0xFF110826), Color(0xFF1F0F42)), // ← change me
-    'evening':   _Quad(Color(0xFFFDFDFC), Color(0xFFC7C7C7), Color(0xFFE8E8E8), Color(0xFFC7C7C7)), // ← change me
+    'evening':   _Quad(Color(0xFFBAA3FF), Color(0xFFC7C7C7), Color(0xFFE8E8E8), Color(0xFFC7C7C7)), // ← change me
     'night':     _Quad(Color(0xFF834ACF), Color(0xFF9093B0), Color(0xFFDCE0E8), Color(0xFFBCC0CC)), // ← change me
   };
 
@@ -73,7 +73,7 @@ class ImageOverlayColors {
   static const _gruvbox = {
     'morning':   _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFFF292821)),
     'afternoon': _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFFF292821)),
-    'evening':   _Quad(Color(0xFFFB4934), Color(0xFFC4B59C), Color(0xFFC4B59C), Color(0xFFC4B59C)),
+    'evening':   _Quad(Color(0xFFFB4934), Color(0xFFC4B59C), Color(0xFFDBCFBF), Color(0xFFC4B59C)),
     'night':     _Quad(Color(0xFFFB4934), Color(0xFFC4B59C), Color(0xFFC4B59C), Color(0xFFC4B59C)),
   };
 
