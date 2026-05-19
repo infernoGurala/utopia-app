@@ -23,7 +23,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   
   bool _loading = true;
-  bool _markDoneEnabled = true;
+  bool _allowDeleteEnabled = true;
   FocusNote? _note;
   FocusUserHabits? _userHabits;
   Set<String> _noteDates = {};
@@ -51,7 +51,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   Future<void> _init() async {
     await _service.initialize();
     final prefs = await SharedPreferences.getInstance();
-    _markDoneEnabled = prefs.getBool('daily_note_mark_done') ?? true;
+    _allowDeleteEnabled = prefs.getBool('daily_note_allow_delete') ?? true;
     await _loadData();
     await _loadMonthDots();
   }
@@ -308,17 +308,17 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
               const SizedBox(height: 8),
               Container(width: 32, height: 4, decoration: BoxDecoration(color: U.dim, borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 16),
-              // Mark Done toggle
+              // Allow Delete toggle
               SwitchListTile(
-                secondary: Icon(Icons.check_circle_outline_rounded, color: U.sub, size: 22),
-                title: Text('Allow Mark Done', style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w500)),
-                subtitle: Text('Tap checkboxes to toggle completion', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
-                value: _markDoneEnabled,
+                secondary: Icon(Icons.delete_outline_rounded, color: U.sub, size: 22),
+                title: Text('Allow Delete Tasks', style: GoogleFonts.outfit(color: U.text, fontSize: 15, fontWeight: FontWeight.w500)),
+                subtitle: Text('Show delete (x) button next to tasks', style: GoogleFonts.outfit(color: U.sub, fontSize: 12)),
+                value: _allowDeleteEnabled,
                 activeTrackColor: U.primary,
                 onChanged: (v) async {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('daily_note_mark_done', v);
-                  setSheetState(() => _markDoneEnabled = v);
+                  await prefs.setBool('daily_note_allow_delete', v);
+                  setSheetState(() => _allowDeleteEnabled = v);
                   setState(() {});
                 },
               ),
@@ -1450,7 +1450,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _AnimatedCheckbox(checked: checked, enabled: _markDoneEnabled, onTap: onTap),
+          _AnimatedCheckbox(checked: checked, enabled: true, onTap: onTap),
           Expanded(
             child: GestureDetector(
               onTap: onTextTap,
@@ -1467,17 +1467,18 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
               ),
             ),
           ),
-          if (isTask && onDelete != null)
+          if (isTask && onDelete != null && _allowDeleteEnabled)
             GestureDetector(
               onTap: onDelete,
+              behavior: HitTestBehavior.opaque,
               child: Padding(
-                padding: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.only(left: 8, right: 16, top: 4, bottom: 4),
                 child: Text(
                   'x',
                   style: GoogleFonts.inter(
-                    color: U.text.withValues(alpha: 0.35),
-                    fontSize: 14,
-                    letterSpacing: 0.2,
+                    color: U.text.withValues(alpha: 0.45),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
