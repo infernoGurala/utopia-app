@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 import 'create_event_screen.dart';
+import '../widgets/utopia_snackbar.dart';
 
 class OrganizerDashboardScreen extends StatefulWidget {
   const OrganizerDashboardScreen({super.key});
@@ -324,9 +325,27 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
               }),
               _buildIconBtn(Icons.people_outline_rounded, 'Participants', () async {
                 if (event.id == null) return;
-                final regs = await EventService.instance.getRegistrations(event.id!);
-                if (mounted) {
-                  _showParticipantsDialog(event.title, regs);
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: UtopiaLoader(scale: 0.7)),
+                );
+                try {
+                  final regs = await EventService.instance.getRegistrations(event.id!);
+                  final certs = await EventService.instance.getEventCertificates(event.id!);
+                  if (mounted) {
+                    Navigator.pop(context); // Dismiss loader
+                    _showParticipantsDialog(event, regs, certs);
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Dismiss loader
+                    showUtopiaSnackBar(
+                      context,
+                      message: 'Error loading participants: $e',
+                      tone: UtopiaSnackBarTone.error,
+                    );
+                  }
                 }
               }),
               _buildIconBtn(Icons.delete_outline_rounded, 'Delete', () => _confirmDelete(event), iconColor: U.red),
@@ -408,45 +427,242 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
     );
   }
 
-  void _showParticipantsDialog(String eventTitle, List<EventRegistration> regs) {
+  void _showParticipantsDialog(
+    EventModel event,
+    List<EventRegistration> regs,
+    List<EventCertificate> initialCerts,
+  ) {
+    final certs = List<EventCertificate>.from(initialCerts);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: U.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('$eventTitle — Participants', style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600)),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: regs.isEmpty
-              ? Center(child: Text('No registrations yet', style: GoogleFonts.outfit(color: U.sub)))
-              : ListView.builder(
-                  itemCount: regs.length,
-                  itemBuilder: (context, index) {
-                    final r = regs[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: U.primary.withValues(alpha: 0.1),
-                        child: Text(
-                          r.userName.isNotEmpty ? r.userName[0].toUpperCase() : '?',
-                          style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      title: Text(r.userName, style: GoogleFonts.outfit(color: U.text)),
-                      subtitle: Text(r.ticketId ?? '', style: GoogleFonts.outfit(color: U.dim, fontSize: 11)),
-                      trailing: r.checkedIn
-                          ? Icon(Icons.check_circle_rounded, color: U.teal, size: 20)
-                          : Icon(Icons.circle_outlined, color: U.dim, size: 20),
-                    );
-                  },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: U.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              '${event.title} — Participants',
+              style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 350,
+              child: regs.isEmpty
+                  ? Center(child: Text('No registrations yet', style: GoogleFonts.outfit(color: U.sub)))
+                  : ListView.builder(
+                      itemCount: regs.length,
+                      itemBuilder: (context, index) {
+                        final r = regs[index];
+                        final isIssued = certs.any((c) => c.userId == r.userId);
+                        
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: U.primary.withValues(alpha: 0.1),
+                            child: Text(
+                              r.userName.isNotEmpty ? r.userName[0].toUpperCase() : '?',
+                              style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          title: Text(
+                            r.userName,
+                            style: GoogleFonts.outfit(color: U.text, fontSize: 14, fontWeight: FontWeight.w500),
+                          ),
+                          subtitle: Row(
+                            children: [
+                              Text(r.ticketId ?? '', style: GoogleFonts.outfit(color: U.dim, fontSize: 11)),
+                              const SizedBox(width: 6),
+                              if (r.checkedIn)
+                                Icon(Icons.check_circle_rounded, color: U.teal, size: 14)
+                              else
+                                Icon(Icons.circle_outlined, color: U.dim, size: 14),
+                            ],
+                          ),
+                          trailing: isIssued
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: U.teal.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: U.teal.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.verified_user_rounded, color: U.teal, size: 12),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Issued',
+                                        style: GoogleFonts.outfit(color: U.teal, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : TextButton.icon(
+                                  onPressed: () => _awardCertificatePrompt(context, event, r, (newCert) {
+                                    setState(() {
+                                      certs.add(newCert);
+                                    });
+                                  }),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    backgroundColor: U.primary.withValues(alpha: 0.1),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    foregroundColor: U.primary,
+                                  ),
+                                  icon: Icon(Icons.workspace_premium_rounded, size: 14),
+                                  label: Text(
+                                    'Award',
+                                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close', style: GoogleFonts.outfit(color: U.primary)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _awardCertificatePrompt(
+    BuildContext dialogContext,
+    EventModel event,
+    EventRegistration registration,
+    Function(EventCertificate) onIssued,
+  ) {
+    final urlController = TextEditingController();
+    bool issuing = false;
+
+    showDialog(
+      context: dialogContext,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setPromptState) {
+          return AlertDialog(
+            backgroundColor: U.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              'Award Certificate',
+              style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Issue a certificate of participation to ${registration.userName}.',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
                 ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Close', style: GoogleFonts.outfit(color: U.primary)),
-          ),
-        ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: urlController,
+                  enabled: !issuing,
+                  style: GoogleFonts.outfit(color: U.text, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Certificate URL (Optional)',
+                    hintText: 'e.g. https://drive.google.com/...',
+                    labelStyle: GoogleFonts.outfit(color: U.text, fontSize: 12),
+                    hintStyle: GoogleFonts.outfit(color: U.dim, fontSize: 12),
+                    filled: true,
+                    fillColor: U.card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: U.primary, width: 1.2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: issuing ? null : () => Navigator.pop(context),
+                child: Text('Cancel', style: GoogleFonts.outfit(color: U.dim)),
+              ),
+              FilledButton(
+                onPressed: issuing
+                    ? null
+                    : () async {
+                        setPromptState(() => issuing = true);
+                        try {
+                          final certUrl = urlController.text.trim().isNotEmpty
+                              ? urlController.text.trim()
+                              : 'https://utopia-app.web.app/certificates/default.pdf';
+                          
+                          final success = await EventService.instance.issueCertificate(
+                            eventId: event.id!,
+                            eventTitle: event.title,
+                            userId: registration.userId,
+                            issuerName: event.organizerName.isNotEmpty ? event.organizerName : 'Utopia Organizer',
+                            certificateUrl: certUrl,
+                          );
+
+                          if (success) {
+                            final newCert = EventCertificate(
+                              eventId: event.id!,
+                              eventTitle: event.title,
+                              userId: registration.userId,
+                              issuerName: event.organizerName.isNotEmpty ? event.organizerName : 'Utopia Organizer',
+                              certificateUrl: certUrl,
+                              issuedAt: DateTime.now(),
+                            );
+                            onIssued(newCert);
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close award prompt
+                              showUtopiaSnackBar(
+                                dialogContext,
+                                message: 'Certificate awarded to ${registration.userName} successfully!',
+                                tone: UtopiaSnackBarTone.success,
+                              );
+                            }
+                          } else {
+                            throw Exception('Database insertion returned false');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            setPromptState(() => issuing = false);
+                            showUtopiaSnackBar(
+                              context,
+                              message: 'Failed to issue certificate: $e',
+                              tone: UtopiaSnackBarTone.error,
+                            );
+                          }
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: U.primary,
+                  foregroundColor: U.bg,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: issuing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Text('Award', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
