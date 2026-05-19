@@ -222,6 +222,18 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
+    final contactNum = _contactController.text.trim();
+    final digitsOnly = contactNum.replaceAll(RegExp(r'\D'), '');
+    String cleanNum = digitsOnly;
+    if (digitsOnly.length == 12 && digitsOnly.startsWith('91')) {
+      cleanNum = digitsOnly.substring(2);
+    }
+    if (cleanNum.length != 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Contact number must be exactly 10 digits', style: GoogleFonts.outfit())),
+      );
+      return;
+    }
     if (_participationLinkController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Participation link is required (e.g. Microsoft Form link)', style: GoogleFonts.outfit())),

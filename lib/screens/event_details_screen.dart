@@ -1035,7 +1035,13 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           runSpacing: 8,
           children: [
             if (_event.providesAttendance) _buildBadge('Attendance', U.teal),
-            if (_event.requiresPayment) _buildBadge('Paid Entry', U.peach),
+            if (_event.requiresPayment)
+              _buildBadge(
+                _event.feeAmount != null && _event.feeAmount!.isNotEmpty
+                    ? 'Paid Entry: ${_event.feeAmount}'
+                    : 'Paid Entry',
+                U.peach,
+              ),
             if (_event.providesCertificate) _buildBadge('Certificate', U.primary),
           ],
         ),
