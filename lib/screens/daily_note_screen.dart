@@ -40,6 +40,13 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
 
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
+  bool get _isToday {
+    final now = DateTime.now();
+    return _selectedDate.year == now.year &&
+        _selectedDate.month == now.month &&
+        _selectedDate.day == now.day;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1527,69 +1534,71 @@ Future<void> _editHabits() async {
               onTextTap: () => _showEditTaskSheet(i, tasks[i]['label']),
               onDelete: () => _deleteTask(i),
             ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: accent.withValues(alpha: 0.45), width: 2)),
-            ),
-            padding: const EdgeInsets.only(left: 12),
-            child: TextSelectionTheme(
-              data: TextSelectionThemeData(
-                cursorColor: accent,
-                selectionColor: accent.withValues(alpha: 0.15),
-                selectionHandleColor: accent,
+          if (_isToday) ...[
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                border: Border(left: BorderSide(color: accent.withValues(alpha: 0.45), width: 2)),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _taskController,
-                      style: GoogleFonts.inter(color: U.text, fontSize: 17),
-                      cursorColor: accent,
-                      cursorWidth: 1.5,
-                      cursorRadius: const Radius.circular(10),
-                      decoration: InputDecoration(
-                        hintText: 'Add a task...',
-                        hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
-                        border: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        filled: false,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
+              padding: const EdgeInsets.only(left: 12),
+              child: TextSelectionTheme(
+                data: TextSelectionThemeData(
+                  cursorColor: accent,
+                  selectionColor: accent.withValues(alpha: 0.15),
+                  selectionHandleColor: accent,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _taskController,
+                        style: GoogleFonts.inter(color: U.text, fontSize: 17),
+                        cursorColor: accent,
+                        cursorWidth: 1.5,
+                        cursorRadius: const Radius.circular(10),
+                        decoration: InputDecoration(
+                          hintText: 'Add a task...',
+                          hintStyle: GoogleFonts.inter(color: U.text.withValues(alpha: 0.35), fontSize: 17),
+                          border: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding: EdgeInsets.zero,
+                          isDense: true,
+                        ),
+                        onSubmitted: (val) => _addTask(val),
                       ),
-                      onSubmitted: (val) => _addTask(val),
                     ),
-                  ),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _taskController,
-                    builder: (context, value, child) {
-                      final showButton = value.text.trim().isNotEmpty;
-                      return AnimatedOpacity(
-                        opacity: showButton ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 150),
-                        child: AnimatedScale(
-                          scale: showButton ? 1.0 : 0.8,
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _taskController,
+                      builder: (context, value, child) {
+                        final showButton = value.text.trim().isNotEmpty;
+                        return AnimatedOpacity(
+                          opacity: showButton ? 1.0 : 0.0,
                           duration: const Duration(milliseconds: 150),
-                          child: IgnorePointer(
-                            ignoring: !showButton,
-                            child: IconButton(
-                              icon: Icon(Icons.arrow_upward_rounded, color: accent, size: 22),
-                              splashColor: accent.withValues(alpha: 0.1),
-                              highlightColor: Colors.transparent,
-                              onPressed: () {
-                                _addTask(_taskController.text);
-                              },
+                          child: AnimatedScale(
+                            scale: showButton ? 1.0 : 0.8,
+                            duration: const Duration(milliseconds: 150),
+                            child: IgnorePointer(
+                              ignoring: !showButton,
+                              child: IconButton(
+                                icon: Icon(Icons.arrow_upward_rounded, color: accent, size: 22),
+                                splashColor: accent.withValues(alpha: 0.1),
+                                highlightColor: Colors.transparent,
+                                onPressed: () {
+                                  _addTask(_taskController.text);
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1657,15 +1666,16 @@ Future<void> _editHabits() async {
     required VoidCallback? onTextTap,
     VoidCallback? onDelete,
   }) {
+    final enabled = _isToday;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _AnimatedCheckbox(checked: checked, enabled: true, onTap: onTap),
+          _AnimatedCheckbox(checked: checked, enabled: enabled, onTap: onTap),
           Expanded(
             child: GestureDetector(
-              onTap: onTextTap,
+              onTap: enabled ? onTextTap : null,
               behavior: HitTestBehavior.opaque,
               child: _StrikeThroughText(
                 text: label,
@@ -1679,7 +1689,7 @@ Future<void> _editHabits() async {
               ),
             ),
           ),
-          if (isTask && onDelete != null && _allowDeleteEnabled)
+          if (isTask && onDelete != null && _allowDeleteEnabled && enabled)
             GestureDetector(
               onTap: onDelete,
               behavior: HitTestBehavior.opaque,
@@ -1901,7 +1911,9 @@ class _AnimatedCheckboxState extends State<_AnimatedCheckbox> with SingleTickerP
             margin: const EdgeInsets.only(right: 12),
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: Color.lerp(const Color(0xFFDDDDDD), const Color(0xFF08BB68), _controller.value),
+              color: widget.enabled
+                  ? Color.lerp(const Color(0xFFDDDDDD), const Color(0xFF08BB68), _controller.value)
+                  : Color.lerp(const Color(0xFFE5E5E5), const Color(0xFFB5E2CD), _controller.value),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Center(
