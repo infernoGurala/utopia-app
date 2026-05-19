@@ -47,9 +47,9 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
 
       final events = results[0] as List<EventModel>;
       final analytics = results[1] as Map<String, dynamic>;
-      final userDoc = results[2] as DocumentSnapshot<Map<String, dynamic>>;
+      final userDoc = results[2] as DocumentSnapshot;
 
-      final data = userDoc.data();
+      final data = userDoc.data() as Map<String, dynamic>?;
       final rollNumber = data?['rollNumber'] as String? ?? '';
       final name = data?['displayName'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? '';
 
@@ -266,8 +266,10 @@ class _OrganizerDashboardScreenState extends State<OrganizerDashboardScreen> {
 
                     final user = FirebaseAuth.instance.currentUser;
                     if (user != null) {
-                      await user.updateDisplayName(newName);
-                      await user.reload();
+                      try {
+                        await user.updateDisplayName(newName);
+                        await user.reload();
+                      } catch (_) {}
                     }
 
                     if (mounted) {
