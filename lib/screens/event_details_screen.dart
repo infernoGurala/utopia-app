@@ -10,6 +10,7 @@ import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/role_service.dart';
+import '../widgets/utopia_loader.dart';
 import 'event_chat_screen.dart';
 import 'qr_ticket_screen.dart';
 
@@ -69,6 +70,21 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
 
   Future<void> _toggleRegistration() async {
     if (_event.id == null) return;
+
+    if (!_isRegistered && _event.participationLink != null && _event.participationLink!.isNotEmpty) {
+      try {
+        final uri = Uri.parse(_event.participationLink!);
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not open participation link: $e', style: GoogleFonts.outfit())),
+          );
+        }
+      }
+      return;
+    }
+
     setState(() => _isRegistering = true);
     try {
       if (_isRegistered) {
@@ -188,7 +204,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
                         const SizedBox(height: 24),
                         _buildTags(),
                       ],
-                      if (_event.whatsappLink != null || _event.participationLink != null) ...[
+                      if (_event.whatsappLink != null && _event.whatsappLink!.isNotEmpty) ...[
                         const SizedBox(height: 24),
                         _buildLinks(),
                       ],
@@ -423,6 +439,9 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   Widget _buildInfoSection() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final isAuthorized = _isAdmin || _event.organizerUid == uid;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -443,7 +462,10 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           _buildInfoRow(
             Icons.groups_rounded,
             '${_event.participantCount} registered${_event.participantLimit > 0 ? ' / ${_event.participantLimit} max' : ''}',
-            _event.isFull ? 'Event is full' : 'View participants',
+            isAuthorized 
+                ? 'Tap to view participants list' 
+                : (_event.isFull ? 'Event is full' : 'View participants'),
+            onTap: isAuthorized ? _showParticipants : null,
           ),
           if (_event.contactNumbers.isNotEmpty) ...[
             _buildDivider(),
@@ -469,8 +491,8 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String primary, String secondary) {
-    return Row(
+  Widget _buildInfoRow(IconData icon, String primary, String secondary, {VoidCallback? onTap}) {
+    final row = Row(
       children: [
         Container(
           padding: const EdgeInsets.all(10),
@@ -487,7 +509,95 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
             ],
           ),
         ),
+        if (onTap != null) ...[
+          const SizedBox(width: 8),
+          Icon(Icons.arrow_forward_ios_rounded, size: 14, color: U.dim),
+        ],
       ],
+    );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: row,
+        ),
+      );
+    }
+    return row;
+  }
+
+  void _showParticipants() async {
+    if (_event.id == null) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: UtopiaLoader(scale: 0.7)),
+    );
+
+    try {
+      final regs = await EventService.instance.getRegistrations(_event.id!);
+      Navigator.pop(context); // Dismiss loading dialog
+      
+      if (mounted) {
+        _showParticipantsDialog(_event.title, regs);
+      }
+    } catch (e) {
+      Navigator.pop(context); // Dismiss loading dialog
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading participants: $e', style: GoogleFonts.outfit())),
+        );
+      }
+    }
+  }
+
+  void _showParticipantsDialog(String eventTitle, List<EventRegistration> regs) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: U.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          '$eventTitle — Participants',
+          style: GoogleFonts.outfit(color: U.text, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: regs.isEmpty
+              ? Center(child: Text('No registrations yet', style: GoogleFonts.outfit(color: U.sub)))
+              : ListView.builder(
+                  itemCount: regs.length,
+                  itemBuilder: (context, index) {
+                    final r = regs[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: U.primary.withValues(alpha: 0.1),
+                        child: Text(
+                          r.userName.isNotEmpty ? r.userName[0].toUpperCase() : '?',
+                          style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      title: Text(r.userName, style: GoogleFonts.outfit(color: U.text)),
+                      subtitle: Text(r.ticketId ?? '', style: GoogleFonts.outfit(color: U.dim, fontSize: 11)),
+                      trailing: r.checkedIn
+                          ? Icon(Icons.check_circle_rounded, color: U.teal, size: 20)
+                          : Icon(Icons.circle_outlined, color: U.dim, size: 20),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: GoogleFonts.outfit(color: U.primary)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -607,8 +717,6 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
         const SizedBox(height: 8),
         if (_event.whatsappLink != null && _event.whatsappLink!.isNotEmpty)
           _buildLinkTile(Icons.chat_rounded, 'WhatsApp Group', _event.whatsappLink!, U.teal),
-        if (_event.participationLink != null && _event.participationLink!.isNotEmpty)
-          _buildLinkTile(Icons.open_in_new_rounded, 'Participation Link', _event.participationLink!, U.primary),
       ],
     ).animate().fadeIn(delay: 500.ms);
   }
@@ -616,9 +724,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   Widget _buildLinkTile(IconData icon, String label, String url, Color color) {
     return InkWell(
       onTap: () async {
-        final uri = Uri.parse(url);
-        if (await canLaunchUrl(uri)) {
+        try {
+          final uri = Uri.parse(url);
           await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open link: $e', style: GoogleFonts.outfit())),
+            );
+          }
         }
       },
       borderRadius: BorderRadius.circular(12),

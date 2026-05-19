@@ -382,6 +382,34 @@ class EventService {
     }
   }
 
+  /// Get events liked/saved by the current user.
+  Future<List<EventModel>> getLikedEvents() async {
+    final uid = _uid;
+    if (uid == null) return [];
+    try {
+      final response = await _sb
+          .from('event_likes')
+          .select('event_id')
+          .eq('user_id', uid);
+      final eventIds = List<Map<String, dynamic>>.from(response)
+          .map((m) => m['event_id'] as String)
+          .toList();
+      if (eventIds.isEmpty) return [];
+      
+      final eventsResponse = await _sb
+          .from('events')
+          .select()
+          .inFilter('id', eventIds);
+      
+      return List<Map<String, dynamic>>.from(eventsResponse)
+          .map((m) => EventModel.fromMap(m))
+          .toList();
+    } catch (e) {
+      debugPrint('Failed to get liked events: $e');
+      return [];
+    }
+  }
+
   // ─── Chat ──────────────────────────────────────────────────────
 
   /// Send a chat message in an event.
