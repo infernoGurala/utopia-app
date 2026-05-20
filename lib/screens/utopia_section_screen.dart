@@ -8,8 +8,10 @@ import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../main.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/role_service.dart';
 import 'developer_panel_screen.dart';
+import 'legal_policies_screen.dart';
 
 class CreatorApp {
   final String name;
@@ -52,6 +54,7 @@ class UtopiaSectionScreen extends StatefulWidget {
 
 class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsBindingObserver {
   bool _isSuperUser = false;
+  String _appVersion = '1.0.0';
   final _channel = const MethodChannel('utopia_app/app_update');
   
   final List<CreatorApp> _creatorApps = [
@@ -85,7 +88,19 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
         setState(() => _isSuperUser = v);
       }
     });
+    _loadAppVersion();
     _refreshApps();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = packageInfo.version;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -411,7 +426,7 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'App Version 1.0.0',
+                    'App Version $_appVersion',
                     style: GoogleFonts.outfit(
                       color: U.sub,
                       fontSize: 12,
@@ -439,6 +454,24 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
                     sub: 'Help us improve UTOPIA',
                     color: U.teal,
                     onTap: _launchBugReport,
+                  ),
+                  Divider(
+                    height: 1,
+                    thickness: 0.5,
+                    color: U.border.withValues(alpha: 0.5),
+                  ),
+                  // Legal & Privacy Policies
+                  _groupedTile(
+                    icon: Icons.gavel_outlined,
+                    label: 'Legal & Policies',
+                    sub: 'Terms, privacy, and academic guidelines',
+                    color: U.primary,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LegalPoliciesScreen(),
+                      ),
+                    ),
                   ),
 
                   if (_isSuperUser) ...[

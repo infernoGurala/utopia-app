@@ -21,6 +21,8 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:utopia_app/models/focus_models.dart';
+import 'package:utopia_app/services/user_timetable_service.dart';
+import 'package:utopia_app/models/user_timetable.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -625,86 +627,159 @@ class NotificationService {
       } catch (_) {}
       final localLocation = tz.local;
 
+      // Cancel all existing timetable notifications
       await _localNotifications.cancel(100);
+      for (int i = 101; i <= 106; i++) {
+        await _localNotifications.cancel(i);
+      }
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('timetable_notif_hour', hour);
       await prefs.setInt('timetable_notif_minute', minute);
       await prefs.setBool('timetable_notif_enabled', true);
 
-      final now = tz.TZDateTime.now(localLocation);
-      var scheduledDate = tz.TZDateTime(
-        localLocation,
-        now.year,
-        now.month,
-        now.day,
-        hour,
-        minute,
-      );
-      if (scheduledDate.isBefore(now)) {
-        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      UserTimetable? timetable;
+      try {
+        timetable = await UserTimetableService.getTimetable();
+      } catch (e) {
+        debugPrint("NOTIF: Could not fetch timetable for dynamic scheduling: $e");
       }
 
-      debugPrint("NOTIF: Scheduling timetable notification for $scheduledDate");
+      if (timetable == null || timetable.week.isEmpty) {
+        // Fallback to scheduling a single daily notification with generic text
+        debugPrint("NOTIF: Timetable is empty, scheduling generic notification.");
+        final now = tz.TZDateTime.now(localLocation);
+        var scheduledDate = tz.TZDateTime(
+          localLocation,
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        );
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
 
-      // Try exact scheduling first
-      try {
-        await _localNotifications.zonedSchedule(
-          100,
-          'Your Daily Timetable',
-          'Time to check your classes for today!',
-          scheduledDate,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'utopia_high_importance',
-              'UTOPIA Notifications',
-              channelDescription: 'Daily timetable reminders',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.exact,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
+        await _scheduleSingleZoned(
+          id: 100,
+          title: 'Daily Timetable',
+          body: 'Time to check your classes for today!',
+          scheduledDate: scheduledDate,
+          components: DateTimeComponents.time,
         );
-        debugPrint(
-          "NOTIF: Timetable notification scheduled successfully (exact)",
-        );
-      } catch (e) {
-        debugPrint("NOTIF: Exact scheduling failed ($e), trying inexact...");
-        // Fallback to inexact scheduling (doesn't require special permission)
-        await _localNotifications.zonedSchedule(
-          100,
-          'Your Daily Timetable',
-          'Time to check your classes for today!',
-          scheduledDate,
-          NotificationDetails(
-            android: AndroidNotificationDetails(
-              'utopia_high_importance',
-              'UTOPIA Notifications',
-              channelDescription: 'Daily timetable reminders',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: DateTimeComponents.time,
-        );
-        debugPrint(
-          "NOTIF: Timetable notification scheduled with fallback (inexact)",
-        );
+      } else {
+        // Schedule 6 weekly notifications, one for each weekday (1 = Monday, 6 = Saturday)
+        debugPrint("NOTIF: Timetable found, scheduling weekly weekday notifications.");
+        final now = tz.TZDateTime.now(localLocation);
+        final dayPrefixes = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+        for (int i = 1; i <= 6; i++) {
+          final targetWeekday = i; // 1 = Monday, 6 = Saturday
+          var scheduledDate = tz.TZDateTime(
+            localLocation,
+            now.year,
+            now.month,
+            now.day,
+            hour,
+            minute,
+          );
+          while (scheduledDate.weekday != targetWeekday || scheduledDate.isBefore(now)) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+
+          final prefix = dayPrefixes[i - 1];
+          final dayData = timetable.week.firstWhere(
+            (d) => d.day.toLowerCase().startsWith(prefix),
+            orElse: () => const TimetableDay(day: '', slots: []),
+          );
+
+          final activeSlots = dayData.slots
+              .map((s) => s.trim())
+              .where((s) => s.isNotEmpty)
+              .toList();
+
+          String bodyText = 'No classes today! Enjoy your free time.';
+          if (activeSlots.isNotEmpty) {
+            bodyText = 'Today\'s Classes: ${activeSlots.join(", ")}';
+          }
+
+          final dayId = 100 + i;
+          await _scheduleSingleZoned(
+            id: dayId,
+            title: 'Your Timetable for ${dayData.day.isNotEmpty ? dayData.day : prefix.toUpperCase()}',
+            body: bodyText,
+            scheduledDate: scheduledDate,
+            components: DateTimeComponents.dayOfWeekAndTime,
+          );
+        }
       }
       return true;
     } catch (e) {
       debugPrint("NOTIF: Failed to schedule timetable notification: $e");
       return false;
+    }
+  }
+
+  // Private helper to avoid code duplication and support robust exact/inexact fallback
+  static Future<void> _scheduleSingleZoned({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required DateTimeComponents components,
+  }) async {
+    try {
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'utopia_high_importance',
+            'UTOPIA Notifications',
+            channelDescription: 'Daily timetable reminders',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: 'ic_notification',
+            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: components,
+      );
+      debugPrint("NOTIF: Timetable notification $id scheduled successfully (exact) for $scheduledDate");
+    } catch (e) {
+      debugPrint("NOTIF: Exact zoned schedule failed for $id ($e), trying inexact fallback...");
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'utopia_high_importance',
+            'UTOPIA Notifications',
+            channelDescription: 'Daily timetable reminders',
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: 'ic_notification',
+            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: components,
+      );
+      debugPrint("NOTIF: Timetable notification $id scheduled successfully (inexact) for $scheduledDate");
     }
   }
 
@@ -714,6 +789,10 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('timetable_notif_enabled', false);
       await _localNotifications.cancel(100);
+      for (int i = 101; i <= 106; i++) {
+        await _localNotifications.cancel(i);
+      }
+      debugPrint("NOTIF: Timetable notifications cancelled successfully.");
     } catch (e) {
       // Ignored
     }

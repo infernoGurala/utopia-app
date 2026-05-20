@@ -138,6 +138,15 @@ class CacheService {
     return rows.first['value'] as String?;
   }
 
+  Future<void> deleteAppSetting(String key) async {
+    final database = await db;
+    await database.delete(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+  }
+
   Future<void> saveFolders(List<Map<String, dynamic>> folders) async {
     final database = await db;
     final batch = database.batch();

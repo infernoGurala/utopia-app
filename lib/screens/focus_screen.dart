@@ -16,6 +16,7 @@ import 'profile_screen.dart';
 import 'reminders_screen.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
+import '../widgets/news_brief_dashboard_card.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -297,7 +298,7 @@ class _FocusScreenState extends State<FocusScreen> {
           if (left <= 0) {
             dailyNoteInsight = 'All habits completed! 🎉';
           } else {
-            dailyNoteInsight = '$left habits remaining';
+            dailyNoteInsight = '$left ${left == 1 ? "habit" : "habits"} remaining';
           }
         }
       } catch (e) {
@@ -725,122 +726,37 @@ class _FocusScreenState extends State<FocusScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        // Bottom row: Activity (full width)
-                        _FeatureCard(
-                          title: 'Activity',
-                          description: 'Track your habits\nand progress',
-                          icon: Icons.grid_view_rounded,
-                          iconColor: U.peach,
-                          statLabel: '$_activeHabits habits active',
-                          statColor: U.peach,
-                          delay: 600,
-                          isWide: true,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
-                          ).then((_) => _loadData()),
-                        ),
                       ],
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 12),
 
-                  // ── Motivational Quote Card ──
+                  // ── Today's Brief Card ──
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: NewsBriefDashboardCard(),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Activity (full width)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.4 : 0.75),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: U.border.withValues(alpha: 0.5),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: U.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.auto_awesome_rounded,
-                              color: U.primary.withValues(alpha: 0.7),
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _quote,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FontStyle.italic,
-                                    color: U.text,
-                                    height: 1.35,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _quoteSubtitle,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 12,
-                                    color: U.sub,
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_streakDays > 0) ...[
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: U.card,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: U.border, width: 0.5),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Day $_streakDays',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: U.text,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text('📈', style: TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ).animate()
-                        .fadeIn(delay: 700.ms, duration: 600.ms)
-                        .slideY(begin: 0.1, end: 0, delay: 700.ms, duration: 600.ms, curve: Curves.easeOut),
+                    child: _FeatureCard(
+                      title: 'Activity',
+                      description: 'Track your habits\nand progress',
+                      icon: Icons.grid_view_rounded,
+                      iconColor: U.peach,
+                      statLabel: '$_activeHabits habits active',
+                      statColor: U.peach,
+                      delay: 600,
+                      isWide: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
+                      ).then((_) => _loadData()),
+                    ),
                   ),
 
                   // Bottom padding for nav bar
