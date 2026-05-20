@@ -7,6 +7,11 @@ import '../models/event_model.dart';
 import '../screens/event_details_screen.dart';
 import 'aditya_logo_circle.dart';
 
+// Premium Events Card Palette
+const _kPurple = Color(0xFF7C3AED);
+const _kLavender = Color(0xFFA78BFA);
+const _kIndigo = Color(0xFF6366F1);
+
 class EventCard extends StatefulWidget {
   final EventModel event;
   final bool isLarge;
@@ -44,7 +49,7 @@ class _EventCardState extends State<EventCard> {
       case EventStatus.cancelled:
         return U.dim;
       default:
-        return U.primary;
+        return _kIndigo;
     }
   }
 
@@ -60,11 +65,11 @@ class _EventCardState extends State<EventCard> {
         width: width,
         height: height,
         placeholder: (_, __) => Container(
-          color: U.primary.withValues(alpha: 0.1),
+          color: _kPurple.withValues(alpha: 0.15),
           child: Center(
             child: SizedBox(
               width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: U.primary.withValues(alpha: 0.4)),
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: _kLavender.withValues(alpha: 0.5)),
             ),
           ),
         ),
@@ -119,12 +124,17 @@ class _EventCardState extends State<EventCard> {
           decoration: BoxDecoration(
             color: U.card,
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: U.border.withValues(alpha: 0.5)),
             boxShadow: [
               BoxShadow(
-                color: U.primary.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+                color: _kPurple.withValues(alpha: 0.10),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: _kLavender.withValues(alpha: 0.06),
+                blurRadius: 48,
+                offset: const Offset(0, 20),
+                spreadRadius: -4,
               ),
             ],
           ),
@@ -188,26 +198,26 @@ class _EventCardState extends State<EventCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Icon(Icons.schedule_rounded, size: 12, color: U.primary.withValues(alpha: 0.8)),
-                      const SizedBox(width: 6),
+                      Icon(Icons.schedule_rounded, size: 11, color: _kLavender.withValues(alpha: 0.8)),
+                      const SizedBox(width: 5),
                       Text(
                         '${_formatDate(event.date)} • ${event.startTime}',
-                        style: GoogleFonts.outfit(fontSize: 12, color: U.sub, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
                       ),
                     ]),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(children: [
                       if (event.isAdityaEvent) ...[
                         const AdityaLogoCircle(size: 13),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 5),
                       ] else ...[
-                        Icon(Icons.place_outlined, size: 12, color: U.primary.withValues(alpha: 0.8)),
-                        const SizedBox(width: 6),
+                        Icon(Icons.place_outlined, size: 11, color: _kLavender.withValues(alpha: 0.8)),
+                        const SizedBox(width: 5),
                       ],
                       Expanded(
                         child: Text(
                           '${event.venue}  ·  ${event.participantCount} going',
-                          style: GoogleFonts.outfit(fontSize: 12, color: U.sub, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -240,12 +250,11 @@ class _EventCardState extends State<EventCard> {
           decoration: BoxDecoration(
             color: U.card,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: U.border.withValues(alpha: 0.5)),
             boxShadow: [
               BoxShadow(
-                color: U.primary.withValues(alpha: 0.04),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
+                color: _kIndigo.withValues(alpha: 0.07),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
@@ -295,8 +304,8 @@ class _EventCardState extends State<EventCard> {
                           event.category.toUpperCase(),
                           style: GoogleFonts.outfit(
                             fontSize: 9,
-                            fontWeight: FontWeight.w800,
-                            color: U.primary,
+                            fontWeight: FontWeight.w700,
+                            color: _kLavender,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -317,7 +326,7 @@ class _EventCardState extends State<EventCard> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     Text(
                       event.title,
                       style: GoogleFonts.outfit(
@@ -326,28 +335,28 @@ class _EventCardState extends State<EventCard> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     Row(children: [
-                      Icon(Icons.schedule_rounded, size: 11, color: U.primary.withValues(alpha: 0.7)),
-                      const SizedBox(width: 5),
+                      Icon(Icons.schedule_rounded, size: 10, color: _kLavender.withValues(alpha: 0.75)),
+                      const SizedBox(width: 4),
                       Text(
                         '${_formatDate(event.date)} · ${event.startTime}',
-                        style: GoogleFonts.outfit(fontSize: 11, color: U.sub, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.outfit(fontSize: 11, color: U.sub),
                       ),
                     ]),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 2),
                     Row(children: [
                       if (event.isAdityaEvent) ...[
                         const AdityaLogoCircle(size: 12),
                         const SizedBox(width: 5),
                       ] else ...[
-                        Icon(Icons.place_outlined, size: 11, color: U.primary.withValues(alpha: 0.7)),
-                        const SizedBox(width: 5),
+                        Icon(Icons.place_outlined, size: 10, color: _kLavender.withValues(alpha: 0.75)),
+                        const SizedBox(width: 4),
                       ],
                       Expanded(
                         child: Text(
                           event.venue,
-                          style: GoogleFonts.outfit(fontSize: 11, color: U.sub, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.outfit(fontSize: 11, color: U.sub),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -376,9 +385,9 @@ class _DefaultBannerContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width, height: height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [U.primary, U.teal],
+          colors: [_kPurple, _kIndigo],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
