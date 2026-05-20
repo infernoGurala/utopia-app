@@ -225,6 +225,23 @@ class EventService {
     }
   }
 
+  /// Increment share count for an event.
+  Future<void> incrementShares(String eventId) async {
+    try {
+      await _sb.rpc('increment_event_shares', params: {'event_id_param': eventId});
+    } catch (e) {
+      // Fallback: fetch and update
+      try {
+        final event = await getEvent(eventId);
+        if (event != null) {
+          await _sb.from('events')
+              .update({'share_count': event.shareCount + 1})
+              .eq('id', eventId);
+        }
+      } catch (_) {}
+    }
+  }
+
   // ─── Registration ──────────────────────────────────────────────
 
   /// Register current user for an event.

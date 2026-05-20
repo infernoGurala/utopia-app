@@ -8,7 +8,6 @@ import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/role_service.dart';
 import 'event_details_screen.dart';
-import 'create_event_screen.dart';
 import 'event_notifications_screen.dart';
 import 'admin_events_panel.dart';
 import 'organizer_dashboard_screen.dart';
@@ -18,7 +17,6 @@ import '../widgets/event_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/platform_support.dart';
 import '../services/notification_service.dart';
-import '../widgets/gradient_dot_button.dart';
 import '../widgets/utopia_snackbar.dart';
 
 class EventsScreen extends StatefulWidget {
@@ -146,70 +144,83 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dotColor = U.primary.withValues(alpha: isDark ? 0.04 : 0.035);
+
     return Scaffold(
       backgroundColor: U.bg,
-      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
-          ? null
-          : _buildUploadFAB(),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: U.primary,
-          onRefresh: _loadEvents,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              _buildHeader(),
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSearchBar(),
-                    const SizedBox(height: 24),
-                    _buildCategories(),
-                    const SizedBox(height: 32),
-                    if (_isLoading)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 80),
-                        child: const Center(child: UtopiaLoader(scale: 0.7)),
-                      )
-                    else if (_searchQuery.isNotEmpty || _selectedCategory != 'All') ...[
-                      _buildSectionTitle('Results'),
-                      const SizedBox(height: 16),
-                      _filteredEvents.isEmpty
-                          ? _buildEmptyState('No events found')
-                          : _buildVerticalList(_filteredEvents),
-                    ] else ...[
-                      if (_liveEvents.isNotEmpty) ...[
-                        _buildSectionTitle('🔴 Live Now'),
-                        const SizedBox(height: 16),
-                        _buildHorizontalCarousel(_liveEvents),
-                        const SizedBox(height: 32),
-                      ],
-                      _buildSectionTitle('Trending Events'),
-                      const SizedBox(height: 16),
-                      _trendingEvents.isEmpty
-                          ? _buildEmptyState('No trending events yet')
-                          : _buildHorizontalCarousel(_trendingEvents),
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Upcoming Events'),
-                      const SizedBox(height: 16),
-                      _upcomingEvents.isEmpty
-                          ? _buildEmptyState('No upcoming events')
-                          : _buildVerticalList(_upcomingEvents),
-                      if (_endingSoonEvents.isNotEmpty) ...[
-                        const SizedBox(height: 32),
-                        _buildSectionTitle('⏰ Ending Soon'),
-                        const SizedBox(height: 16),
-                        _buildHorizontalCarousel(_endingSoonEvents),
-                      ],
-                    ],
-                    const SizedBox(height: 100),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _EventsPatternPainter(
+                color: dotColor,
+                spacing: 28.0,
+                dotRadius: 1.0,
               ),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            child: RefreshIndicator(
+              color: U.primary,
+              onRefresh: _loadEvents,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                slivers: [
+                  _buildHeader(),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSearchBar(),
+                        const SizedBox(height: 24),
+                        _buildCategories(),
+                        const SizedBox(height: 32),
+                        if (_isLoading)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 80),
+                            child: const Center(child: UtopiaLoader(scale: 0.7)),
+                          )
+                        else if (_searchQuery.isNotEmpty || _selectedCategory != 'All') ...[
+                          _buildSectionTitle('Results'),
+                          const SizedBox(height: 16),
+                          _filteredEvents.isEmpty
+                              ? _buildEmptyState('No events found')
+                              : _buildVerticalList(_filteredEvents),
+                        ] else ...[
+                          if (_liveEvents.isNotEmpty) ...[
+                            _buildSectionTitle('🔴 Live Now'),
+                            const SizedBox(height: 16),
+                            _buildHorizontalCarousel(_liveEvents),
+                            const SizedBox(height: 32),
+                          ],
+                          _buildSectionTitle('Trending Events'),
+                          const SizedBox(height: 16),
+                          _trendingEvents.isEmpty
+                              ? _buildEmptyState('No trending events yet')
+                              : _buildHorizontalCarousel(_trendingEvents),
+                          const SizedBox(height: 32),
+                          _buildSectionTitle('Upcoming Events'),
+                          const SizedBox(height: 16),
+                          _upcomingEvents.isEmpty
+                              ? _buildEmptyState('No upcoming events')
+                              : _buildVerticalList(_upcomingEvents),
+                          if (_endingSoonEvents.isNotEmpty) ...[
+                            const SizedBox(height: 32),
+                            _buildSectionTitle('⏰ Ending Soon'),
+                            const SizedBox(height: 16),
+                            _buildHorizontalCarousel(_endingSoonEvents),
+                          ],
+                        ],
+                        const SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -240,11 +251,10 @@ class _EventsScreenState extends State<EventsScreen> {
                       children: [
                         Text(
                           'Campus Events',
-                          style: GoogleFonts.playfairDisplay(
-                            fontSize: 26,
+                          style: GoogleFonts.outfit(
+                            fontSize: 24,
                             fontWeight: FontWeight.w700,
-                            color: U.primary,
-                            fontStyle: FontStyle.italic,
+                            color: U.text,
                             letterSpacing: -0.5,
                           ),
                           maxLines: 1,
@@ -252,7 +262,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         ),
                         Text(
                           'Discover what\'s happening',
-                          style: GoogleFonts.outfit(fontSize: 14, color: U.sub),
+                          style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -276,89 +286,75 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Widget _buildNotificationIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        color: U.surface,
-        shape: BoxShape.circle,
-        border: Border.all(color: U.border),
-      ),
-      child: IconButton(
-        icon: Icon(Icons.notifications_outlined, color: U.text),
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
-        ),
+    return IconButton(
+      icon: Icon(Icons.notifications_outlined, color: U.text, size: 24),
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
       ),
     ).animate().fadeIn(duration: 400.ms, delay: 100.ms).scale();
   }
 
   Widget _buildMenuIcon() {
-    return Container(
-      decoration: BoxDecoration(
-        color: U.surface,
-        shape: BoxShape.circle,
-        border: Border.all(color: U.border),
-      ),
-      child: PopupMenuButton<String>(
-        icon: Icon(Icons.more_vert_rounded, color: U.text),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: U.surface,
-        onSelected: (value) {
-          if (value == 'organizer') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDashboardScreen()));
-          } else if (value == 'admin') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminEventsPanel()));
-          } else if (value == 'certificates') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const EventCertificatesScreen()));
-          } else if (value == 'saved') {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedEventsScreen()));
-          }
-        },
-        itemBuilder: (context) => [
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert_rounded, color: U.text, size: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: U.surface,
+      onSelected: (value) {
+        if (value == 'organizer') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDashboardScreen()));
+        } else if (value == 'admin') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminEventsPanel()));
+        } else if (value == 'certificates') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const EventCertificatesScreen()));
+        } else if (value == 'saved') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedEventsScreen()));
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'organizer',
+          child: Row(
+            children: [
+              Icon(Icons.business_center_outlined, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('Organizer Dashboard', style: GoogleFonts.outfit(color: U.text)),
+            ],
+          ),
+        ),
+        if (_isSuperUser)
           PopupMenuItem(
-            value: 'organizer',
+            value: 'admin',
             child: Row(
               children: [
-                Icon(Icons.business_center_outlined, color: U.text, size: 20),
+                Icon(Icons.admin_panel_settings_outlined, color: U.text, size: 20),
                 const SizedBox(width: 12),
-                Text('Organizer Dashboard', style: GoogleFonts.outfit(color: U.text)),
+                Text('Admin Panel', style: GoogleFonts.outfit(color: U.text)),
               ],
             ),
           ),
-          if (_isSuperUser)
-            PopupMenuItem(
-              value: 'admin',
-              child: Row(
-                children: [
-                  Icon(Icons.admin_panel_settings_outlined, color: U.text, size: 20),
-                  const SizedBox(width: 12),
-                  Text('Admin Panel', style: GoogleFonts.outfit(color: U.text)),
-                ],
-              ),
-            ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'saved',
-            child: Row(
-              children: [
-                Icon(Icons.bookmark_outline_rounded, color: U.text, size: 20),
-                const SizedBox(width: 12),
-                Text('Saved Events', style: GoogleFonts.outfit(color: U.text)),
-              ],
-            ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'saved',
+          child: Row(
+            children: [
+              Icon(Icons.bookmark_outline_rounded, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('Saved Events', style: GoogleFonts.outfit(color: U.text)),
+            ],
           ),
-          PopupMenuItem(
-            value: 'certificates',
-            child: Row(
-              children: [
-                Icon(Icons.workspace_premium_outlined, color: U.text, size: 20),
-                const SizedBox(width: 12),
-                Text('My Certificates', style: GoogleFonts.outfit(color: U.text)),
-              ],
-            ),
+        ),
+        PopupMenuItem(
+          value: 'certificates',
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('My Certificates', style: GoogleFonts.outfit(color: U.text)),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     ).animate().fadeIn(duration: 400.ms, delay: 150.ms).scale();
   }
 
@@ -366,11 +362,10 @@ class _EventsScreenState extends State<EventsScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        height: 52,
+        height: 50,
         decoration: BoxDecoration(
           color: U.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: U.border),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
@@ -439,17 +434,14 @@ class _EventsScreenState extends State<EventsScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 decoration: BoxDecoration(
-                  color: isSelected ? U.primary : U.surface,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? U.primary : U.border,
-                  ),
+                  color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Center(
                   child: Text(
                     category,
                     style: GoogleFonts.outfit(
-                      color: isSelected ? U.bg : U.text,
+                      color: isSelected ? U.primary : U.sub,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
@@ -531,25 +523,40 @@ class _EventsScreenState extends State<EventsScreen> {
       ),
     );
   }
-
-
-
-  Widget _buildUploadFAB() {
-    return GradientDotButton(
-      onPressed: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CreateEventScreen()),
-        );
-        _loadEvents();
-      },
-      icon: Icons.add_rounded,
-      label: 'Upload Event',
-    ).animate().scale(delay: 500.ms, duration: 400.ms, curve: Curves.easeOutBack);
-  }
-
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+}
+
+class _EventsPatternPainter extends CustomPainter {
+  final Color color;
+  final double spacing;
+  final double dotRadius;
+
+  const _EventsPatternPainter({
+    required this.color,
+    required this.spacing,
+    required this.dotRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _EventsPatternPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.spacing != spacing ||
+        oldDelegate.dotRadius != dotRadius;
   }
 }

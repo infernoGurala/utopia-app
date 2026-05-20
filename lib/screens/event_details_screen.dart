@@ -198,9 +198,15 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
   }
 
   void _shareEvent() {
+    final eventUrl = 'https://events.inferalis.space/${_event.id ?? ""}';
     SharePlus.instance.share(
-      ShareParams(text: 'Check out ${_event.title} on Utopia! ${_formatDate(_event.date)} at ${_event.venue}'),
+      ShareParams(
+        text: 'Check out ${_event.title} on Utopia!\nDate: ${_formatDate(_event.date)} at ${_event.venue}\n\nLink: $eventUrl',
+      ),
     );
+    if (_event.id != null) {
+      EventService.instance.incrementShares(_event.id!);
+    }
   }
 
   Future<void> _deleteEvent() async {

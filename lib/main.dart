@@ -26,6 +26,8 @@ import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
 import 'services/focus_supabase_service.dart';
 import 'widgets/app_update_prompt.dart';
+import 'screens/event_details_screen.dart';
+import 'services/event_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 late final Future<AppInitializationState> appInitialization;
@@ -994,29 +996,56 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
   void _handleLink(Uri uri) {
     String? classCode;
+    String? eventId;
 
-    // https://classes.inferalis.space/join/CODE
+    // Handle class join links: https://classes.inferalis.space/join/CODE or utopia://join/CODE
     if (uri.path.startsWith('/join/')) {
       classCode = uri.pathSegments.last;
-    }
-    // utopia://join/CODE
-    else if (uri.scheme == 'utopia' && uri.host == 'join') {
+    } else if (uri.scheme == 'utopia' && uri.host == 'join') {
       classCode = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
     }
 
-    if (classCode == null || classCode.isEmpty) return;
+    // Handle event links: https://events.inferalis.space/eventID or utopia://event/eventID
+    if (uri.host == 'events.inferalis.space' || uri.path.startsWith('/event/')) {
+      eventId = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    } else if (uri.scheme == 'utopia' && uri.host == 'event') {
+      eventId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+    } else if (uri.host == 'events.inferalis.space' && uri.path.isNotEmpty) {
+      eventId = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+    }
 
-    // Wait for navigator to be ready, then push the join screen
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final nav = navigatorKey.currentState;
-      if (nav != null) {
-        nav.push(
-          MaterialPageRoute(
-            builder: (_) => JoinClassScreen(classCode: classCode!),
-          ),
-        );
-      }
-    });
+    if (classCode != null && classCode.isNotEmpty) {
+      // Wait for navigator to be ready, then push the join screen
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final nav = navigatorKey.currentState;
+        if (nav != null) {
+          nav.push(
+            MaterialPageRoute(
+              builder: (_) => JoinClassScreen(classCode: classCode!),
+            ),
+          );
+        }
+      });
+    } else if (eventId != null && eventId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final nav = navigatorKey.currentState;
+        if (nav != null) {
+          try {
+            // Show dynamic feedback/dialog or direct navigation
+            final event = await EventService.instance.getEvent(eventId!);
+            if (event != null) {
+              nav.push(
+                MaterialPageRoute(
+                  builder: (_) => EventDetailsScreen(event: event),
+                ),
+              );
+            }
+          } catch (e) {
+            debugPrint('Failed to load deep-linked event: $e');
+          }
+        }
+      });
+    }
   }
 
   @override
