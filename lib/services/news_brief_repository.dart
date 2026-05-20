@@ -256,6 +256,31 @@ class NewsBriefRepository {
     return _groupBriefsByCategory(mockBriefs);
   }
 
+  /// Queries Supabase for the latest fetched_at timestamp (last edge function run).
+  Future<DateTime?> getLastFetchedAt() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final res = await supabase
+          .from('news_briefs')
+          .select('fetched_at')
+          .eq('is_active', true)
+          .order('fetched_at', ascending: false)
+          .limit(1);
+
+      debugPrint('NewsBriefRepository: getLastFetchedAt raw response: $res');
+      if (res is List && res.isNotEmpty) {
+        final raw = res[0]['fetched_at'];
+        debugPrint('NewsBriefRepository: getLastFetchedAt raw value: $raw');
+        if (raw != null) {
+          return DateTime.tryParse(raw.toString());
+        }
+      }
+    } catch (e) {
+      debugPrint('NewsBriefRepository: getLastFetchedAt failed: $e');
+    }
+    return null;
+  }
+
   /// Groups a flat list of NewsBrief items by their category field dynamically.
   Map<String, List<NewsBrief>> _groupBriefsByCategory(List<NewsBrief> list) {
     final Map<String, List<NewsBrief>> grouped = {};

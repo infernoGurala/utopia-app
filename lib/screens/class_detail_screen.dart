@@ -276,10 +276,61 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
     if (!mounted) return;
     setState(() {
       _items = items.where((item) => item['name'] != '.keep' && !item['name'].toString().startsWith('.')).toList();
+      _sortItems();
       _loading = false;
     });
     _loadFolderIcons();
   }
+
+  void _sortItems() {
+    _items.sort((a, b) {
+      final aSort = a['sort_index'] as int? ?? 0;
+      final bSort = b['sort_index'] as int? ?? 0;
+
+      if (aSort != bSort) {
+        return aSort.compareTo(bSort);
+      }
+
+      final aIsFolder = a['type'] == 'dir';
+      final bIsFolder = b['type'] == 'dir';
+      if (aIsFolder && !bIsFolder) return -1;
+      if (!aIsFolder && bIsFolder) return 1;
+
+      return (a['name'] as String? ?? '').toLowerCase().compareTo(
+        (b['name'] as String? ?? '').toLowerCase(),
+      );
+    });
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex == newIndex) return;
+
+    final movedItem = _items[oldIndex];
+
+    setState(() {
+      _items.removeAt(oldIndex);
+      _items.insert(newIndex, movedItem);
+
+      // Re-assign sort indices
+      for (int i = 0; i < _items.length; i++) {
+        _items[i]['sort_index'] = i;
+      }
+    });
+
+    // Persist to Supabase
+    _github.updateSortOrder(_items).catchError((e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save order: $e'),
+            backgroundColor: U.red,
+          ),
+        );
+      }
+    });
+  }
+
 
   void _navigateToFolder(String folderName) {
     setState(() {
@@ -901,15 +952,11 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       style: GoogleFonts.outfit(color: U.sub),
                     ),
                   )
-                : ListView.separated(
+                : ReorderableListView.builder(
                     padding: const EdgeInsets.only(bottom: 116),
                     itemCount: _items.length,
-                    separatorBuilder: (_, __) => Divider(
-                      color: U.border,
-                      height: 1,
-                      thickness: 0.5,
-                      indent: 56,
-                    ),
+                    onReorder: _onReorder,
+                    buildDefaultDragHandles: _isEditMode,
                     itemBuilder: (context, index) {
                       final item = _items[index];
                       final name = item['name'] as String;
@@ -932,160 +979,173 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                       ];
                       final itemColor = isFolder ? palette[index % palette.length] : U.sub;
 
-                      return TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: Duration(milliseconds: 250 + index * 45),
-                        curve: Curves.easeOut,
-                        builder: (context, v, child) => Opacity(
-                          opacity: v,
-                          child: Transform.translate(
-                            offset: Offset(0, 16 * (1 - v)),
-                            child: child,
-                          ),
-                        ),
-                        child: InkWell(
-                          onTap: () {
-                            if (isFolder) {
-                              _navigateToFolder(name);
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => NoteViewerScreen(
-                                    title: displayTitle,
-                                    filePath: path,
-                                    isEditable: _isEditMode && _userRole == 'writer',
-                                    useGlobalRepo: true,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          splashColor: itemColor.withOpacity(0.06),
-                          highlightColor: itemColor.withOpacity(0.04),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                            child: Row(
-                              children: [
-                                  () {
-                                    final iconKey = _folderIcons[path];
-                                    if (iconKey != null && iconKey.startsWith('num_')) {
-                                      final numText = iconKey.replaceFirst('num_', '');
-                                      return Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: BoxDecoration(color: itemColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                                        child: Center(
-                                          child: Text(
-                                            numText,
-                                            style: GoogleFonts.outfit(color: itemColor, fontSize: 12, fontWeight: FontWeight.w700),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                    if (iconKey != null && kFolderIconCatalogue.containsKey(iconKey)) {
-                                      return Icon(kFolderIconCatalogue[iconKey]!.$1, color: isFolder ? itemColor : U.primary, size: isFolder ? 26 : 22);
-                                    }
-                                    return Icon(iconData.$1, color: isFolder ? itemColor : iconData.$2, size: isFolder ? 26 : 22);
-                                  }(),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        displayTitle.trim(),
-                                        style: GoogleFonts.outfit(
-                                          color: U.text,
-                                          fontSize: 16,
-                                          fontWeight: isFolder ? FontWeight.w500 : FontWeight.w400,
-                                        ),
+                      return Column(
+                        key: ValueKey(path),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (index > 0)
+                            Divider(
+                              color: U.border,
+                              height: 1,
+                              thickness: 0.5,
+                              indent: 56,
+                            ),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: 1),
+                            duration: Duration(milliseconds: 250 + index * 45),
+                            curve: Curves.easeOut,
+                            builder: (context, v, child) => Opacity(
+                              opacity: v,
+                              child: Transform.translate(
+                                offset: Offset(0, 16 * (1 - v)),
+                                child: child,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                if (isFolder) {
+                                  _navigateToFolder(name);
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => NoteViewerScreen(
+                                        title: displayTitle,
+                                        filePath: path,
+                                        isEditable: _isEditMode && _userRole == 'writer',
+                                        useGlobalRepo: true,
                                       ),
-                                      if (!isFolder && item['size'] != null && !name.toLowerCase().endsWith('.md'))
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            _formatFileSize(item['size'] as int),
-                                            style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
-                                          ),
-                                        ),
-                                      if (_isEditMode && (item['updated_at'] != null || item['created_at'] != null))
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 3),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.schedule_rounded, size: 11, color: U.dim),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                _formatRelativeTime(DateTime.parse((item['updated_at'] ?? item['created_at']) as String)),
-                                                style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w400),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                if (_isEditMode && _userRole == 'writer')
-                                  PopupMenuButton<String>(
-                                    color: U.surface,
-                                    padding: EdgeInsets.zero,
-                                    tooltip: 'Actions',
-                                    child: SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: Center(child: Icon(Icons.more_vert, color: U.dim, size: 16)),
                                     ),
-                                    splashRadius: 18,
-                                    onSelected: (value) {
-                                      if (value == 'edit') _showRenameDialog(item, isFolder);
-                                      if (value == 'icon') _showIconPicker(path);
-                                      if (value == 'delete') _showDeleteDialog(item);
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.edit_outlined, color: U.text, size: 14),
-                                            const SizedBox(width: 6),
-                                            Text('Rename', style: GoogleFonts.outfit(color: U.text, fontSize: 13, fontWeight: FontWeight.w500)),
-                                          ],
-                                        ),
+                                  );
+                                }
+                              },
+                              splashColor: itemColor.withOpacity(0.06),
+                              highlightColor: itemColor.withOpacity(0.04),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                                child: Row(
+                                  children: [
+                                      () {
+                                        final iconKey = _folderIcons[path];
+                                        if (iconKey != null && iconKey.startsWith('num_')) {
+                                          final numText = iconKey.replaceFirst('num_', '');
+                                          return Container(
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(color: itemColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                                            child: Center(
+                                              child: Text(
+                                                numText,
+                                                style: GoogleFonts.outfit(color: itemColor, fontSize: 12, fontWeight: FontWeight.w700),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        if (iconKey != null && kFolderIconCatalogue.containsKey(iconKey)) {
+                                          return Icon(kFolderIconCatalogue[iconKey]!.$1, color: isFolder ? itemColor : U.primary, size: isFolder ? 26 : 22);
+                                        }
+                                        return Icon(iconData.$1, color: isFolder ? itemColor : iconData.$2, size: isFolder ? 26 : 22);
+                                      }(),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayTitle.trim(),
+                                            style: GoogleFonts.outfit(
+                                              color: U.text,
+                                              fontSize: 16,
+                                              fontWeight: isFolder ? FontWeight.w500 : FontWeight.w400,
+                                            ),
+                                          ),
+                                          if (!isFolder && item['size'] != null && !name.toLowerCase().endsWith('.md'))
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Text(
+                                                _formatFileSize(item['size'] as int),
+                                                style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                                              ),
+                                            ),
+                                          if (_isEditMode && (item['updated_at'] != null || item['created_at'] != null))
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 3),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.schedule_rounded, size: 11, color: U.dim),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    _formatRelativeTime(DateTime.parse((item['updated_at'] ?? item['created_at']) as String)),
+                                                    style: GoogleFonts.outfit(color: U.dim, fontSize: 11, fontWeight: FontWeight.w400),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
                                       ),
-                                      PopupMenuItem(
-                                        value: 'icon',
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.palette_outlined, color: U.primary, size: 14),
-                                            const SizedBox(width: 6),
-                                            Text('Change Icon', style: GoogleFonts.outfit(color: U.primary, fontSize: 13, fontWeight: FontWeight.w500)),
-                                          ],
+                                    ),
+                                    if (_isEditMode && _userRole == 'writer')
+                                      PopupMenuButton<String>(
+                                        color: U.surface,
+                                        padding: EdgeInsets.zero,
+                                        tooltip: 'Actions',
+                                        child: SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: Center(child: Icon(Icons.more_vert, color: U.dim, size: 16)),
                                         ),
+                                        splashRadius: 18,
+                                        onSelected: (value) {
+                                          if (value == 'edit') _showRenameDialog(item, isFolder);
+                                          if (value == 'icon') _showIconPicker(path);
+                                          if (value == 'delete') _showDeleteDialog(item);
+                                        },
+                                        itemBuilder: (ctx) => [
+                                          PopupMenuItem(
+                                            value: 'edit',
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.edit_outlined, color: U.text, size: 14),
+                                                const SizedBox(width: 6),
+                                                Text('Rename', style: GoogleFonts.outfit(color: U.text, fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'icon',
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.palette_outlined, color: U.primary, size: 14),
+                                                const SizedBox(width: 6),
+                                                Text('Change Icon', style: GoogleFonts.outfit(color: U.primary, fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: 'delete',
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.delete_outline, color: U.red, size: 14),
+                                                const SizedBox(width: 6),
+                                                Text('Delete', style: GoogleFonts.outfit(color: U.red, fontSize: 13, fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.delete_outline, color: U.red, size: 14),
-                                            const SizedBox(width: 6),
-                                            Text('Delete', style: GoogleFonts.outfit(color: U.red, fontSize: 13, fontWeight: FontWeight.w500)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                              ],
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       );
                     },
                   ),

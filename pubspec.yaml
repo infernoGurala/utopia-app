@@ -1,7 +1,7 @@
 name: utopia_app
 description: UTOPIA student notes app.
 publish_to: 'none'
-version: 3.1.0+20
+version: 3.2.0+21
 
 environment:
   sdk: ^3.11.3
@@ -53,6 +53,7 @@ dependencies:
   image_picker: ^1.1.2
   intl: ^0.19.0
   cached_network_image: ^3.4.1
+  flutter_svg: ^2.0.9
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +77,7 @@ flutter:
     - assets/focus screen/
     - assets/apps_icons/
     - assets/icon_cropped.png
+    - assets/icons/
   fonts:
     - family: OrangeAvenue
       fonts:

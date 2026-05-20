@@ -14,6 +14,7 @@ import 'package:utopia_app/main.dart';
 import 'package:utopia_app/services/platform_support.dart';
 import 'package:utopia_app/screens/chat_screen.dart';
 import 'package:utopia_app/screens/event_certificates_screen.dart';
+import 'package:utopia_app/screens/timetable_screen.dart';
 import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -533,6 +534,15 @@ class NotificationService {
       }
       return;
     }
+    if (type == 'timetable') {
+      final navigator = navigatorKey.currentState;
+      if (navigator != null) {
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => const TimetableScreen()),
+        );
+      }
+      return;
+    }
   }
 
   static Future<bool> _openChatFromNotification({
@@ -729,6 +739,14 @@ class NotificationService {
     required tz.TZDateTime scheduledDate,
     required DateTimeComponents components,
   }) async {
+    final payloadString = jsonEncode({
+      'title': title,
+      'body': body,
+      'data': {
+        'type': 'timetable'
+      }
+    });
+
     try {
       await _localNotifications.zonedSchedule(
         id,
@@ -752,6 +770,7 @@ class NotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: components,
+        payload: payloadString,
       );
       debugPrint("NOTIF: Timetable notification $id scheduled successfully (exact) for $scheduledDate");
     } catch (e) {
@@ -778,6 +797,7 @@ class NotificationService {
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: components,
+        payload: payloadString,
       );
       debugPrint("NOTIF: Timetable notification $id scheduled successfully (inexact) for $scheduledDate");
     }

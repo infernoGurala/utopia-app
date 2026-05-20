@@ -145,7 +145,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     final noteFiles = <Map<String, dynamic>>[];
     final assignmentFiles = <Map<String, dynamic>>[];
     final uploadedFiles = <Map<String, dynamic>>[];
-    final contentLines = <String>[];
+    final segments = <_Segment>[];
     final lines = raw.split('\n');
     final sectionHeadingRegex = RegExp(r'^#{2,3}\s+(.+)$');
     final sectionLinkRegex = RegExp(
@@ -155,6 +155,32 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     bool inFrontmatter = false;
     bool frontmatterDone = false;
     int frontmatterDashes = 0;
+    final contentLines = <String>[];
+
+    void flushContentLines() {
+      if (contentLines.isNotEmpty) {
+        var content = contentLines.join('\n').trim();
+        if (content.isNotEmpty) {
+          content = content.replaceAllMapped(RegExp(r'!\[\[([^\]]+)\]\]'), (m) {
+            final inner = m.group(1)!;
+            final name = inner.split('|').first.trim();
+            return '![$name]($name)';
+          });
+          content = content.replaceAllMapped(
+            RegExp(r'\[\[([^\]]+)\]\]'),
+            (m) => '[${m.group(1)}](wikilink://${Uri.encodeComponent(m.group(1)!)})',
+          );
+          content = content.replaceAllMapped(
+            RegExp(r'==([^=]+)=='),
+            (m) => '`${m.group(1)}`',
+          );
+          
+          final highlighted = _applyHighlight(content);
+          segments.addAll(_parseSegments(highlighted));
+        }
+        contentLines.clear();
+      }
+    }
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
@@ -178,15 +204,21 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       final sectionHeading =
           sectionHeadingRegex.firstMatch(t)?.group(1)?.trim().toUpperCase();
       if (sectionHeading == 'NOTES' || sectionHeading == 'RESOURCES') {
+        flushContentLines();
         section = 'NOTES';
+        segments.add(_Segment.fileHeading('NOTES', id: 'heading_notes_${i}'));
         continue;
       }
       if (sectionHeading == 'ASSIGNMENTS') {
+        flushContentLines();
         section = 'ASSIGNMENTS';
+        segments.add(_Segment.fileHeading('ASSIGNMENTS', id: 'heading_assignments_${i}'));
         continue;
       }
       if (sectionHeading == 'FILES') {
+        flushContentLines();
         section = 'FILES';
+        segments.add(_Segment.fileHeading('FILES', id: 'heading_files_${i}'));
         continue;
       }
       if (sectionHeading != null && section != null) {
@@ -208,45 +240,27 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
           } else if (section == 'FILES') {
             uploadedFiles.add(entry);
           }
+          segments.add(_Segment.fileBar(entry, id: 'file_${entry['name']}_${i}'));
           continue;
         }
       }
 
-      if (t == '---') section = null;
+      if (t == '---') {
+        if (section != null) {
+          segments.add(_Segment.spacing(4, id: 'space_${i}'));
+          section = null;
+        }
+      }
       contentLines.add(line);
     }
 
-    while (contentLines.isNotEmpty && contentLines.first.trim().isEmpty) {
-      contentLines.removeAt(0);
-    }
-
-    var content = contentLines.join('\n').trim();
-
-    // Convert Obsidian image embeds ![[image.png|200]] → ![image.png](image.png)
-    // Must run BEFORE the [[wiki link]] conversion below.
-    content = content.replaceAllMapped(RegExp(r'!\[\[([^\]]+)\]\]'), (m) {
-      final inner = m.group(1)!;
-      // Strip Obsidian size suffix (e.g. "|200" or "|200x100")
-      final name = inner.split('|').first.trim();
-      return '![$name]($name)';
-    });
-
-    content = content.replaceAllMapped(
-      RegExp(r'\[\[([^\]]+)\]\]'),
-      (m) => '[${m.group(1)}](wikilink://${Uri.encodeComponent(m.group(1)!)})',
-    );
-
-    content = content.replaceAllMapped(
-      RegExp(r'==([^=]+)=='),
-      (m) => '`${m.group(1)}`',
-    );
+    flushContentLines();
 
     setState(() {
-      final highlighted = _applyHighlight(content);
       _noteFiles = noteFiles;
       _assignmentFiles = assignmentFiles;
       _uploadedFiles = uploadedFiles;
-      _segments = _parseSegments(highlighted);
+      _segments = segments;
       _loading = false;
     });
     _scheduleInitialSegmentReveal();
@@ -774,6 +788,10 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
         );
       case _SegType.markdown:
         return _buildMarkdown(seg.content);
+      case _SegType.fileHeading:
+      case _SegType.fileBar:
+      case _SegType.spacing:
+        return const SizedBox.shrink();
     }
   }
 
@@ -848,91 +866,20 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 
   int _contentItemCount() {
-    var count = _segments.length;
-    if (_noteFiles.isNotEmpty) {
-      count += _noteFiles.length + 2;
-    }
-    if (_assignmentFiles.isNotEmpty) {
-      count += _assignmentFiles.length + 2;
-    }
-    if (_uploadedFiles.isNotEmpty) {
-      count += _uploadedFiles.length + 2;
-    }
-    if (_noteFiles.isNotEmpty ||
-        _assignmentFiles.isNotEmpty ||
-        _uploadedFiles.isNotEmpty) {
-      count += 1;
-    }
-    return count;
+    return _segments.length;
   }
 
   Widget _buildContentItem(int index) {
-    var cursor = index;
-
-    if (_noteFiles.isNotEmpty) {
-      if (cursor == 0) {
-        return const _SecLabel('NOTES');
-      }
-      cursor -= 1;
-
-      if (cursor < _noteFiles.length) {
-        return _FileBar(file: _noteFiles[cursor]);
-      }
-      cursor -= _noteFiles.length;
-
-      if (cursor == 0) {
-        return const SizedBox(height: 4);
-      }
-      cursor -= 1;
+    final segment = _segments[index];
+    if (segment.type == _SegType.fileHeading) {
+      return _SecLabel(segment.content);
     }
-
-    if (_assignmentFiles.isNotEmpty) {
-      if (cursor == 0) {
-        return const _SecLabel('ASSIGNMENTS');
-      }
-      cursor -= 1;
-
-      if (cursor < _assignmentFiles.length) {
-        return _FileBar(file: _assignmentFiles[cursor]);
-      }
-      cursor -= _assignmentFiles.length;
-
-      if (cursor == 0) {
-        return const SizedBox(height: 4);
-      }
-      cursor -= 1;
+    if (segment.type == _SegType.fileBar) {
+      return _FileBar(file: segment.fileData!);
     }
-
-    if (_uploadedFiles.isNotEmpty) {
-      if (cursor == 0) {
-        return const _SecLabel('FILES');
-      }
-      cursor -= 1;
-
-      if (cursor < _uploadedFiles.length) {
-        return _FileBar(file: _uploadedFiles[cursor]);
-      }
-      cursor -= _uploadedFiles.length;
-
-      if (cursor == 0) {
-        return const SizedBox(height: 4);
-      }
-      cursor -= 1;
+    if (segment.type == _SegType.spacing) {
+      return SizedBox(height: double.parse(segment.content));
     }
-
-    if (_noteFiles.isNotEmpty ||
-        _assignmentFiles.isNotEmpty ||
-        _uploadedFiles.isNotEmpty) {
-      if (cursor == 0) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Divider(color: U.border, thickness: 0.5),
-        );
-      }
-      cursor -= 1;
-    }
-
-    final segment = _segments[cursor];
     return _shareableSegment(segment, _buildSegment(segment));
   }
 
@@ -1040,7 +987,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 }
 
-enum _SegType { markdown, latex, mermaid, callout, code }
+enum _SegType { markdown, latex, mermaid, callout, code, fileHeading, fileBar, spacing }
 
 class _Segment {
   final _SegType type;
@@ -1050,6 +997,7 @@ class _Segment {
   final String? calloutType;
   final String? title;
   final String? language;
+  final Map<String, dynamic>? fileData;
   _Segment._(
     this.type,
     this.content, {
@@ -1058,6 +1006,7 @@ class _Segment {
     this.calloutType,
     this.title,
     this.language,
+    this.fileData,
   });
   factory _Segment.markdown(
     String c, {
@@ -1100,6 +1049,20 @@ class _Segment {
     id: id,
     preview: preview,
   );
+  factory _Segment.fileHeading(
+    String label, {
+    required String id,
+  }) => _Segment._(_SegType.fileHeading, label, id: id, preview: label);
+
+  factory _Segment.fileBar(
+    Map<String, dynamic> file, {
+    required String id,
+  }) => _Segment._(_SegType.fileBar, '', id: id, preview: file['name'] ?? '', fileData: file);
+
+  factory _Segment.spacing(
+    double height, {
+    required String id,
+  }) => _Segment._(_SegType.spacing, height.toString(), id: id, preview: 'spacing');
 }
 
 class _ShareNoteSheet extends StatefulWidget {

@@ -327,11 +327,12 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
 
   Widget _buildCategoryTabs(bool isDark) {
     return SizedBox(
-      height: 38,
+      height: 46,
       child: ListView.builder(
         controller: _tabsScrollController,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         itemCount: _categories.length,
         itemBuilder: (context, index) {
           final isSelected = _currentTab == index;
@@ -363,13 +364,15 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
                         : U.border.withValues(alpha: 0.4),
                     width: 1,
                   ),
-                  boxShadow: isSelected ? [
+                  boxShadow: [
                     BoxShadow(
-                      color: U.primary.withValues(alpha: 0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                      color: isSelected 
+                          ? U.primary.withValues(alpha: 0.2) 
+                          : Colors.transparent,
+                      blurRadius: isSelected ? 8 : 0,
+                      offset: isSelected ? const Offset(0, 2) : Offset.zero,
                     )
-                  ] : null,
+                  ],
                 ),
                 child: Center(
                   child: Text(

@@ -153,13 +153,52 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
         
         final String abi = await _channel.invokeMethod<String>('getAbi') ?? '';
         final assets = data['assets'] as List<dynamic>? ?? [];
-        for (final asset in assets) {
-          final name = asset['name'] as String? ?? '';
-          if (abi.isNotEmpty && name.contains(abi)) {
-            downloadUrl = asset['browser_download_url'] as String?;
-            break;
+        
+        // 1. Try to find the exact architecture-specific APK based on the new standard names
+        if (abi.isNotEmpty) {
+          String? targetSuffix;
+          if (abi.contains('arm64-v8a')) {
+            targetSuffix = 'arm64-v8a-release.apk';
+          } else if (abi.contains('armeabi-v7a')) {
+            targetSuffix = 'armeabi-v7a-release.apk';
+          } else if (abi.contains('x86_64')) {
+            targetSuffix = 'x86_64-release.apk';
+          }
+          
+          if (targetSuffix != null) {
+            for (final asset in assets) {
+              final name = asset['name'] as String? ?? '';
+              if (name.endsWith(targetSuffix)) {
+                downloadUrl = asset['browser_download_url'] as String?;
+                break;
+              }
+            }
           }
         }
+        
+        // 2. Fallback to containing the raw ABI name
+        if (downloadUrl == null) {
+          for (final asset in assets) {
+            final name = asset['name'] as String? ?? '';
+            if (abi.isNotEmpty && name.contains(abi)) {
+              downloadUrl = asset['browser_download_url'] as String?;
+              break;
+            }
+          }
+        }
+        
+        // 3. Fallback to generic app-release.apk
+        if (downloadUrl == null) {
+          for (final asset in assets) {
+            final name = asset['name'] as String? ?? '';
+            if (name.endsWith('app-release.apk')) {
+              downloadUrl = asset['browser_download_url'] as String?;
+              break;
+            }
+          }
+        }
+        
+        // 4. Ultimate fallback to any release APK
         if (downloadUrl == null) {
           for (final asset in assets) {
             final name = asset['name'] as String? ?? '';

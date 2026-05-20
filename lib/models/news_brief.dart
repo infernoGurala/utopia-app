@@ -8,6 +8,7 @@ class NewsBrief {
   final String summary;
   final DateTime publishedAt;
   final String fetchedDate;
+  final DateTime? fetchedAt;
   final int displayOrder;
   final bool isActive;
   final String? imageUrl;
@@ -22,6 +23,7 @@ class NewsBrief {
     required this.summary,
     required this.publishedAt,
     required this.fetchedDate,
+    this.fetchedAt,
     required this.displayOrder,
     this.isActive = true,
     this.imageUrl,
@@ -41,6 +43,9 @@ class NewsBrief {
           ? DateTime.tryParse(map['published_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
       fetchedDate: map['fetched_date']?.toString() ?? '',
+      fetchedAt: map['fetched_at'] != null
+          ? DateTime.tryParse(map['fetched_at'].toString())
+          : null,
       displayOrder: map['display_order'] is int 
           ? map['display_order'] as int 
           : int.tryParse(map['display_order']?.toString() ?? '0') ?? 0,
@@ -61,6 +66,7 @@ class NewsBrief {
       'summary': summary,
       'published_at': publishedAt.toIso8601String(),
       'fetched_date': fetchedDate,
+      'fetched_at': fetchedAt?.toIso8601String(),
       'display_order': displayOrder,
       'is_active': isActive ? 1 : 0,
       'image_url': imageUrl,

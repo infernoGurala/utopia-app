@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
@@ -709,7 +710,8 @@ class _FocusScreenState extends State<FocusScreen> {
                               child: _FeatureCard(
                                 title: 'Daily Note',
                                 description: 'Write your thoughts\nand ideas',
-                                icon: Icons.edit_note_rounded,
+                                icon: Icons.event_repeat_rounded,
+                                svgAsset: 'assets/icons/routine_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
                                 iconColor: U.blue,
                                 statLabel: _dailyNoteInsight,
                                 statColor: U.blue,
@@ -725,7 +727,8 @@ class _FocusScreenState extends State<FocusScreen> {
                               child: _FeatureCard(
                                 title: 'Reminders',
                                 description: 'Stay on top of your\nimportant tasks',
-                                icon: Icons.notifications_outlined,
+                                icon: Icons.alarm_on_rounded,
+                                svgAsset: 'assets/icons/alarm_smart_wake_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
                                 iconColor: U.lavender,
                                 statLabel: _remindersInsight,
                                 statColor: U.lavender,
@@ -759,6 +762,7 @@ class _FocusScreenState extends State<FocusScreen> {
                       title: 'Activity',
                       description: 'Track your habits\nand progress',
                       icon: Icons.grid_view_rounded,
+                      svgAsset: 'assets/icons/full_stacked_bar_chart_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
                       iconColor: U.peach,
                       statLabel: '$_activeHabits habits active',
                       statColor: U.peach,
@@ -788,6 +792,7 @@ class _FeatureCard extends StatelessWidget {
   final String title;
   final String description;
   final IconData icon;
+  final String? svgAsset;
   final Color iconColor;
   final String statLabel;
   final Color statColor;
@@ -799,6 +804,7 @@ class _FeatureCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.icon,
+    this.svgAsset,
     required this.iconColor,
     required this.statLabel,
     required this.statColor,
@@ -864,7 +870,9 @@ class _FeatureCard extends StatelessWidget {
                     width: 1,
                   ),
                 ),
-                child: Icon(icon, color: iconColor, size: 22),
+                child: svgAsset != null
+                    ? SvgPicture.asset(svgAsset!, width: 22, height: 22, colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn))
+                    : Icon(icon, color: iconColor, size: 22),
               ),
               Container(
                 padding: const EdgeInsets.all(7),
@@ -950,7 +958,9 @@ class _FeatureCard extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Icon(icon, color: iconColor, size: 24),
+          child: svgAsset != null
+              ? SvgPicture.asset(svgAsset!, width: 24, height: 24, colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn))
+              : Icon(icon, color: iconColor, size: 24),
         ),
         const SizedBox(width: 16),
         Expanded(

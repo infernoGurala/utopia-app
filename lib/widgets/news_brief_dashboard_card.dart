@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -18,9 +19,11 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isPressed = false;
-  NewsBrief? _previewBrief;
+  List<NewsBrief> _allBriefs = [];
+  int _activeBriefIndex = 0;
   int _categoryCount = 0;
   String _lastUpdatedStr = 'Updated just now';
+  Timer? _rotationTimer;
 
   @override
   void initState() {
@@ -28,49 +31,67 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
     _loadPreviewData();
   }
 
+  @override
+  void dispose() {
+    _rotationTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadPreviewData() async {
     if (!mounted) return;
+    _rotationTimer?.cancel();
     setState(() {
       _isLoading = true;
       _hasError = false;
     });
 
     try {
-      final briefs = await NewsBriefRepository().getTodaysBriefs();
+      final repo = NewsBriefRepository();
+      final briefs = await repo.getTodaysBriefs();
       
-      NewsBrief? topBrief;
+      final allAvailableBriefs = <NewsBrief>[];
       int activeCategories = 0;
 
-      // Find the first brief available in any category as a preview
-      final categoryOrder = ['india', 'world', 'tech', 'economy', 'sports', 'culture'];
-      for (final cat in categoryOrder) {
-        if (briefs.containsKey(cat) && briefs[cat]!.isNotEmpty) {
-          activeCategories++;
-          topBrief ??= briefs[cat]!.first;
-        }
-      }
-
-      // Check others too in case
       briefs.forEach((cat, list) {
-        if (!categoryOrder.contains(cat) && list.isNotEmpty) {
+        if (list.isNotEmpty) {
           activeCategories++;
-          topBrief ??= list.first;
+          allAvailableBriefs.addAll(list);
         }
       });
 
+      // Shuffle them so they roll randomly!
+      allAvailableBriefs.shuffle();
+
+      // Find the last cron run time: prefer fetchedAt (exact), fall back to
+      // the most recent publishedAt (close approximation).
+      DateTime? lastCronRun;
+      DateTime? latestPublished;
+      for (final b in allAvailableBriefs) {
+        if (b.fetchedAt != null) {
+          if (lastCronRun == null || b.fetchedAt!.isAfter(lastCronRun)) {
+            lastCronRun = b.fetchedAt;
+          }
+        }
+        if (latestPublished == null || b.publishedAt.isAfter(latestPublished)) {
+          latestPublished = b.publishedAt;
+        }
+      }
+      final effectiveTime = lastCronRun ?? latestPublished;
+
       if (mounted) {
         setState(() {
-          _previewBrief = topBrief;
+          _allBriefs = allAvailableBriefs;
+          _activeBriefIndex = 0;
           _categoryCount = activeCategories;
           _isLoading = false;
           _hasError = false;
           
-          final localBrief = topBrief;
-          if (localBrief != null) {
-            final now = DateTime.now();
-            final diff = now.difference(localBrief.publishedAt);
-            if (diff.inHours <= 0) {
+          if (effectiveTime != null) {
+            final diff = DateTime.now().difference(effectiveTime);
+            if (diff.inMinutes < 2) {
               _lastUpdatedStr = 'Updated just now';
+            } else if (diff.inMinutes < 60) {
+              _lastUpdatedStr = 'Updated ${diff.inMinutes} min ago';
             } else if (diff.inHours == 1) {
               _lastUpdatedStr = 'Updated 1 hour ago';
             } else {
@@ -80,6 +101,17 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
             _lastUpdatedStr = 'Updated just now';
           }
         });
+
+        // Start periodic rotation every 4 seconds
+        if (allAvailableBriefs.length > 1) {
+          _rotationTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+            if (mounted) {
+              setState(() {
+                _activeBriefIndex = (_activeBriefIndex + 1) % _allBriefs.length;
+              });
+            }
+          });
+        }
       }
     } catch (e) {
       debugPrint('NewsBriefDashboardCard: Error loading preview: $e');
@@ -103,7 +135,7 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
       cardContent = _buildLoadingState(isDark);
     } else if (_hasError) {
       cardContent = _buildErrorState(isDark);
-    } else if (_previewBrief == null) {
+    } else if (_allBriefs.isEmpty) {
       cardContent = _buildEmptyState(isDark);
     } else {
       cardContent = _buildLoadedState(isDark);
@@ -168,7 +200,7 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
             ),
           ),
           child: Icon(
-            Icons.language_rounded,
+            Icons.newspaper_rounded,
             color: U.primary,
             size: 22,
           ),
@@ -191,14 +223,42 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
                 ),
               ),
               const SizedBox(height: 5),
-              Text(
-                _previewBrief!.headline,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  color: U.text.withValues(alpha: 0.9),
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14.5,
+              ClipRect(
+                child: SizedBox(
+                  height: 22,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 550),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      final isEntering = (child.key as ValueKey<int>).value == _activeBriefIndex;
+                      return SlideTransition(
+                        position: Tween<Offset>(
+                          begin: isEntering ? const Offset(0.0, 1.0) : const Offset(0.0, -1.0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeInOutCubic,
+                        )),
+                        child: FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      key: ValueKey(_activeBriefIndex),
+                      child: Text(
+                        _allBriefs[_activeBriefIndex].headline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          color: U.text.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14.5,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 5),

@@ -534,6 +534,8 @@ class FocusSupabaseService {
     } catch (e) {
       debugPrint('Focus sync failed: $e');
     }
+  }
+
   Future<void> syncDownAllData() async {
     final userId = _userId;
     if (userId.isEmpty || !_initialized || _client == null) return;

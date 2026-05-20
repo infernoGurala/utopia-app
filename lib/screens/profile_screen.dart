@@ -13,7 +13,6 @@ import '../main.dart';
 import '../services/cache_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
-import 'legal_policies_screen.dart';
 import 'university_selection_screen.dart';
 import 'user_profile_screen.dart';
 import 'utopia_section_screen.dart';
@@ -533,24 +532,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Legal & Policies
-                      _groupedTile(
-                        icon: Icons.gavel_outlined,
-                        label: 'Legal & Policies',
-                        sub: 'Terms, privacy, and academic guidelines',
-                        color: U.primary,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const LegalPoliciesScreen(),
-                          ),
-                        ),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
                       // UTOPIA Section
                       _groupedTile(
                         icon: Icons.rocket_launch_outlined,

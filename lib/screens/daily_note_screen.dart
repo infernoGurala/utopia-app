@@ -31,6 +31,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   Set<String> _noteDates = {};
   final Set<String> _collapsedSections = {};
   bool _isDraggingCalendar = false;
+  bool _isDraggingBack = false;
 
   final _journalController = TextEditingController();
   final _taskController = TextEditingController();
@@ -869,18 +870,42 @@ Future<void> _editHabits() async {
                               buildTomorrowPanel(),
                             ],
                           )
-                        : ListView.builder(
+                        : ReorderableListView.builder(
+                            proxyDecorator: (child, index, animation) {
+                              return AnimatedBuilder(
+                                animation: animation,
+                                builder: (context, child) {
+                                  final double scale = lerpDouble(1.0, 1.03, animation.value)!;
+                                  final double elevation = lerpDouble(0.0, 8.0, animation.value)!;
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      elevation: elevation,
+                                      shadowColor: Colors.black.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: child,
+                              );
+                            },
+                            onReorder: (oldIndex, newIndex) {
+                              setSheetState(() {
+                                if (newIndex > oldIndex) newIndex -= 1;
+                                final item = localHabits.removeAt(oldIndex);
+                                localHabits.insert(newIndex, item);
+                              });
+                            },
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                            itemCount: localHabits.length + 1,
+                            itemCount: localHabits.length,
+                            footer: Padding(
+                              padding: const EdgeInsets.only(left: 24, right: 24, top: 12, bottom: 24),
+                              child: buildTomorrowPanel(),
+                            ),
                             itemBuilder: (context, index) {
-                              if (index == localHabits.length) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 12, bottom: 24),
-                                  child: buildTomorrowPanel(),
-                                );
-                              }
-
                               final habit = localHabits[index];
                               return Dismissible(
                                 key: Key(habit),
@@ -956,7 +981,13 @@ Future<void> _editHabits() async {
                                               });
                                             },
                                           ),
-                                          const SizedBox(width: 8),
+                                          ReorderableDragStartListener(
+                                            index: index,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(right: 12),
+                                              child: Icon(Icons.drag_handle_rounded, color: U.dim, size: 22),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
@@ -1057,8 +1088,18 @@ Future<void> _editHabits() async {
         body: GestureDetector(
         behavior: HitTestBehavior.translucent,
         onHorizontalDragStart: (details) {
+          final startX = details.globalPosition.dx;
           final isOpen = _calendarController.value > 0.5;
-          final startFromRight = details.globalPosition.dx > screenWidth * 0.45;
+          final startFromRight = startX > screenWidth * 0.45;
+
+          // Swipe from left edge → navigate back
+          if (!isOpen && startX < 40) {
+            _isDraggingCalendar = false;
+            _isDraggingBack = true;
+            return;
+          }
+
+          _isDraggingBack = false;
           if (isOpen || startFromRight) {
             _isDraggingCalendar = true;
             _calendarController.stop();
@@ -1067,11 +1108,18 @@ Future<void> _editHabits() async {
           }
         },
         onHorizontalDragUpdate: (details) {
-          if (!_isDraggingCalendar) return;
+          if (_isDraggingBack || !_isDraggingCalendar) return;
           // Multiplying dx by 1.6 to make the slider extremely responsive and direct!
           _calendarController.value = (_calendarController.value - (details.delta.dx * 1.6) / contentWidth).clamp(0.0, 1.0);
         },
         onHorizontalDragEnd: (details) {
+          if (_isDraggingBack) {
+            _isDraggingBack = false;
+            if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+              Navigator.of(context).pop();
+            }
+            return;
+          }
           if (!_isDraggingCalendar) return;
           _isDraggingCalendar = false;
           // Lowered velocity trigger from 200 to 140, and value threshold from 0.3 to 0.18 for instant spring activation
@@ -1356,7 +1404,7 @@ Future<void> _editHabits() async {
                         duration: const Duration(milliseconds: 200),
                         decoration: BoxDecoration(
                           color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                           border: isSelected ? Border.all(color: U.primary.withValues(alpha: 0.2)) : null,
                         ),
                       ),
@@ -1469,63 +1517,36 @@ Future<void> _editHabits() async {
                   ),
                 ],
               ),
-              child: SafeArea(
-                bottom: true,
-                child: Stack(
+              child: GestureDetector(
+                onTap: _closeCalendar,
+                onHorizontalDragEnd: (d) {
+                  if (d.primaryVelocity != null && d.primaryVelocity! > 100) {
+                    _closeCalendar();
+                  }
+                },
+                behavior: HitTestBehavior.translucent,
+                child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 96),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
                       child: _buildCalendarBody(),
                     ),
-                    Positioned(
-                      left: 16,
-                      right: 16,
-                      bottom: 24,
-                      child: GestureDetector(
-                        onTap: _closeCalendar,
-                        child: Container(
-                          height: 56,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                U.primary.withValues(alpha: 0.12),
-                                U.primary.withValues(alpha: 0.04),
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: U.primary.withValues(alpha: 0.3),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: U.primary.withValues(alpha: 0.05),
-                                blurRadius: 15,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.arrow_forward_rounded, color: U.primary, size: 20),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Slide Back',
-                                style: GoogleFonts.outfit(
-                                  color: U.text,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    const Spacer(),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      color: U.primary.withValues(alpha: 0.35),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap to close',
+                      style: GoogleFonts.outfit(
+                        color: U.dim.withValues(alpha: 0.4),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const Spacer(),
                   ],
                 ),
               ),
@@ -1558,7 +1579,16 @@ Future<void> _editHabits() async {
     final accent = U.blue;
     final icon = Icons.track_changes_rounded;
 
-    final habits = _note?.habitsState.keys.toList() ?? [];
+    // Use the userHabits list order (respects reorder) as the source of truth,
+    // then append any extra habits only present in habitsState (legacy/edge case).
+    final habitsStateKeys = _note?.habitsState.keys.toSet() ?? <String>{};
+    final orderedTemplate = _userHabits?.habits ?? [];
+    final habits = <String>[
+      for (final h in orderedTemplate)
+        if (habitsStateKeys.contains(h)) h,
+      for (final h in habitsStateKeys)
+        if (!orderedTemplate.contains(h)) h,
+    ];
     if (habits.isEmpty) {
       final today = DateTime.now();
       final todayDate = DateTime(today.year, today.month, today.day);
