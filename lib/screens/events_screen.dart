@@ -481,15 +481,6 @@ class _EventsScreenState extends State<EventsScreen> {
                       color: isSelected ? Colors.transparent : U.border.withValues(alpha: 0.5),
                       width: 1.0,
                     ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: U.primary.withValues(alpha: 0.25),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : null,
                   ),
                   child: Text(
                     category,
