@@ -386,7 +386,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                 style: GoogleFonts.outfit(
                                   color: onImageSubtitleColor,
                                   fontSize: 13.5,
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -539,7 +539,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                       _motivationalText,
                                       style: GoogleFonts.outfit(
                                         fontSize: 15,
-                                        fontWeight: FontWeight.w400,
+                                        fontWeight: FontWeight.w500,
                                         color: motivationalColor,
                                         height: 1.45,
                                       ),

@@ -39,8 +39,8 @@ class ImageOverlayColors {
 
   // ── Rosé Pine Dawn ── (light theme)
   static const _rosePineDawn = {
-    'morning':   _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)),
-    'afternoon': _Quad(Color(0xFF360A08), Color(0xFF381514), Color(0xFF1F0403), Color(0xFF330705)),
+    'morning':   _Quad(Color(0xFF8F2A43), Color(0xFF191724), Color(0xFF191724), Color(0xFF191724)),
+    'afternoon': _Quad(Color(0xFF8F2A43), Color(0xFF191724), Color(0xFF191724), Color(0xFF191724)),
     'evening':   _Quad(Color(0xFFFEE9E7), Color(0xFFF8CFCB), Color(0xFFFFFFFF), Color(0xFFFEE9E7)),
     'night':     _Quad(Color(0xFFFAD1CE), Color(0xFFE8DCDA), Color(0xFFFFFFFF), Color(0xFFFAF4ED)),
   };

@@ -65,64 +65,100 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   Future<void> _init() async {
-    await _service.initialize();
+    // Start Supabase initialization in background, do not block the UI!
+    _service.initialize().then((_) {
+      if (mounted) {
+        _loadData(backgroundFetch: true);
+        _loadMonthDots(backgroundFetch: true);
+      }
+    });
+
     final prefs = await SharedPreferences.getInstance();
     _allowDeleteEnabled = prefs.getBool('daily_note_allow_delete') ?? true;
-    await _loadData();
-    await _loadMonthDots();
+
+    // Load local SQLite data instantly!
+    await _loadData(backgroundFetch: false);
+    await _loadMonthDots(backgroundFetch: false);
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool backgroundFetch = false}) async {
     if (!mounted) return;
-    setState(() => _loading = true);
     final dateStr = _dateStr(_selectedDate);
-    final note = await _service.loadNote(dateStr);
-    final userHabits = await _service.getUserHabits();
-    
-    if (!mounted) return;
-    setState(() {
-      _userHabits = userHabits ?? FocusUserHabits(userId: _userId);
+
+    if (!backgroundFetch) {
+      setState(() => _loading = true);
+      final localNote = await _service.getLocalNote(dateStr);
+      final localUserHabits = await _service.getLocalUserHabits();
+
+      if (!mounted) return;
+      _setupLoadedData(localNote, localUserHabits, dateStr);
+      setState(() => _loading = false);
+    } else {
+      final remoteNote = await _service.loadNote(dateStr);
+      final remoteUserHabits = await _service.getUserHabits();
+
+      if (!mounted) return;
       
-      final today = DateTime.now();
-      final todayDate = DateTime(today.year, today.month, today.day);
-      final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
-      final isPast = compareDate.isBefore(todayDate);
-
-      FocusNote finalNote;
-      if (note != null) {
-        finalNote = note;
-        if (finalNote.habitsState.isEmpty && !isPast && _userHabits != null) {
-          final initialState = <String, bool>{};
-          for (final h in _userHabits!.habits) {
-            initialState[h] = false;
-          }
-          finalNote = finalNote.copyWith(habitsState: initialState);
-        }
-      } else {
-        final initialState = <String, bool>{};
-        if (!isPast && _userHabits != null) {
-          for (final h in _userHabits!.habits) {
-            initialState[h] = false;
-          }
-        }
-        finalNote = FocusNote(
-          userId: _userId,
-          date: dateStr,
-          habitsState: initialState,
-        );
+      final hasChanges = remoteNote != null && remoteNote.updatedAt != _note?.updatedAt;
+      final habitsChanged = remoteUserHabits != null && remoteUserHabits.syncStatus == 'synced';
+      
+      if (hasChanges || habitsChanged) {
+        setState(() {
+          _setupLoadedData(remoteNote, remoteUserHabits, dateStr);
+        });
       }
-
-      _note = finalNote;
-      _journalController.text = _note!.journal;
-      _loading = false;
-    });
+    }
   }
 
-  Future<void> _loadMonthDots() async {
+  void _setupLoadedData(FocusNote? note, FocusUserHabits? userHabits, String dateStr) {
+    _userHabits = userHabits ?? FocusUserHabits(userId: _userId);
+    
+    final today = DateTime.now();
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final compareDate = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final isPast = compareDate.isBefore(todayDate);
+
+    FocusNote finalNote;
+    if (note != null) {
+      finalNote = note;
+      if (finalNote.habitsState.isEmpty && !isPast && _userHabits != null) {
+        final initialState = <String, bool>{};
+        for (final h in _userHabits!.habits) {
+          initialState[h] = false;
+        }
+        finalNote = finalNote.copyWith(habitsState: initialState);
+      }
+    } else {
+      final initialState = <String, bool>{};
+      if (!isPast && _userHabits != null) {
+        for (final h in _userHabits!.habits) {
+          initialState[h] = false;
+        }
+      }
+      finalNote = FocusNote(
+        userId: _userId,
+        date: dateStr,
+        habitsState: initialState,
+      );
+    }
+
+    _note = finalNote;
+    if (_journalController.text != _note!.journal && !FocusScope.of(context).hasFocus) {
+      _journalController.text = _note!.journal;
+    }
+  }
+
+  Future<void> _loadMonthDots({bool backgroundFetch = false}) async {
     final start = DateTime(_calendarMonth.year, _calendarMonth.month, 1);
     final end = DateTime(_calendarMonth.year, _calendarMonth.month + 1, 0);
-    final dates = await _service.getNoteDates(_dateStr(start), _dateStr(end));
-    if (mounted) setState(() => _noteDates = dates);
+
+    if (!backgroundFetch) {
+      final localDates = await _service.getLocalNoteDates(_dateStr(start), _dateStr(end));
+      if (mounted) setState(() => _noteDates = localDates);
+    } else {
+      final remoteDates = await _service.getNoteDates(_dateStr(start), _dateStr(end));
+      if (mounted) setState(() => _noteDates = remoteDates);
+    }
   }
 
   void _closeCalendar() {
@@ -219,7 +255,8 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       _saveNote();
     }
     setState(() => _selectedDate = date);
-    _loadData();
+    _loadData(backgroundFetch: false);
+    _loadData(backgroundFetch: true);
   }
 
   void _toggleHabit(String habit) {

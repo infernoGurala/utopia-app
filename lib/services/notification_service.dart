@@ -18,6 +18,7 @@ import 'package:utopia_app/widgets/app_motion.dart';
 import 'package:utopia_app/widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:utopia_app/models/focus_models.dart';
 
@@ -123,7 +124,12 @@ class NotificationService {
         return;
       }
       tz.initializeTimeZones();
-      tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+      try {
+        final String timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+      } catch (_) {
+        tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+      }
 
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('ic_notification');
@@ -611,10 +617,13 @@ class NotificationService {
       // Ensure service is initialized
       await initialize();
 
-      // Ensure timezone is initialized and set to IST
+      // Ensure timezone is initialized
       tz.initializeTimeZones();
-      final ist = tz.getLocation('Asia/Kolkata');
-      tz.setLocalLocation(ist);
+      try {
+        final String timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+      } catch (_) {}
+      final localLocation = tz.local;
 
       await _localNotifications.cancel(100);
 
@@ -623,9 +632,9 @@ class NotificationService {
       await prefs.setInt('timetable_notif_minute', minute);
       await prefs.setBool('timetable_notif_enabled', true);
 
-      final now = tz.TZDateTime.now(ist);
+      final now = tz.TZDateTime.now(localLocation);
       var scheduledDate = tz.TZDateTime(
-        ist,
+        localLocation,
         now.year,
         now.month,
         now.day,
@@ -757,7 +766,7 @@ class NotificationService {
     try {
       debugPrint("NOTIF: Starting scheduling for reminder: ID=${reminder.id}, Label=${reminder.label}, Type=${reminder.type}, Time=${reminder.reminderTime}, Active=${reminder.isActive}");
       await initialize();
-      final ist = tz.getLocation('Asia/Kolkata');
+      final ist = tz.local;
       
       // Cancel any pre-existing notifications for this reminder
       await cancelFocusReminder(reminder.id!);

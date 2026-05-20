@@ -212,6 +212,27 @@ class FocusSupabaseService {
     }
   }
 
+  /// Get local note from SQLite directly without any network calls
+  Future<FocusNote?> getLocalNote(String date) async {
+    final userId = _userId;
+    if (userId.isEmpty) return null;
+    return _db.getNote(userId, date);
+  }
+
+  /// Get local user habits from SQLite directly without any network calls
+  Future<FocusUserHabits?> getLocalUserHabits() async {
+    final userId = _userId;
+    if (userId.isEmpty) return null;
+    return _db.getUserHabits(userId);
+  }
+
+  /// Get local note dates from SQLite directly without any network calls
+  Future<Set<String>> getLocalNoteDates(String startDate, String endDate) async {
+    final userId = _userId;
+    if (userId.isEmpty) return {};
+    return _db.getNoteDates(userId, startDate, endDate);
+  }
+
   /// Load a note for a specific date. SQLite first, then Supabase refresh.
   Future<FocusNote?> loadNote(String date) async {
     final userId = _userId;

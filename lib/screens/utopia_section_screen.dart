@@ -16,6 +16,7 @@ class CreatorApp {
   final String packageName;
   final String githubRepo;
   final IconData icon;
+  final String imageAsset;
   final Color color;
   final String sub;
   
@@ -31,6 +32,7 @@ class CreatorApp {
     required this.packageName,
     required this.githubRepo,
     required this.icon,
+    required this.imageAsset,
     required this.color,
     required this.sub,
   });
@@ -58,14 +60,16 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
       packageName: 'com.delve.app',
       githubRepo: 'infernoGurala/Delve-app',
       icon: Icons.explore_outlined,
+      imageAsset: 'assets/apps_icons/delve.jpeg',
       color: Colors.deepPurpleAccent,
-      sub: 'A clean and fast student companion app.',
+      sub: 'intelligent word learning app.',
     ),
     CreatorApp(
       name: 'Interceptor',
       packageName: 'com.interceptor.interceptor',
       githubRepo: 'infernoGurala/Interceptor-app',
       icon: Icons.hourglass_empty_outlined,
+      imageAsset: 'assets/apps_icons/interceptor.jpeg',
       color: Colors.tealAccent,
       sub: 'A personal doom-scrolling replacement app.',
     ),
@@ -168,6 +172,65 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No release URL found for your device ABI.')),
       );
+      return;
+    }
+
+    // Check unknown app install permission before starting the download
+    final bool canInstall = await _channel.invokeMethod<bool>('canInstallApk') ?? false;
+    if (!canInstall) {
+      if (!mounted) return;
+      final bool? proceed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: U.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: U.border),
+          ),
+          title: Text(
+            'Install Permission Required',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.w700,
+              color: U.text,
+            ),
+          ),
+          content: Text(
+            'To download and install ${app.name}, UTOPIA requires the "Install Unknown Apps" permission. Would you like to enable it now?',
+            style: GoogleFonts.outfit(
+              color: U.sub,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.outfit(
+                  color: U.sub,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Open Settings',
+                style: GoogleFonts.outfit(
+                  color: U.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (proceed == true) {
+        await _channel.invokeMethod('openInstallPermissionSettings');
+      }
       return;
     }
     
@@ -443,7 +506,15 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> with WidgetsB
                             color: app.color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(app.icon, color: app.color, size: 22),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              app.imageAsset,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(app.icon, color: app.color, size: 22),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         // App Details
