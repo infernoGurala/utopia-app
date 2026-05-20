@@ -163,7 +163,12 @@ class FileUploadService {
 
     onProgress?.call(0.0);
 
-    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/raw/upload');
+    // Determine Cloudinary resource type (image vs raw) based on file extension
+    final ext = originalFilename.split('.').last.toLowerCase();
+    final isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'heic', 'heif'].contains(ext);
+    final resourceType = isImage ? 'image' : 'raw';
+
+    final uri = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/$resourceType/upload');
     final request = http.MultipartRequest('POST', uri)
       ..fields['api_key'] = apiKey
       ..fields['timestamp'] = unixTs.toString()
@@ -188,6 +193,17 @@ class FileUploadService {
     }
 
     onProgress?.call(1.0);
+
+    try {
+      final responseData = jsonDecode(response.body);
+      final secureUrl = responseData['secure_url'] as String?;
+      if (secureUrl != null && secureUrl.isNotEmpty) {
+        return secureUrl;
+      }
+    } catch (e) {
+      debugPrint('FileUploadService: Failed to parse secure_url from response: $e');
+    }
+
     return '${publicBaseUrl.replaceFirst(RegExp(r'/+$'), '')}/$publicId';
   }
 
