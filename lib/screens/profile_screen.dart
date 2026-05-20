@@ -43,6 +43,94 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showSignOutConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: U.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.logout_rounded, color: U.red, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Sign Out',
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to sign out of UTOPIA? You will need to sign back in to access your reminders, focus sessions, and academic data.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(
+            color: U.sub,
+            fontSize: 14,
+            height: 1.5,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: U.text,
+                    side: BorderSide(color: U.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _signOut();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: U.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text(
+                    'Sign Out',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _selectThemeStyle() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _updatingTheme) {
@@ -467,7 +555,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Minimal Logout Button
                 Center(
                   child: TextButton.icon(
-                    onPressed: _signOut,
+                    onPressed: _showSignOutConfirmDialog,
                     icon: Icon(Icons.logout_rounded, size: 16, color: U.red.withValues(alpha: 0.7)),
                     label: Text(
                       'Sign Out',

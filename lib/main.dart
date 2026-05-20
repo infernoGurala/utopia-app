@@ -862,7 +862,58 @@ class UtopiaApp extends StatelessWidget {
               ),
               iconTheme: IconThemeData(color: U.text),
             ),
-            dividerColor: U.border,
+             dividerColor: U.border,
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: U.surface,
+              headerBackgroundColor: Colors.transparent,
+              headerForegroundColor: U.text,
+              dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
+                  return U.text.withValues(alpha: 0.3);
+                }
+                if (states.contains(WidgetState.selected)) {
+                  return U.bg;
+                }
+                return U.text;
+              }),
+              dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return U.primary;
+                }
+                return null;
+              }),
+              todayForegroundColor: WidgetStateProperty.all(U.primary),
+              todayBackgroundColor: WidgetStateProperty.all(Colors.transparent),
+              todayBorder: BorderSide(color: U.primary, width: 1.5),
+              confirmButtonStyle: TextButton.styleFrom(
+                foregroundColor: U.primary,
+                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+              ),
+              cancelButtonStyle: TextButton.styleFrom(
+                foregroundColor: U.sub,
+                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+              ),
+            ),
+             timePickerTheme: TimePickerThemeData(
+              backgroundColor: U.surface,
+              dialBackgroundColor: U.bg,
+              dialHandColor: U.primary,
+              dialTextColor: U.text,
+              entryModeIconColor: U.primary,
+              hourMinuteColor: U.bg,
+              hourMinuteTextColor: U.text,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              confirmButtonStyle: TextButton.styleFrom(
+                foregroundColor: U.primary,
+                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+              ),
+              cancelButtonStyle: TextButton.styleFrom(
+                foregroundColor: U.sub,
+                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+              ),
+            ),
           ),
           home: const AppLoadingOverlay(child: AuthGate()),
         );

@@ -1091,27 +1091,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               FilledButton.tonal(
                 onPressed: () async {
                   final now = DateTime.now();
-                  final picked = await showDatePicker(
+                   final picked = await showDatePicker(
                     context: context,
                     initialDate: _selectedCalendarDate,
                     firstDate: DateTime(2020),
                     lastDate: now,
                     builder: (context, child) {
-                      final isDark = Theme.of(context).brightness == Brightness.dark;
+                      final theme = Theme.of(context);
                       return Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: isDark
-                              ? ColorScheme.dark(
-                                  primary: U.green,
-                                  surface: U.card,
-                                  onSurface: U.text,
-                                )
-                              : ColorScheme.light(
-                                  primary: U.green,
-                                  onPrimary: Colors.white,
-                                  surface: U.card,
-                                  onSurface: U.text,
-                                ),
+                        data: theme.copyWith(
+                          colorScheme: theme.colorScheme.copyWith(
+                            primary: U.green,
+                          ),
+                          datePickerTheme: theme.datePickerTheme.copyWith(
+                            todayForegroundColor: WidgetStateProperty.all(U.green),
+                            todayBorder: BorderSide(color: U.green, width: 1.5),
+                            dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+                              if (states.contains(WidgetState.selected)) {
+                                return U.green;
+                              }
+                              return null;
+                            }),
+                          ),
                         ),
                         child: child!,
                       );

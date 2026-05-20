@@ -56,6 +56,13 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     return !selected.isBefore(today);
   }
 
+  bool get _isFuture {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    return selected.isAfter(today);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -260,7 +267,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   void _toggleHabit(String habit) {
-    if (!_isToday) return;
+    if (_isFuture) return;
     if (_note == null) return;
     final state = Map<String, bool>.from(_note!.habitsState);
     state[habit] = !(state[habit] ?? false);
@@ -280,7 +287,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   void _toggleTask(int index) {
-    if (!_isToday) return;
+    if (_isFuture) return;
     if (_note == null) return;
     final tasks = List<Map<String, dynamic>>.from(_note!.tasks);
     tasks[index]['completed'] = !(tasks[index]['completed'] == true);
@@ -1813,7 +1820,7 @@ Future<void> _editHabits() async {
     required VoidCallback? onTextTap,
     VoidCallback? onDelete,
   }) {
-    final enabled = _isToday;
+    final enabled = !_isFuture;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(

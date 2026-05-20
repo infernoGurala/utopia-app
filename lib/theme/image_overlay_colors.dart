@@ -71,8 +71,8 @@ class ImageOverlayColors {
 
   // ── Gruvbox ── (dark theme)
   static const _gruvbox = {
-    'morning':   _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFFF292821)),
-    'afternoon': _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFFF292821)),
+    'morning':   _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFF292821)),
+    'afternoon': _Quad(Color(0xFF260900), Color(0xFF292821), Color(0xFF211600), Color(0xFF292821)),
     'evening':   _Quad(Color(0xFFFE8019), Color(0xFFA89984), Color(0xFFEBDBB2), Color(0xFFBDAE93)),
     'night':     _Quad(Color(0xFFFB4934), Color(0xFFEBDBB2), Color(0xFFFBF1C7), Color(0xFFD5C4A1)),
   };

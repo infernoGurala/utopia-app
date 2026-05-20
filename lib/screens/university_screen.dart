@@ -16,6 +16,7 @@ import 'map_screen.dart';
 import 'uni_chat_screen.dart';
 import 'docs_screen.dart';
 import 'events_screen.dart';
+import 'timetable_screen.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -280,6 +281,17 @@ class _UniversityScreenState extends State<UniversityScreen> {
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => const MapScreen()),
+                          ),
+                        ),
+                        _UniversityCard(
+                          title: 'Timetable',
+                          subtitle: 'Plan your day\nand lectures',
+                          icon: Icons.calendar_month_rounded,
+                          color: const Color(0xFFF43F5E),
+                          delay: 500,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TimetableScreen()),
                           ),
                         ),
                       ],

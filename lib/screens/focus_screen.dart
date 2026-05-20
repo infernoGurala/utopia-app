@@ -258,13 +258,14 @@ class _FocusScreenState extends State<FocusScreen> {
     final greetingText = _generateRandomGreeting(timeSlot);
     final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
     final themeKey = appThemeNotifier.value.key;
+    final isDarkTheme = appThemeNotifier.value.isDark;
+
     final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
     final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
     final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
     final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
 
     final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
-    final isDarkTheme = appThemeNotifier.value.isDark;
     final useLightStatusBarIcons = isDarkSky || isDarkTheme;
 
     SystemChrome.setSystemUIOverlayStyle(

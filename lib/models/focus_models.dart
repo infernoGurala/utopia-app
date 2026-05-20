@@ -409,6 +409,26 @@ class FocusReminder {
         return '${n}th';
     }
   }
+
+  bool get isCompleted {
+    if (type == 'one_time' && remindDate != null) {
+      try {
+        final dateParts = remindDate!.split('-');
+        final timeParts = reminderTime.split(':');
+        final scheduled = DateTime(
+          int.parse(dateParts[0]),
+          int.parse(dateParts[1]),
+          int.parse(dateParts[2]),
+          int.parse(timeParts[0]),
+          int.parse(timeParts[1]),
+        );
+        return scheduled.isBefore(DateTime.now());
+      } catch (_) {
+        return false;
+      }
+    }
+    return false;
+  }
 }
 
 /// Parsed data from a daily note's Tasks section
