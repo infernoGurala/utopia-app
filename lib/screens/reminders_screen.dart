@@ -30,6 +30,7 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
 
   bool _hasNotificationPermission = true;
   bool _hasAlarmPermission = true;
+  bool _hasBatteryPermission = true;
   bool _checkingPermissionState = true;
 
   bool _reminderAppliesToDay(FocusReminder r, DateTime day) {
@@ -76,10 +77,12 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
   Future<void> _checkPermissions() async {
     final notifEnabled = await NotificationService.areNotificationPermissionsEnabled();
     final alarmEnabled = await NotificationService.canScheduleExactNotifications();
+    final batteryIgnored = await NotificationService.isBatteryOptimizationIgnored();
     if (mounted) {
       setState(() {
         _hasNotificationPermission = notifEnabled;
         _hasAlarmPermission = alarmEnabled;
+        _hasBatteryPermission = batteryIgnored;
         _checkingPermissionState = false;
       });
     }
@@ -438,6 +441,76 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
             ),
           ),
         ).animate().fadeIn(delay: 100.ms, duration: 550.ms).slideY(begin: 0.08, end: 0, delay: 100.ms, duration: 550.ms),
+
+        if (!_hasBatteryPermission)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: U.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: U.red.withValues(alpha: 0.35),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: U.red.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.battery_alert_rounded, color: U.red, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Uninterrupted Alarms',
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Battery saver may block reminders. Tap to exclude UTOPIA.',
+                          style: GoogleFonts.outfit(
+                            color: U.sub,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () async {
+                      await NotificationService.requestIgnoreBatteryOptimization();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      backgroundColor: U.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      'Enable',
+                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0, duration: 400.ms),
 
         // List
         Expanded(

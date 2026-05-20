@@ -314,6 +314,36 @@ class FocusReminder {
   }
 
   factory FocusReminder.fromMap(Map<String, dynamic> map) {
+    List<int>? parsedWeekdays;
+    if (map['weekdays'] != null) {
+      if (map['weekdays'] is List) {
+        parsedWeekdays = (map['weekdays'] as List)
+            .map((e) => e is int ? e : int.parse(e.toString()))
+            .toList();
+      } else if (map['weekdays'] is String && (map['weekdays'] as String).isNotEmpty) {
+        parsedWeekdays = (map['weekdays'] as String)
+            .split(',')
+            .where((s) => s.trim().isNotEmpty)
+            .map(int.parse)
+            .toList();
+      }
+    }
+
+    List<int>? parsedActiveMonths;
+    if (map['active_months'] != null) {
+      if (map['active_months'] is List) {
+        parsedActiveMonths = (map['active_months'] as List)
+            .map((e) => e is int ? e : int.parse(e.toString()))
+            .toList();
+      } else if (map['active_months'] is String && (map['active_months'] as String).isNotEmpty) {
+        parsedActiveMonths = (map['active_months'] as String)
+            .split(',')
+            .where((s) => s.trim().isNotEmpty)
+            .map(int.parse)
+            .toList();
+      }
+    }
+
     return FocusReminder(
       id: map['id']?.toString(),
       userId: map['user_id'] as String,
@@ -321,13 +351,9 @@ class FocusReminder {
       type: map['type'] as String,
       reminderTime: map['reminder_time'] as String,
       remindDate: map['remind_date'] as String?,
-      weekdays: map['weekdays'] != null
-          ? (map['weekdays'] as String).split(',').map(int.parse).toList()
-          : null,
+      weekdays: parsedWeekdays,
       monthDay: map['month_day'] as int?,
-      activeMonths: map['active_months'] != null
-          ? (map['active_months'] as String).split(',').map(int.parse).toList()
-          : null,
+      activeMonths: parsedActiveMonths,
       isActive: (map['is_active'] is bool)
           ? map['is_active'] as bool
           : (map['is_active'] as int) == 1,

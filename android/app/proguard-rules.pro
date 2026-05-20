@@ -12,3 +12,37 @@
 -dontwarn com.google.android.play.core.**
 -keep class com.google.android.play.core.** { *; }
 
+# ── flutter_local_notifications ──
+# Keep ALL classes, members, constructors, and field names.
+# The plugin uses Gson reflection to serialize/deserialize notification
+# details into AlarmManager intents. R8 stripping field names or
+# constructors causes zonedSchedule to silently fail in release builds.
+-keep class com.dexterous.** { *; }
+-keepclassmembers class com.dexterous.** { *; }
+-keep class com.dexterous.flutterlocalnotifications.** { *; }
+-keepclassmembers class com.dexterous.flutterlocalnotifications.** { *; }
+-dontwarn com.dexterous.**
+
+# Keep all enum values (ScheduleMode, Importance, Priority, etc.)
+-keepclassmembers enum com.dexterous.flutterlocalnotifications.** {
+    **[] $VALUES;
+    public *;
+}
+
+# ── Gson (critical for flutter_local_notifications serialization) ──
+-keep class com.google.gson.** { *; }
+-keepclassmembers class com.google.gson.** { *; }
+-dontwarn com.google.gson.**
+-keepattributes Signature
+-keepattributes *Annotation*
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses
+
+# Keep generic type information for Gson TypeToken
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+
+# Keep fields that Gson accesses via reflection
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}

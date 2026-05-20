@@ -65,18 +65,37 @@ class AppUpdateService {
               .toString()
               .trim();
       final abi = await _channel.invokeMethod<String>('getAbi');
-      String apkUrl = (data['androidApkUrl'] ?? data['apkUrl'] ?? '')
-          .toString()
-          .trim();
+      // Space-immune and case-insensitive helper to find the exact key in Firestore data map
+      String? findKeyIgnoreCaseAndWhitespace(String targetKey) {
+        final cleanTarget = targetKey.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        for (final k in data.keys) {
+          final cleanK = k.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+          if (cleanK == cleanTarget) {
+            return k;
+          }
+        }
+        return null;
+      }
 
-      // Architecture-specific optimization fallback
+      final defaultKey = findKeyIgnoreCaseAndWhitespace('androidApkUrl') ??
+          findKeyIgnoreCaseAndWhitespace('apkUrl');
+      String apkUrl = '';
+      if (defaultKey != null) {
+        apkUrl = data[defaultKey].toString().trim();
+      }
+
+      // Architecture-specific optimization fallback (immune to trailing/leading spaces in Firestore keys)
       if (abi != null) {
-        if (abi.contains('arm64-v8a') && data['apkUrl_arm64'] != null) {
-          apkUrl = data['apkUrl_arm64'].toString().trim();
-        } else if (abi.contains('armeabi-v7a') && data['apkUrl_v7a'] != null) {
-          apkUrl = data['apkUrl_v7a'].toString().trim();
-        } else if (abi.contains('x86_64') && data['apkUrl_x64'] != null) {
-          apkUrl = data['apkUrl_x64'].toString().trim();
+        final cleanAbi = abi.toLowerCase();
+        if (cleanAbi.contains('arm64') || cleanAbi.contains('aarch64')) {
+          final key = findKeyIgnoreCaseAndWhitespace('apkUrl_arm64');
+          if (key != null) apkUrl = data[key].toString().trim();
+        } else if (cleanAbi.contains('v7a') || cleanAbi.contains('armeabi')) {
+          final key = findKeyIgnoreCaseAndWhitespace('apkUrl_v7a');
+          if (key != null) apkUrl = data[key].toString().trim();
+        } else if (cleanAbi.contains('x86_64') || cleanAbi.contains('x64')) {
+          final key = findKeyIgnoreCaseAndWhitespace('apkUrl_x64');
+          if (key != null) apkUrl = data[key].toString().trim();
         }
       }
 

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -731,6 +732,141 @@ class NotificationService {
     }
   }
 
+  // Robust zoned scheduling wrapper that always succeeds even if a resource (like largeIcon) is missing,
+  // or if exact alarm permissions are denied.
+  static Future<void> _safeZonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    required tz.TZDateTime scheduledDate,
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    String? payload,
+    DateTimeComponents? matchDateTimeComponents,
+  }) async {
+    // 1. Try EXACT scheduling WITH Large Icon
+    try {
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: 'ic_notification',
+            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+      debugPrint("NOTIF: Scheduled successfully (exact, with large icon) for ID $id at $scheduledDate");
+      return;
+    } catch (e) {
+      debugPrint("NOTIF: Exact schedule with large icon failed for ID $id ($e). Trying exact WITHOUT large icon...");
+    }
+
+    // 2. Try EXACT scheduling WITHOUT Large Icon
+    try {
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: 'ic_notification',
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+      debugPrint("NOTIF: Scheduled successfully (exact, no large icon) for ID $id at $scheduledDate");
+      return;
+    } catch (e) {
+      debugPrint("NOTIF: Exact schedule without large icon failed for ID $id ($e). Trying inexact WITH large icon...");
+    }
+
+    // 3. Try INEXACT scheduling WITH Large Icon
+    try {
+      await _localNotifications.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDescription,
+            importance: Importance.max,
+            priority: Priority.high,
+            playSound: true,
+            enableVibration: true,
+            icon: 'ic_notification',
+            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: matchDateTimeComponents,
+        payload: payload,
+      );
+      debugPrint("NOTIF: Scheduled successfully (inexact, with large icon) for ID $id at $scheduledDate");
+      return;
+    } catch (e) {
+      debugPrint("NOTIF: Inexact schedule with large icon failed for ID $id ($e). Trying inexact WITHOUT large icon...");
+    }
+
+    // 4. Try INEXACT scheduling WITHOUT Large Icon (absolute baseline fallback)
+    await _localNotifications.zonedSchedule(
+      id,
+      title,
+      body,
+      scheduledDate,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: 'ic_notification',
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: matchDateTimeComponents,
+      payload: payload,
+    );
+    debugPrint("NOTIF: Scheduled successfully (inexact, no large icon - absolute fallback) for ID $id at $scheduledDate");
+  }
+
   // Private helper to avoid code duplication and support robust exact/inexact fallback
   static Future<void> _scheduleSingleZoned({
     required int id,
@@ -747,60 +883,17 @@ class NotificationService {
       }
     });
 
-    try {
-      await _localNotifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledDate,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'utopia_high_importance',
-            'UTOPIA Notifications',
-            channelDescription: 'Daily timetable reminders',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            icon: 'ic_notification',
-            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: components,
-        payload: payloadString,
-      );
-      debugPrint("NOTIF: Timetable notification $id scheduled successfully (exact) for $scheduledDate");
-    } catch (e) {
-      debugPrint("NOTIF: Exact zoned schedule failed for $id ($e), trying inexact fallback...");
-      await _localNotifications.zonedSchedule(
-        id,
-        title,
-        body,
-        scheduledDate,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            'utopia_high_importance',
-            'UTOPIA Notifications',
-            channelDescription: 'Daily timetable reminders',
-            importance: Importance.max,
-            priority: Priority.high,
-            playSound: true,
-            enableVibration: true,
-            icon: 'ic_notification',
-            largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: components,
-        payload: payloadString,
-      );
-      debugPrint("NOTIF: Timetable notification $id scheduled successfully (inexact) for $scheduledDate");
-    }
+    await _safeZonedSchedule(
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledDate,
+      channelId: 'utopia_high_importance',
+      channelName: 'UTOPIA Notifications',
+      channelDescription: 'Daily timetable reminders',
+      payload: payloadString,
+      matchDateTimeComponents: components,
+    );
   }
 
   static Future<void> cancelTimetableNotification() async {
@@ -853,6 +946,30 @@ class NotificationService {
     }
   }
 
+  /// Check if battery optimization is ignored/disabled for the app.
+  static Future<bool> isBatteryOptimizationIgnored() async {
+    if (!PlatformSupport.isAndroid) return true;
+    try {
+      const platform = MethodChannel('utopia_app/app_update');
+      final bool? ignored = await platform.invokeMethod<bool>('isBatteryOptimizationIgnored');
+      return ignored ?? true;
+    } catch (e) {
+      debugPrint("NOTIF: Error checking battery optimization: $e");
+      return true;
+    }
+  }
+
+  /// Direct user to system settings to disable battery optimization.
+  static Future<void> requestIgnoreBatteryOptimization() async {
+    if (!PlatformSupport.isAndroid) return;
+    try {
+      const platform = MethodChannel('utopia_app/app_update');
+      await platform.invokeMethod('requestIgnoreBatteryOptimization');
+    } catch (e) {
+      debugPrint("NOTIF: Error requesting ignore battery optimization: $e");
+    }
+  }
+
   static int _notificationIdFromUuid(String uuid) {
     return uuid.hashCode & 0x7FFFFFF0;
   }
@@ -896,56 +1013,15 @@ class NotificationService {
           return;
         }
 
-        try {
-          await _localNotifications.zonedSchedule(
-            baseId,
-            'Focus Reminder',
-            reminder.label,
-            scheduledDate,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                'utopia_high_importance',
-                'UTOPIA Notifications',
-                channelDescription: 'Focus reminders and task alerts',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: 'ic_notification',
-                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-          );
-          debugPrint("NOTIF: One-time reminder scheduled successfully (exact): baseId=$baseId for date $scheduledDate");
-        } catch (e) {
-          debugPrint("NOTIF: One-time exact scheduling failed ($e), falling back to inexact alarm...");
-          await _localNotifications.zonedSchedule(
-            baseId,
-            'Focus Reminder',
-            reminder.label,
-            scheduledDate,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                'utopia_high_importance',
-                'UTOPIA Notifications',
-                channelDescription: 'Focus reminders and task alerts',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: 'ic_notification',
-                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-          );
-          debugPrint("NOTIF: One-time reminder scheduled successfully (inexact): baseId=$baseId for date $scheduledDate");
-        }
+        await _safeZonedSchedule(
+          id: baseId,
+          title: 'Focus Reminder',
+          body: reminder.label,
+          scheduledDate: scheduledDate,
+          channelId: 'utopia_high_importance',
+          channelName: 'UTOPIA Notifications',
+          channelDescription: 'Focus reminders and task alerts',
+        );
       } else if (reminder.type == 'weekly' && reminder.weekdays != null) {
         debugPrint("NOTIF: Scheduling weekly reminder for weekdays: ${reminder.weekdays}");
         for (final weekday in reminder.weekdays!) {
@@ -959,58 +1035,16 @@ class NotificationService {
           }
 
           final dayId = baseId + weekday;
-          try {
-            await _localNotifications.zonedSchedule(
-              dayId,
-              'Weekly Reminder',
-              reminder.label,
-              scheduledDate,
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  'utopia_high_importance',
-                  'UTOPIA Notifications',
-                  channelDescription: 'Focus reminders and task alerts',
-                  importance: Importance.max,
-                  priority: Priority.high,
-                  playSound: true,
-                  enableVibration: true,
-                  icon: 'ic_notification',
-                  largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-                ),
-              ),
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-            );
-            debugPrint("NOTIF: Weekly reminder scheduled (exact) for weekday $weekday (dayId=$dayId) at $scheduledDate");
-          } catch (e) {
-            debugPrint("NOTIF: Weekly exact scheduling failed for weekday $weekday ($e), falling back to inexact alarm...");
-            await _localNotifications.zonedSchedule(
-              dayId,
-              'Weekly Reminder',
-              reminder.label,
-              scheduledDate,
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  'utopia_high_importance',
-                  'UTOPIA Notifications',
-                  channelDescription: 'Focus reminders and task alerts',
-                  importance: Importance.max,
-                  priority: Priority.high,
-                  playSound: true,
-                  enableVibration: true,
-                  icon: 'ic_notification',
-                  largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-                ),
-              ),
-              androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-            );
-            debugPrint("NOTIF: Weekly reminder scheduled (inexact) for weekday $weekday (dayId=$dayId) at $scheduledDate");
-          }
+          await _safeZonedSchedule(
+            id: dayId,
+            title: 'Weekly Reminder',
+            body: reminder.label,
+            scheduledDate: scheduledDate,
+            channelId: 'utopia_high_importance',
+            channelName: 'UTOPIA Notifications',
+            channelDescription: 'Focus reminders and task alerts',
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          );
         }
       } else if (reminder.type == 'monthly_date' && reminder.monthDay != null) {
         var scheduledDate = tz.TZDateTime(ist, now.year, now.month, reminder.monthDay!, hour, minute);
@@ -1019,58 +1053,16 @@ class NotificationService {
           scheduledDate = tz.TZDateTime(ist, now.year, now.month + 1, reminder.monthDay!, hour, minute);
         }
 
-        try {
-          await _localNotifications.zonedSchedule(
-            baseId,
-            'Monthly Reminder',
-            reminder.label,
-            scheduledDate,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                'utopia_high_importance',
-                'UTOPIA Notifications',
-                channelDescription: 'Focus reminders and task alerts',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: 'ic_notification',
-                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-          );
-          debugPrint("NOTIF: Monthly reminder scheduled successfully (exact): baseId=$baseId at $scheduledDate");
-        } catch (e) {
-          debugPrint("NOTIF: Monthly exact scheduling failed ($e), falling back to inexact alarm...");
-          await _localNotifications.zonedSchedule(
-            baseId,
-            'Monthly Reminder',
-            reminder.label,
-            scheduledDate,
-            NotificationDetails(
-              android: AndroidNotificationDetails(
-                'utopia_high_importance',
-                'UTOPIA Notifications',
-                channelDescription: 'Focus reminders and task alerts',
-                importance: Importance.max,
-                priority: Priority.high,
-                playSound: true,
-                enableVibration: true,
-                icon: 'ic_notification',
-                largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
-              ),
-            ),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
-            matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-          );
-          debugPrint("NOTIF: Monthly reminder scheduled successfully (inexact): baseId=$baseId at $scheduledDate");
-        }
+        await _safeZonedSchedule(
+          id: baseId,
+          title: 'Monthly Reminder',
+          body: reminder.label,
+          scheduledDate: scheduledDate,
+          channelId: 'utopia_high_importance',
+          channelName: 'UTOPIA Notifications',
+          channelDescription: 'Focus reminders and task alerts',
+          matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+        );
       }
     } catch (e, stack) {
       debugPrint("NOTIF: Error scheduling focus reminder: $e");

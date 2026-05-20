@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:dio/dio.dart';
 
 import '../services/app_update_service.dart';
 
@@ -20,6 +22,60 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
   String? _error;
   int _received = 0;
   int _total = 0;
+  String _deviceAbi = 'loading...';
+  String _apkSize = 'calculating...';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeviceAbi();
+    _loadApkSize();
+  }
+
+  Future<void> _loadApkSize() async {
+    try {
+      final dio = Dio();
+      final response = await dio.head(
+        widget.info.apkUrl,
+        options: Options(followRedirects: true),
+      );
+      final contentLengthStr = response.headers.value('content-length');
+      if (contentLengthStr != null) {
+        final bytes = int.tryParse(contentLengthStr);
+        if (bytes != null && mounted) {
+          setState(() {
+            _apkSize = '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+          });
+          return;
+        }
+      }
+    } catch (e, s) {
+      debugPrint('Update size check error: $e\n$s');
+      if (mounted) {
+        setState(() {
+          _apkSize = 'unknown size';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadDeviceAbi() async {
+    try {
+      const channel = MethodChannel('utopia_app/app_update');
+      final abi = await channel.invokeMethod<String>('getAbi');
+      if (mounted && abi != null) {
+        setState(() {
+          _deviceAbi = abi;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _deviceAbi = 'unknown';
+        });
+      }
+    }
+  }
 
   double? get _progress {
     if (_total <= 0) {
@@ -68,6 +124,9 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
           setState(() {
             _received = received;
             _total = total;
+            if (total > 0) {
+              _apkSize = '${(total / (1024 * 1024)).toStringAsFixed(1)} MB';
+            }
           });
         },
       );
@@ -122,14 +181,15 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
             _error = 'Could not open the installer.';
           });
       }
-    } catch (_) {
+    } catch (e, s) {
+      debugPrint('Update download failed: $e\n$s');
       if (!mounted) {
         return;
       }
       setState(() {
         _downloading = false;
         _installing = false;
-        _error = 'Download failed. Check your connection and try again.';
+        _error = 'Download failed: $e';
       });
     }
   }
@@ -201,13 +261,14 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                       ),
                       SizedBox(height: sectionGap),
                       Text(
-                        'Current: ${widget.info.currentVersion}  •  Latest: ${widget.info.latestVersion}',
+                        'Current: ${widget.info.currentVersion}  •  Latest: ${widget.info.latestVersion}  •  Arch: $_deviceAbi  •  Size: $_apkSize',
                         style: GoogleFonts.outfit(
                           color: const Color(0xFF94E2D5),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+
                       if (_downloading || _installing) ...[
                         SizedBox(height: shortHeight ? 14 : 20),
                         ClipRRect(
