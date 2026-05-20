@@ -17,6 +17,7 @@ class EventNotificationsScreen extends StatefulWidget {
 class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
   List<EventModel> _endingSoon = [];
   List<EventModel> _newEvents = [];
+  List<EventCertificate> _certificates = [];
   List<String> _dismissedIds = [];
   bool _isLoading = true;
 
@@ -38,11 +39,13 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
       final results = await Future.wait([
         EventService.instance.getEndingSoonEvents(limit: 5),
         EventService.instance.getUpcomingEvents(limit: 5),
+        EventService.instance.getMyCertificates(),
       ]);
       if (mounted) {
         setState(() {
           _endingSoon = (results[0] as List<EventModel>).where((e) => !_dismissedIds.contains(e.id)).toList();
           _newEvents = (results[1] as List<EventModel>).where((e) => !_dismissedIds.contains(e.id)).toList();
+          _certificates = (results[2] as List<EventCertificate>).where((c) => !_dismissedIds.contains(c.id)).toList();
           _isLoading = false;
         });
       }
@@ -58,6 +61,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
     setState(() {
       _endingSoon.removeWhere((e) => e.id == eventId);
       _newEvents.removeWhere((e) => e.id == eventId);
+      _certificates.removeWhere((c) => c.id == eventId);
     });
   }
 
@@ -74,6 +78,11 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
         allIdsToDismiss.add(event.id!);
       }
     }
+    for (final cert in _certificates) {
+      if (cert.id != null) {
+        allIdsToDismiss.add(cert.id!);
+      }
+    }
     if (allIdsToDismiss.isEmpty) return;
 
     _dismissedIds.addAll(allIdsToDismiss);
@@ -81,6 +90,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
     setState(() {
       _endingSoon.clear();
       _newEvents.clear();
+      _certificates.clear();
     });
   }
 
@@ -100,7 +110,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
           style: GoogleFonts.outfit(color: U.text, fontSize: 20, fontWeight: FontWeight.w600),
         ),
         actions: [
-          if (_endingSoon.isNotEmpty || _newEvents.isNotEmpty)
+          if (_endingSoon.isNotEmpty || _newEvents.isNotEmpty || _certificates.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: TextButton(
@@ -129,6 +139,16 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
                 children: [
+                  if (_certificates.isNotEmpty) ...[
+                    ..._certificates.map((cert) => _buildNotificationItem(
+                      cert.id ?? '',
+                      'Certificate Awarded! 🎓',
+                      'You have received a certificate of participation for ${cert.eventTitle}.',
+                      Icons.workspace_premium_rounded,
+                      U.gold,
+                      isUnread: true,
+                    ).animate().fadeIn(delay: 50.ms).slideY(begin: 0.1, end: 0)),
+                  ],
                   if (_endingSoon.isNotEmpty) ...[
                     ..._endingSoon.map((event) => _buildNotificationItem(
                       event.id ?? '',
@@ -149,7 +169,7 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
                       isUnread: false,
                     ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0)),
                   ],
-                  if (_endingSoon.isEmpty && _newEvents.isEmpty)
+                  if (_endingSoon.isEmpty && _newEvents.isEmpty && _certificates.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 80),
                       child: Center(

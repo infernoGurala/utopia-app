@@ -108,6 +108,15 @@ class EventModel {
   final int shareCount;
   final int likeCount;
 
+  bool get isAdityaEvent {
+    final venueLower = venue.toLowerCase();
+    final conductedLower = conductedBy.toLowerCase();
+    final orgLower = organizerName.toLowerCase();
+    return venueLower.contains('aditya') || 
+           conductedLower.contains('aditya') || 
+           orgLower.contains('aditya');
+  }
+
   // Metadata
   final String? universityId;
   final DateTime? createdAt;
@@ -422,6 +431,11 @@ class EventCertificate {
           ? DateTime.tryParse(map['issued_at'] as String)
           : null,
     );
+  }
+
+  bool get isAditya {
+    return eventTitle.toLowerCase().contains('aditya') || 
+           issuerName.toLowerCase().contains('aditya');
   }
 }
 

@@ -234,15 +234,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       );
       return;
     }
-    if (_participationLinkController.text.trim().isEmpty) {
+    // Participation link is optional now
+    final hasBanner = _bannerFile != null || _existingBannerUrl != null;
+    final hasPoster = _posterFile != null || _existingPosterUrl != null;
+    if (!hasBanner && !hasPoster) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Participation link is required (e.g. Microsoft Form link)', style: GoogleFonts.outfit())),
-      );
-      return;
-    }
-    if (_bannerFile == null && _existingBannerUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Banner image is required', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Either a Banner or a Poster image is required', style: GoogleFonts.outfit())),
       );
       return;
     }
@@ -697,7 +694,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         _buildField('Prize Information', _prizeInfoController, maxLines: 2, icon: Icons.emoji_events_rounded, hint: 'e.g. ₹10,000 prize pool'),
         _buildField('Contact Numbers', _contactController, icon: Icons.phone_rounded),
         _buildField('WhatsApp Group Link', _whatsappController, icon: Icons.link_rounded),
-        _buildField('Participation Link *', _participationLinkController, icon: Icons.open_in_new_rounded, hint: 'e.g. Microsoft participation link (required)'),
+        _buildField('Participation Link (Optional)', _participationLinkController, icon: Icons.open_in_new_rounded, hint: 'e.g. Microsoft form link'),
         _buildField('Tags (comma separated)', _tagsController, icon: Icons.tag_rounded, hint: 'e.g. coding, web, flutter'),
       ],
     ).animate().fadeIn();
@@ -760,14 +757,14 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_bannerFile != null || _existingBannerUrl != null)
+          if (_bannerFile != null || _existingBannerUrl != null || _posterFile != null || _existingPosterUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: _bannerFile != null 
-                  ? Image.file(_bannerFile!, height: 120, width: double.infinity, fit: BoxFit.cover)
-                  : CachedNetworkImage(imageUrl: _existingBannerUrl!.trim().replaceFirst('http://', 'https://'), height: 120, width: double.infinity, fit: BoxFit.cover),
+              child: (_bannerFile != null || _posterFile != null)
+                  ? Image.file(_bannerFile ?? _posterFile!, height: 120, width: double.infinity, fit: BoxFit.cover)
+                  : CachedNetworkImage(imageUrl: (_existingBannerUrl ?? _existingPosterUrl)!.trim().replaceFirst('http://', 'https://'), height: 120, width: double.infinity, fit: BoxFit.cover),
             ),
-          if (_bannerFile != null || _existingBannerUrl != null) const SizedBox(height: 16),
+          if (_bannerFile != null || _existingBannerUrl != null || _posterFile != null || _existingPosterUrl != null) const SizedBox(height: 16),
           Text(
             _titleController.text.isEmpty ? 'Untitled Event' : _titleController.text,
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, color: U.text),
