@@ -1,12 +1,13 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../widgets/utopia_loader.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
 import '../services/role_service.dart';
+import 'event_details_screen.dart';
 import 'event_notifications_screen.dart';
 import 'admin_events_panel.dart';
 import 'organizer_dashboard_screen.dart';
@@ -17,12 +18,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/platform_support.dart';
 import '../services/notification_service.dart';
 import '../widgets/utopia_snackbar.dart';
-
-// Premium Events Palette
-const _kPurple = Color(0xFF7C3AED);
-const _kLavender = Color(0xFFA78BFA);
-const _kIndigo = Color(0xFF6366F1);
-const _kCyan = Color(0xFF67E8F9);
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -66,29 +61,36 @@ class _EventsScreenState extends State<EventsScreen> {
     try {
       final certs = await EventService.instance.getMyCertificates();
       if (certs.isEmpty) return;
+
       final prefs = await SharedPreferences.getInstance();
       final knownCertIds = prefs.getStringList('known_certificate_ids') ?? [];
+
       final newCerts = certs.where((c) => c.id != null && !knownCertIds.contains(c.id)).toList();
+
       if (newCerts.isNotEmpty) {
         final updatedIds = List<String>.from(knownCertIds)..addAll(newCerts.map((c) => c.id!));
         await prefs.setStringList('known_certificate_ids', updatedIds);
+
         if (mounted) {
           for (final cert in newCerts) {
             if (PlatformSupport.supportsNotifications) {
               await NotificationService.sendCertificateNotification(
                 title: '🏆 Certificate Received!',
-                body: 'You received a certificate for "${cert.eventTitle}"!',
+                body: 'You received a certificate for participating in "${cert.eventTitle}"!',
               );
             }
+            
             showUtopiaSnackBar(
               context,
-              message: '🏆 New Certificate: "${cert.eventTitle}"!',
+              message: '🏆 New Certificate Awarded: "${cert.eventTitle}"!',
               tone: UtopiaSnackBarTone.success,
               actionLabel: 'View',
-              onActionPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EventCertificatesScreen()),
-              ),
+              onActionPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const EventCertificatesScreen()),
+                );
+              },
             );
           }
         }
@@ -123,7 +125,9 @@ class _EventsScreenState extends State<EventsScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -133,22 +137,32 @@ class _EventsScreenState extends State<EventsScreen> {
       category: category,
       search: _searchQuery.isEmpty ? null : _searchQuery,
     );
-    if (mounted) setState(() => _filteredEvents = events);
+    if (mounted) {
+      setState(() => _filteredEvents = events);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dotColor = U.primary.withValues(alpha: isDark ? 0.04 : 0.035);
 
     return Scaffold(
       backgroundColor: U.bg,
       body: Stack(
         children: [
-
-          // ── Main Content ──
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _EventsPatternPainter(
+                color: dotColor,
+                spacing: 28.0,
+                dotRadius: 1.0,
+              ),
+            ),
+          ),
           SafeArea(
             child: RefreshIndicator(
-              color: _kPurple,
+              color: U.primary,
               onRefresh: _loadEvents,
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -159,13 +173,13 @@ class _EventsScreenState extends State<EventsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildSearchBar(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
                         _buildCategories(),
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 32),
                         if (_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 80),
-                            child: Center(child: UtopiaLoader(scale: 0.7)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 80),
+                            child: const Center(child: UtopiaLoader(scale: 0.7)),
                           )
                         else if (_searchQuery.isNotEmpty || _selectedCategory != 'All') ...[
                           _buildSectionTitle('Results'),
@@ -175,30 +189,30 @@ class _EventsScreenState extends State<EventsScreen> {
                               : _buildVerticalList(_filteredEvents),
                         ] else ...[
                           if (_liveEvents.isNotEmpty) ...[
-                            _buildSectionTitle('Live Now', isLive: true),
+                            _buildSectionTitle('🔴 Live Now'),
                             const SizedBox(height: 16),
                             _buildHorizontalCarousel(_liveEvents),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 32),
                           ],
                           _buildSectionTitle('Trending Events'),
                           const SizedBox(height: 16),
                           _trendingEvents.isEmpty
                               ? _buildEmptyState('No trending events yet')
                               : _buildHorizontalCarousel(_trendingEvents),
-                          const SizedBox(height: 36),
+                          const SizedBox(height: 32),
                           _buildSectionTitle('Upcoming Events'),
                           const SizedBox(height: 16),
                           _upcomingEvents.isEmpty
                               ? _buildEmptyState('No upcoming events')
                               : _buildVerticalList(_upcomingEvents),
                           if (_endingSoonEvents.isNotEmpty) ...[
-                            const SizedBox(height: 36),
-                            _buildSectionTitle('Ending Soon', isUrgent: true),
+                            const SizedBox(height: 32),
+                            _buildSectionTitle('⏰ Ending Soon'),
                             const SizedBox(height: 16),
                             _buildHorizontalCarousel(_endingSoonEvents),
                           ],
                         ],
-                        const SizedBox(height: 110),
+                        const SizedBox(height: 100),
                       ],
                     ),
                   ),
@@ -212,205 +226,191 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Widget _buildHeader() {
-    final now = DateTime.now();
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final dateStr = '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
-
     return SliverToBoxAdapter(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 16, 16),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            if (Navigator.canPop(context))
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
-                  onPressed: () => Navigator.pop(context),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [_kLavender, _kIndigo],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ).createShader(bounds),
-                    child: Text(
-                      'Campus Events',
-                      style: GoogleFonts.outfit(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: -0.8,
+                  if (Navigator.canPop(context))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    dateStr,
-                    style: GoogleFonts.outfit(fontSize: 12, color: U.sub, letterSpacing: 0.2),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Campus Events',
+                          style: GoogleFonts.outfit(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: U.text,
+                            letterSpacing: -0.5,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Discover what\'s happening',
+                          style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
-            _buildHeaderIcon(
-              icon: Icons.notifications_outlined,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
-              ),
+            ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
+            Row(
+              children: [
+                _buildNotificationIcon(),
+                const SizedBox(width: 8),
+                _buildMenuIcon(),
+              ],
             ),
-            const SizedBox(width: 6),
-            _buildMenuIcon(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderIcon({required IconData icon, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.12)),
-            ),
-            child: Icon(icon, color: U.text, size: 20),
-          ),
-        ),
+  Widget _buildNotificationIcon() {
+    return IconButton(
+      icon: Icon(Icons.notifications_outlined, color: U.text, size: 24),
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
       ),
-    ).animate().fadeIn(duration: 400.ms, delay: 100.ms).scale(begin: const Offset(0.9, 0.9));
+    ).animate().fadeIn(duration: 400.ms, delay: 100.ms).scale();
   }
 
   Widget _buildMenuIcon() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: PopupMenuButton<String>(
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          color: U.surface,
-          elevation: 8,
-          onSelected: (value) {
-            if (value == 'organizer') {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDashboardScreen()));
-            } else if (value == 'admin') {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminEventsPanel()));
-            } else if (value == 'certificates') {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const EventCertificatesScreen()));
-            } else if (value == 'saved') {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedEventsScreen()));
-            }
-          },
-          itemBuilder: (context) => [
-            _buildMenuItem('organizer', Icons.business_center_outlined, 'Organizer Dashboard'),
-            if (_isSuperUser)
-              _buildMenuItem('admin', Icons.admin_panel_settings_outlined, 'Admin Panel'),
-            const PopupMenuDivider(),
-            _buildMenuItem('saved', Icons.bookmark_outline_rounded, 'Saved Events'),
-            _buildMenuItem('certificates', Icons.workspace_premium_outlined, 'My Certificates'),
-          ],
-          child: Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.12)),
-            ),
-            child: Icon(Icons.more_vert_rounded, color: U.text, size: 20),
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert_rounded, color: U.text, size: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: U.surface,
+      onSelected: (value) {
+        if (value == 'organizer') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const OrganizerDashboardScreen()));
+        } else if (value == 'admin') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminEventsPanel()));
+        } else if (value == 'certificates') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const EventCertificatesScreen()));
+        } else if (value == 'saved') {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedEventsScreen()));
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'organizer',
+          child: Row(
+            children: [
+              Icon(Icons.business_center_outlined, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('Organizer Dashboard', style: GoogleFonts.outfit(color: U.text)),
+            ],
           ),
         ),
-      ),
-    ).animate().fadeIn(duration: 400.ms, delay: 150.ms).scale(begin: const Offset(0.9, 0.9));
-  }
-
-  PopupMenuItem<String> _buildMenuItem(String value, IconData icon, String label) {
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon, color: U.text, size: 18),
-          const SizedBox(width: 12),
-          Text(label, style: GoogleFonts.outfit(color: U.text, fontSize: 14)),
-        ],
-      ),
-    );
+        if (_isSuperUser)
+          PopupMenuItem(
+            value: 'admin',
+            child: Row(
+              children: [
+                Icon(Icons.admin_panel_settings_outlined, color: U.text, size: 20),
+                const SizedBox(width: 12),
+                Text('Admin Panel', style: GoogleFonts.outfit(color: U.text)),
+              ],
+            ),
+          ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'saved',
+          child: Row(
+            children: [
+              Icon(Icons.bookmark_outline_rounded, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('Saved Events', style: GoogleFonts.outfit(color: U.text)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'certificates',
+          child: Row(
+            children: [
+              Icon(Icons.workspace_premium_outlined, color: U.text, size: 20),
+              const SizedBox(width: 12),
+              Text('My Certificates', style: GoogleFonts.outfit(color: U.text)),
+            ],
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 400.ms, delay: 150.ms).scale();
   }
 
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            height: 52,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.65),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.18), width: 1),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.search_rounded, color: _kLavender.withValues(alpha: 0.7), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    style: GoogleFonts.outfit(color: U.text, fontSize: 15),
-                    decoration: InputDecoration(
-                      hintText: 'Search events...',
-                      hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 15),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    onChanged: (value) {
-                      _searchQuery = value;
-                      _applyFilters();
-                    },
-                  ),
-                ),
-                if (_searchQuery.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      _searchController.clear();
-                      setState(() { _searchQuery = ''; _filteredEvents = []; });
-                    },
-                    child: Icon(Icons.close_rounded, color: U.dim, size: 18),
-                  ),
-              ],
-            ),
-          ),
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: BorderRadius.circular(16),
         ),
-      ).animate().fadeIn(duration: 400.ms, delay: 150.ms).slideY(begin: 0.15, end: 0),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: U.dim),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.outfit(color: U.text, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Search events...',
+                  hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 16),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                onChanged: (value) {
+                  _searchQuery = value;
+                  _applyFilters();
+                },
+              ),
+            ),
+            if (_searchQuery.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchQuery = '';
+                    _filteredEvents = [];
+                  });
+                },
+                child: Icon(Icons.close_rounded, color: U.dim, size: 20),
+              ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideY(begin: 0.2, end: 0),
     );
   }
 
   Widget _buildCategories() {
     return SizedBox(
-      height: 38,
+      height: 40,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -420,7 +420,7 @@ class _EventsScreenState extends State<EventsScreen> {
           final category = _categories[index];
           final isSelected = _selectedCategory == category;
           return Padding(
-            padding: const EdgeInsets.only(right: 10),
+            padding: const EdgeInsets.only(right: 12),
             child: GestureDetector(
               onTap: () {
                 setState(() => _selectedCategory = category);
@@ -431,72 +431,41 @@ class _EventsScreenState extends State<EventsScreen> {
                 }
               },
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 decoration: BoxDecoration(
-                  gradient: isSelected
-                      ? const LinearGradient(
-                          colors: [_kPurple, _kIndigo],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: _kPurple.withValues(alpha: 0.3),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
+                  color: isSelected ? U.primary.withValues(alpha: 0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(
-                  category,
-                  style: GoogleFonts.outfit(
-                    color: isSelected ? Colors.white : U.sub,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    fontSize: 13,
+                child: Center(
+                  child: Text(
+                    category,
+                    style: GoogleFonts.outfit(
+                      color: isSelected ? U.primary : U.sub,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
             ),
-          ).animate().fadeIn(duration: 350.ms, delay: (200 + index * 40).ms).slideX(begin: 0.15, end: 0);
+          ).animate().fadeIn(duration: 400.ms, delay: (250 + (index * 50)).ms).slideX(begin: 0.2, end: 0);
         },
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, {bool isLive = false, bool isUrgent = false}) {
+  Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          if (isLive) ...[
-            _PulsingDot(color: const Color(0xFFEF4444)),
-            const SizedBox(width: 8),
-          ],
-          if (isUrgent) ...[
-            Text('⏰ ', style: GoogleFonts.outfit(fontSize: 16)),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: U.text,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ),
-          Container(
-            width: 28, height: 3,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_kPurple, _kCyan]),
-              borderRadius: BorderRadius.circular(2),
+          Text(
+            title,
+            style: GoogleFonts.outfit(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: U.text,
             ),
           ),
         ],
@@ -506,7 +475,7 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _buildHorizontalCarousel(List<EventModel> events) {
     return SizedBox(
-      height: 292,
+      height: 280,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -516,7 +485,7 @@ class _EventsScreenState extends State<EventsScreen> {
           return Padding(
             padding: const EdgeInsets.only(right: 16),
             child: EventCard(event: events[index], isLarge: true, onReturn: _loadEvents),
-          ).animate().fadeIn(duration: 400.ms, delay: (250 + index * 80).ms).slideX(begin: 0.15, end: 0);
+          ).animate().fadeIn(duration: 400.ms, delay: (300 + (index * 100)).ms).slideX(begin: 0.2, end: 0);
         },
       ),
     );
@@ -530,95 +499,64 @@ class _EventsScreenState extends State<EventsScreen> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.only(bottom: 16),
           child: EventCard(event: events[index], isLarge: false, onReturn: _loadEvents),
-        ).animate().fadeIn(duration: 400.ms, delay: (350 + index * 70).ms).slideY(begin: 0.08, end: 0);
+        ).animate().fadeIn(duration: 400.ms, delay: (400 + (index * 100)).ms).slideY(begin: 0.1, end: 0);
       },
     );
   }
 
   Widget _buildEmptyState(String message) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
       child: Center(
         child: Column(
           children: [
-            Container(
-              width: 72, height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [_kLavender.withValues(alpha: 0.15), Colors.transparent],
-                ),
-              ),
-              child: Icon(Icons.event_busy_rounded, size: 36, color: _kLavender.withValues(alpha: 0.5)),
-            ).animate(onPlay: (c) => c.repeat(reverse: true))
-              .moveY(begin: 0, end: -8, duration: 2000.ms, curve: Curves.easeInOut),
-            const SizedBox(height: 16),
+            Icon(Icons.event_busy_rounded, size: 48, color: U.dim),
+            const SizedBox(height: 12),
             Text(
               message,
-              style: GoogleFonts.outfit(fontSize: 15, color: U.sub, fontWeight: FontWeight.w500),
+              style: GoogleFonts.outfit(fontSize: 16, color: U.sub),
             ),
           ],
         ),
       ),
     );
   }
-
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }
 
-// ── Pulsing dot widget for Live Now ──
-class _PulsingDot extends StatefulWidget {
+class _EventsPatternPainter extends CustomPainter {
   final Color color;
-  const _PulsingDot({required this.color});
-  @override
-  State<_PulsingDot> createState() => _PulsingDotState();
-}
+  final double spacing;
+  final double dotRadius;
 
-class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+  const _EventsPatternPainter({
+    required this.color,
+    required this.spacing,
+    required this.dotRadius,
+  });
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-      ..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    for (double x = spacing / 2; x < size.width; x += spacing) {
+      for (double y = spacing / 2; y < size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), dotRadius, paint);
+      }
+    }
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (_, __) => Container(
-        width: 8, height: 8,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.color.withValues(alpha: _animation.value),
-          boxShadow: [
-            BoxShadow(
-              color: widget.color.withValues(alpha: _animation.value * 0.5),
-              blurRadius: 6,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-      ),
-    );
+  bool shouldRepaint(covariant _EventsPatternPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.spacing != spacing ||
+        oldDelegate.dotRadius != dotRadius;
   }
 }
-
-
