@@ -444,6 +444,7 @@ class _EventsScreenState extends State<EventsScreen> {
       height: 52,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         physics: const BouncingScrollPhysics(),
         itemCount: _categories.length,
@@ -452,49 +453,51 @@ class _EventsScreenState extends State<EventsScreen> {
           final isSelected = _selectedCategory == category;
           return Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedCategory = category);
-                if (category != 'All') {
-                  _applyFilters();
-                } else if (_searchQuery.isEmpty) {
-                  setState(() => _filteredEvents = []);
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: isSelected
-                      ? LinearGradient(
-                          colors: [U.primary, U.primary.withValues(alpha: 0.75)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: isSelected ? null : U.card.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? Colors.transparent : U.border.withValues(alpha: 0.5),
-                    width: 1.0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _selectedCategory = category);
+                  if (category != 'All') {
+                    _applyFilters();
+                  } else if (_searchQuery.isEmpty) {
+                    setState(() => _filteredEvents = []);
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? LinearGradient(
+                            colors: [U.primary, U.primary.withValues(alpha: 0.75)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: isSelected ? null : U.card.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(100),
+                    border: Border.all(
+                      color: isSelected ? Colors.transparent : U.border.withValues(alpha: 0.5),
+                      width: 1.0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: U.primary.withValues(alpha: 0.25),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: U.primary.withValues(alpha: 0.25),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  category,
-                  style: GoogleFonts.outfit(
-                    color: isSelected ? U.bg : U.sub,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    fontSize: 13,
+                  child: Text(
+                    category,
+                    style: GoogleFonts.outfit(
+                      color: isSelected ? U.bg : U.sub,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
