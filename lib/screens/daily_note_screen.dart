@@ -10,7 +10,7 @@ import '../services/focus_supabase_service.dart';
 import 'heatmap_home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/utopia_loader.dart';
-import '../theme/image_overlay_colors.dart';
+import '../widgets/utopia_snackbar.dart';
 
 class DailyNoteScreen extends StatefulWidget {
   const DailyNoteScreen({super.key});
@@ -206,46 +206,10 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       await _saveNote();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            duration: const Duration(seconds: 2),
-            content: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.cloud_done_rounded, color: Color(0xFF08BB68), size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Synced perfectly to cloud!',
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+        showUtopiaSnackBar(
+          context,
+          message: 'Synced perfectly to cloud!',
+          tone: UtopiaSnackBarTone.success,
         );
       }
     } catch (e) {

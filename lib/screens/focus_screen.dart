@@ -15,6 +15,7 @@ import 'heatmap_home_screen.dart';
 import 'profile_screen.dart';
 import 'reminders_screen.dart';
 import '../services/focus_supabase_service.dart';
+import '../models/focus_models.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -30,6 +31,8 @@ class _FocusScreenState extends State<FocusScreen> {
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
+  String _dailyNoteInsight = 'Write today';
+  String _remindersInsight = 'No upcoming';
 
 
   static const _motivationalTexts = [
@@ -201,6 +204,7 @@ class _FocusScreenState extends State<FocusScreen> {
           _streakDays = info?['streak'] as int? ?? 0;
         });
       }
+      _loadStats();
     } catch (_) {}
   }
 
@@ -228,22 +232,143 @@ class _FocusScreenState extends State<FocusScreen> {
     }
   }
 
+  DateTime? _getNextOccurrence(FocusReminder r, DateTime now) {
+    final timeParts = r.reminderTime.split(':');
+    if (timeParts.length < 2) return null;
+    final hour = int.tryParse(timeParts[0]) ?? 0;
+    final minute = int.tryParse(timeParts[1]) ?? 0;
+
+    if (r.type == 'one_time') {
+      if (r.remindDate == null) return null;
+      final dateParts = r.remindDate!.split('-');
+      if (dateParts.length < 3) return null;
+      final year = int.tryParse(dateParts[0]) ?? 0;
+      final month = int.tryParse(dateParts[1]) ?? 0;
+      final day = int.tryParse(dateParts[2]) ?? 0;
+      final scheduled = DateTime(year, month, day, hour, minute);
+      if (scheduled.isAfter(now)) return scheduled;
+      return null;
+    } else if (r.type == 'weekly') {
+      if (r.weekdays == null || r.weekdays!.isEmpty) return null;
+      for (int i = 0; i < 8; i++) {
+        final candidateDate = now.add(Duration(days: i));
+        final candidateWeekday = candidateDate.weekday - 1; // 0=Mon...6=Sun
+        if (r.weekdays!.contains(candidateWeekday)) {
+          final scheduled = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
+          if (scheduled.isAfter(now)) return scheduled;
+        }
+      }
+    } else if (r.type == 'monthly_date') {
+      if (r.monthDay == null) return null;
+      final thisMonthScheduled = DateTime(now.year, now.month, r.monthDay!, hour, minute);
+      if (thisMonthScheduled.isAfter(now)) return thisMonthScheduled;
+      final nextMonth = now.month == 12 ? 1 : now.month + 1;
+      final nextYear = now.month == 12 ? now.year + 1 : now.year;
+      return DateTime(nextYear, nextMonth, r.monthDay!, hour, minute);
+    }
+    return null;
+  }
+
   Future<void> _loadStats() async {
     try {
       final tasks = await _service.getAllTrackedTasks();
       final activeTasks = tasks.length;
 
-      // Get upcoming reminders count
+      // 1. Get today's habits remaining
+      String dailyNoteInsight = 'Write today';
+      try {
+        final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+        final note = await _service.getLocalNote(todayStr);
+        final userHabits = await _service.getLocalUserHabits();
+        
+        final habitsList = userHabits?.habits ?? [];
+        if (habitsList.isEmpty) {
+          dailyNoteInsight = 'No habits configured';
+        } else {
+          int doneCount = 0;
+          if (note != null && note.habitsState.isNotEmpty) {
+            for (final h in note.habitsState.keys) {
+              if (note.habitsState[h] == true && habitsList.contains(h)) {
+                doneCount++;
+              }
+            }
+          }
+          final left = habitsList.length - doneCount;
+          if (left <= 0) {
+            dailyNoteInsight = 'All habits completed! 🎉';
+          } else {
+            dailyNoteInsight = '$left habits remaining';
+          }
+        }
+      } catch (e) {
+        debugPrint('FocusScreen daily note insight load failed: $e');
+      }
+
+      // 2. Get next upcoming reminder
+      String remindersInsight = 'No reminders';
       int reminderCount = 0;
       try {
         final reminders = await _service.getReminders();
-        reminderCount = reminders.where((r) => r.isActive).length;
-      } catch (_) {}
+        final activeReminders = reminders.where((r) => r.isActive).toList();
+        reminderCount = activeReminders.length;
+
+        if (activeReminders.isEmpty) {
+          remindersInsight = 'All clear! No tasks';
+        } else {
+          final now = DateTime.now();
+          final List<MapEntry<FocusReminder, DateTime>> futureReminders = [];
+
+          for (final r in activeReminders) {
+            final nextOccur = _getNextOccurrence(r, now);
+            if (nextOccur != null) {
+              futureReminders.add(MapEntry(r, nextOccur));
+            }
+          }
+
+          if (futureReminders.isEmpty) {
+            remindersInsight = 'All clear for today';
+          } else {
+            // Sort by next occurrence ascending
+            futureReminders.sort((a, b) => a.value.compareTo(b.value));
+            
+            final nextEntry = futureReminders.first;
+            final nextReminder = nextEntry.key;
+            final nextDt = nextEntry.value;
+
+            // Format display
+            final todayDate = DateTime(now.year, now.month, now.day);
+            final occurrenceDate = DateTime(nextDt.year, nextDt.month, nextDt.day);
+            final difference = occurrenceDate.difference(todayDate).inDays;
+
+            final hr = nextDt.hour;
+            final min = nextDt.minute.toString().padLeft(2, '0');
+            final ampm = hr >= 12 ? 'PM' : 'AM';
+            final displayHr = hr == 0 ? 12 : (hr > 12 ? hr - 12 : hr);
+            final formattedTime = '$displayHr:$min $ampm';
+
+            const weekdaysList = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            String dayLabel = '';
+            if (difference == 0) {
+              dayLabel = 'Today, $formattedTime';
+            } else if (difference == 1) {
+              dayLabel = 'Tomorrow, $formattedTime';
+            } else {
+              dayLabel = '${weekdaysList[nextDt.weekday - 1]}, $formattedTime';
+            }
+
+            remindersInsight = '$dayLabel: ${nextReminder.label}';
+          }
+        }
+      } catch (e) {
+        debugPrint('FocusScreen reminders insight load failed: $e');
+      }
 
       if (mounted) {
         setState(() {
           _activeHabits = activeTasks;
           _upcomingReminders = reminderCount;
+          _dailyNoteInsight = dailyNoteInsight;
+          _remindersInsight = remindersInsight;
         });
       }
     } catch (_) {}
@@ -573,7 +698,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                 description: 'Write your thoughts\nand ideas',
                                 icon: Icons.edit_note_rounded,
                                 iconColor: U.blue,
-                                statLabel: 'Write today',
+                                statLabel: _dailyNoteInsight,
                                 statColor: U.blue,
                                 delay: 400,
                                 onTap: () => Navigator.push(
@@ -589,7 +714,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                 description: 'Stay on top of your\nimportant tasks',
                                 icon: Icons.notifications_outlined,
                                 iconColor: U.lavender,
-                                statLabel: '$_upcomingReminders upcoming',
+                                statLabel: _remindersInsight,
                                 statColor: U.lavender,
                                 delay: 500,
                                 onTap: () => Navigator.push(
@@ -875,6 +1000,8 @@ class _FeatureCard extends StatelessWidget {
               color: statColor,
               fontStyle: FontStyle.italic,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -939,6 +1066,8 @@ class _FeatureCard extends StatelessWidget {
                   color: statColor,
                   fontStyle: FontStyle.italic,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
