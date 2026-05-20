@@ -43,6 +43,9 @@ class _HeatmapHomeScreenState extends State<HeatmapHomeScreen> {
   }
 
   Future<void> _load() async {
+    await _service.initialize();
+    await _service.syncDownAllData();
+
     final tasks = await _service.getAllTrackedTasks();
     final userHabits = await _service.getUserHabits();
     for (final t in tasks) {

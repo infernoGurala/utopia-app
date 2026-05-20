@@ -199,6 +199,18 @@ class _FocusScreenState extends State<FocusScreen> {
   Future<void> _loadData() async {
     try {
       await _service.initialize();
+      // Start download sync in background to update local SQLite
+      _service.syncDownAllData().then((_) {
+        _loadStats();
+        _service.getBestActiveStreak().then((info) {
+          if (mounted) {
+            setState(() {
+              _streakDays = info?['streak'] as int? ?? 0;
+            });
+          }
+        });
+      });
+
       final info = await _service.getBestActiveStreak();
       if (mounted) {
         setState(() {

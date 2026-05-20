@@ -31,7 +31,7 @@ class FocusSupabaseService {
         debugPrint('Focus Supabase: Auth state change detected (User logged in). Re-initializing and syncing...');
         _initialized = false;
         initialize().then((success) {
-          _syncPendingData();
+          _syncPendingData().then((_) => syncDownAllData());
         });
       }
     });
@@ -45,7 +45,7 @@ class FocusSupabaseService {
       if (hasConnection) {
         debugPrint('Focus Supabase: Internet connectivity detected. Syncing pending data...');
         initialize().then((success) {
-          _syncPendingData();
+          _syncPendingData().then((_) => syncDownAllData());
         });
       }
     });
@@ -79,7 +79,7 @@ class FocusSupabaseService {
           _initialized = true;
           _initializing = false;
           debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
-          _syncPendingData();
+          _syncPendingData().then((_) => syncDownAllData());
           return true;
         } catch (fallbackError) {
           debugPrint('Primary Supabase fallback failed: $fallbackError');
@@ -99,7 +99,7 @@ class FocusSupabaseService {
           _initialized = true;
           _initializing = false;
           debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
-          _syncPendingData();
+          _syncPendingData().then((_) => syncDownAllData());
           return true;
         } catch (fallbackError) {
           debugPrint('Primary Supabase fallback failed: $fallbackError');
@@ -114,7 +114,7 @@ class FocusSupabaseService {
       debugPrint('Focus Supabase: Initialized successfully with dedicated project URL: $url');
 
       // Background sync of pending data
-      _syncPendingData();
+      _syncPendingData().then((_) => syncDownAllData());
 
       return true;
     } catch (e) {
@@ -123,7 +123,7 @@ class FocusSupabaseService {
         _client = supa.Supabase.instance.client;
         _initialized = true;
         _initializing = false;
-        _syncPendingData();
+        _syncPendingData().then((_) => syncDownAllData());
         return true;
       } catch (fallbackError) {
         debugPrint('Primary Supabase fallback failed: $fallbackError');
@@ -533,6 +533,83 @@ class FocusSupabaseService {
       }
     } catch (e) {
       debugPrint('Focus sync failed: $e');
+    }
+  Future<void> syncDownAllData() async {
+    final userId = _userId;
+    if (userId.isEmpty || !_initialized || _client == null) return;
+
+    try {
+      debugPrint('Focus Supabase: Starting full download sync of user data...');
+
+      // 1. Fetch and sync focus_user_habits
+      final habitsResponse = await _client!
+          .from('focus_user_habits')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+      if (habitsResponse != null) {
+        final remoteHabits = FocusUserHabits.fromMap(habitsResponse).copyWith(syncStatus: 'synced');
+        await _db.saveUserHabits(remoteHabits);
+      }
+
+      // 2. Fetch and sync daily_notes
+      final notesResponse = await _client!
+          .from('daily_notes')
+          .select()
+          .eq('user_id', userId);
+      if (notesResponse != null) {
+        final List<dynamic> noteRows = notesResponse;
+        for (final row in noteRows) {
+          final remoteNote = FocusNote.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          await _db.saveNote(remoteNote);
+
+          // Derived completions for this note
+          final List<HabitCompletion> completions = [];
+          remoteNote.habitsState.forEach((habitName, completed) {
+            completions.add(HabitCompletion(
+              userId: remoteNote.userId,
+              date: remoteNote.date,
+              taskName: habitName.toLowerCase().trim(),
+              completed: completed,
+              completionCount: completed ? 1 : 0,
+              syncStatus: 'synced',
+            ));
+          });
+          for (final task in remoteNote.tasks) {
+            final label = (task['label'] as String?)?.toLowerCase().trim() ?? '';
+            if (label.isEmpty) continue;
+            final completed = task['completed'] == true;
+            completions.add(HabitCompletion(
+              userId: remoteNote.userId,
+              date: remoteNote.date,
+              taskName: label,
+              completed: completed,
+              completionCount: completed ? 1 : 0,
+              syncStatus: 'synced',
+            ));
+          }
+          await _db.saveCompletions(remoteNote.userId, remoteNote.date, completions);
+        }
+      }
+
+      // 3. Fetch and sync reminders
+      final remindersResponse = await _client!
+          .from('reminders')
+          .select()
+          .eq('user_id', userId);
+      if (remindersResponse != null) {
+        final List<dynamic> reminderRows = remindersResponse;
+        for (final row in reminderRows) {
+          final remoteReminder = FocusReminder.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          await _db.saveReminder(remoteReminder);
+          // Reschedule local timezone-based notification
+          await NotificationService.scheduleFocusReminder(remoteReminder);
+        }
+      }
+
+      debugPrint('Focus Supabase: Finished full download sync successfully!');
+    } catch (e) {
+      debugPrint('Focus Supabase full download sync failed: $e');
     }
   }
 
