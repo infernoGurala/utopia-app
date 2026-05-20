@@ -18,12 +18,6 @@ import '../services/platform_support.dart';
 import '../services/notification_service.dart';
 import '../widgets/utopia_snackbar.dart';
 
-// Premium Events Palette
-const _kPurple = Color(0xFF7C3AED);
-const _kLavender = Color(0xFFA78BFA);
-const _kIndigo = Color(0xFF6366F1);
-const _kCyan = Color(0xFF67E8F9);
-
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
 
@@ -138,17 +132,51 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: U.bg,
       body: Stack(
         children: [
+          // ── Beautiful dynamic light leak backdrops ──
+          Positioned(
+            top: -100,
+            left: -60,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    U.primary.withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 220,
+            right: -80,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    U.teal.withValues(alpha: 0.04),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
 
           // ── Main Content ──
           SafeArea(
             child: RefreshIndicator(
-              color: _kPurple,
+              color: U.primary,
+              backgroundColor: U.card,
               onRefresh: _loadEvents,
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
@@ -161,7 +189,7 @@ class _EventsScreenState extends State<EventsScreen> {
                         _buildSearchBar(),
                         const SizedBox(height: 20),
                         _buildCategories(),
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 32),
                         if (_isLoading)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 80),
@@ -178,21 +206,21 @@ class _EventsScreenState extends State<EventsScreen> {
                             _buildSectionTitle('Live Now', isLive: true),
                             const SizedBox(height: 16),
                             _buildHorizontalCarousel(_liveEvents),
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 32),
                           ],
                           _buildSectionTitle('Trending Events'),
                           const SizedBox(height: 16),
                           _trendingEvents.isEmpty
                               ? _buildEmptyState('No trending events yet')
                               : _buildHorizontalCarousel(_trendingEvents),
-                          const SizedBox(height: 36),
+                          const SizedBox(height: 32),
                           _buildSectionTitle('Upcoming Events'),
                           const SizedBox(height: 16),
                           _upcomingEvents.isEmpty
                               ? _buildEmptyState('No upcoming events')
                               : _buildVerticalList(_upcomingEvents),
                           if (_endingSoonEvents.isNotEmpty) ...[
-                            const SizedBox(height: 36),
+                            const SizedBox(height: 32),
                             _buildSectionTitle('Ending Soon', isUrgent: true),
                             const SizedBox(height: 16),
                             _buildHorizontalCarousel(_endingSoonEvents),
@@ -238,8 +266,8 @@ class _EventsScreenState extends State<EventsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ShaderMask(
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [_kLavender, _kIndigo],
+                    shaderCallback: (bounds) => LinearGradient(
+                      colors: [U.primary, U.teal],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ).createShader(bounds),
@@ -256,7 +284,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   const SizedBox(height: 2),
                   Text(
                     dateStr,
-                    style: GoogleFonts.outfit(fontSize: 12, color: U.sub, letterSpacing: 0.2),
+                    style: GoogleFonts.outfit(fontSize: 12, color: U.sub, letterSpacing: 0.2, fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -268,7 +296,7 @@ class _EventsScreenState extends State<EventsScreen> {
                 MaterialPageRoute(builder: (_) => const EventNotificationsScreen()),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             _buildMenuIcon(),
           ],
         ),
@@ -286,9 +314,9 @@ class _EventsScreenState extends State<EventsScreen> {
           child: Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.7),
+              color: U.card.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.12)),
+              border: Border.all(color: U.border.withValues(alpha: 0.6)),
             ),
             child: Icon(icon, color: U.text, size: 20),
           ),
@@ -305,7 +333,10 @@ class _EventsScreenState extends State<EventsScreen> {
         child: PopupMenuButton<String>(
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: U.border.withValues(alpha: 0.8)),
+          ),
           color: U.surface,
           elevation: 8,
           onSelected: (value) {
@@ -330,9 +361,9 @@ class _EventsScreenState extends State<EventsScreen> {
           child: Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.7),
+              color: U.card.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.12)),
+              border: Border.all(color: U.border.withValues(alpha: 0.6)),
             ),
             child: Icon(Icons.more_vert_rounded, color: U.text, size: 20),
           ),
@@ -365,13 +396,13 @@ class _EventsScreenState extends State<EventsScreen> {
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: 0.65),
+              color: U.card.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _kLavender.withValues(alpha: 0.18), width: 1),
+              border: Border.all(color: U.border.withValues(alpha: 0.6), width: 1),
             ),
             child: Row(
               children: [
-                Icon(Icons.search_rounded, color: _kLavender.withValues(alpha: 0.7), size: 20),
+                Icon(Icons.search_rounded, color: U.primary.withValues(alpha: 0.8), size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
@@ -436,18 +467,23 @@ class _EventsScreenState extends State<EventsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: isSelected
-                      ? const LinearGradient(
-                          colors: [_kPurple, _kIndigo],
+                      ? LinearGradient(
+                          colors: [U.primary, U.primary.withValues(alpha: 0.75)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
                       : null,
+                  color: isSelected ? null : U.card.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Colors.transparent : U.border.withValues(alpha: 0.5),
+                    width: 1.0,
+                  ),
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: _kPurple.withValues(alpha: 0.3),
-                            blurRadius: 12,
+                            color: U.primary.withValues(alpha: 0.25),
+                            blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
                         ]
@@ -456,8 +492,8 @@ class _EventsScreenState extends State<EventsScreen> {
                 child: Text(
                   category,
                   style: GoogleFonts.outfit(
-                    color: isSelected ? Colors.white : U.sub,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: isSelected ? U.bg : U.sub,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                     fontSize: 13,
                   ),
                 ),
@@ -475,7 +511,7 @@ class _EventsScreenState extends State<EventsScreen> {
       child: Row(
         children: [
           if (isLive) ...[
-            _PulsingDot(color: const Color(0xFFEF4444)),
+            _PulsingDot(color: U.red),
             const SizedBox(width: 8),
           ],
           if (isUrgent) ...[
@@ -495,7 +531,7 @@ class _EventsScreenState extends State<EventsScreen> {
           Container(
             width: 28, height: 3,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [_kPurple, _kCyan]),
+              gradient: LinearGradient(colors: [U.primary, U.teal]),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -548,26 +584,21 @@ class _EventsScreenState extends State<EventsScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
-                  colors: [_kLavender.withValues(alpha: 0.15), Colors.transparent],
+                  colors: [U.primary.withValues(alpha: 0.15), Colors.transparent],
                 ),
               ),
-              child: Icon(Icons.event_busy_rounded, size: 36, color: _kLavender.withValues(alpha: 0.5)),
+              child: Icon(Icons.event_busy_rounded, size: 36, color: U.primary.withValues(alpha: 0.5)),
             ).animate(onPlay: (c) => c.repeat(reverse: true))
               .moveY(begin: 0, end: -8, duration: 2000.ms, curve: Curves.easeInOut),
             const SizedBox(height: 16),
             Text(
               message,
-              style: GoogleFonts.outfit(fontSize: 15, color: U.sub, fontWeight: FontWeight.w500),
+              style: GoogleFonts.outfit(fontSize: 15, color: U.sub, fontWeight: FontWeight.w600),
             ),
           ],
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }
 
@@ -620,5 +651,3 @@ class _PulsingDotState extends State<_PulsingDot> with SingleTickerProviderState
     );
   }
 }
-
-
