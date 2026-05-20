@@ -441,10 +441,10 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Widget _buildCategories() {
     return SizedBox(
-      height: 38,
+      height: 52,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         physics: const BouncingScrollPhysics(),
         itemCount: _categories.length,
         itemBuilder: (context, index) {
