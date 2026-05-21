@@ -18,7 +18,7 @@ class DailyNoteScreen extends StatefulWidget {
   State<DailyNoteScreen> createState() => _DailyNoteScreenState();
 }
 
-class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderStateMixin {
+class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   final _service = FocusSupabaseService();
   DateTime _selectedDate = DateTime.now();
   DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
@@ -69,6 +69,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _calendarController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
     _calendarController.addListener(() => setState(() {}));
     _journalController.addListener(_onJournalChanged);
@@ -77,7 +78,10 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
 
   void _onJournalChanged() {
     if (_note == null) return;
-    if (mounted) setState(() {});
+    
+    // We do NOT call setState(() {}) here because the UI (save button)
+    // now uses an AnimatedBuilder listening to the controller directly.
+    // This prevents massive UI lag when typing long passages!
 
     if (_journalController.text == _lastSavedJournal) return;
 
@@ -165,10 +169,32 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
       );
     }
 
+    final incomingJournal = finalNote.journal;
+    final currentText = _journalController.text;
+
+    // Check if the user has typed unsaved edits based on the PREVIOUS _lastSavedJournal
+    final hasUnsavedEdits = currentText != _lastSavedJournal;
+
+    debugPrint('DEBUG_LOAD: Incoming remote journal length: ${incomingJournal.length}');
+    debugPrint('DEBUG_LOAD: Current local text length: ${currentText.length}');
+    debugPrint('DEBUG_LOAD: hasUnsavedEdits=$hasUnsavedEdits, previous_lastSavedJournalLength=${_lastSavedJournal.length}');
+
     _note = finalNote;
-    _lastSavedJournal = finalNote.journal;
-    if (_journalController.text != _note!.journal && !FocusScope.of(context).hasFocus) {
-      _journalController.text = _note!.journal;
+
+    if (incomingJournal.isEmpty && currentText.isNotEmpty) {
+      _lastSavedJournal = currentText;
+      debugPrint('DEBUG_LOAD: Preserving local text over empty incoming.');
+    } else {
+      _lastSavedJournal = incomingJournal;
+      // We only overwrite the text field if the text field has no unsaved edits.
+      // This is safe even if the user has focus on the text field, as long as they
+      // haven't started typing yet.
+      if (currentText != incomingJournal && !hasUnsavedEdits) {
+        debugPrint('DEBUG_LOAD: Overwriting local text with incoming remote text!');
+        _journalController.text = incomingJournal;
+      } else {
+        debugPrint('DEBUG_LOAD: Not overwriting local text. hasUnsaved=$hasUnsavedEdits');
+      }
     }
   }
 
@@ -202,19 +228,36 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     }
   }
 
-  Future<void> _saveNote() async {
-    if (_note == null || _userId.isEmpty) return;
-    if (_journalController.text == _lastSavedJournal) return;
+  Future<void> _saveNote({bool force = false}) async {
+    if (_note == null || _userId.isEmpty) {
+      debugPrint('DEBUG_SAVE: Aborting save. note is null? ${_note == null}, userId is empty? ${_userId.isEmpty}');
+      return;
+    }
     
-    _lastSavedJournal = _journalController.text;
+    final journalText = _journalController.text;
+    final journalChanged = journalText != _lastSavedJournal;
+    
+    debugPrint('DEBUG_SAVE: force=$force, journalChanged=$journalChanged');
+    debugPrint('DEBUG_SAVE: old text length=${_lastSavedJournal.length}, new text length=${journalText.length}');
+    
+    if (!force && !journalChanged) {
+      debugPrint('DEBUG_SAVE: Returning early because not forced and journal not changed.');
+      return;
+    }
+    
+    _lastSavedJournal = journalText;
     final updatedNote = _note!.copyWith(
       journal: _lastSavedJournal,
     );
+    
+    debugPrint('DEBUG_SAVE: Attempting to save note with journal length: ${updatedNote.journal.length}');
+    
     try {
-      await _service.saveNote(updatedNote);
+      final savedNote = await _service.saveNote(updatedNote);
       if (!mounted) return;
-      setState(() => _note = updatedNote);
+      setState(() => _note = savedNote);
       _loadMonthDots();
+      debugPrint('DEBUG_SAVE: Save completed successfully.');
     } catch (e) {
       debugPrint('ERROR SAVING NOTE: $e');
       if (mounted) {
@@ -234,7 +277,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     FocusScope.of(context).unfocus();
 
     try {
-      await _saveNote();
+      await _saveNote(force: true);
 
       if (mounted) {
         showUtopiaSnackBar(
@@ -268,7 +311,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     state[habit] = !(state[habit] ?? false);
     _note = _note!.copyWith(habitsState: state);
     setState(() {});
-    _saveNote();
+    _saveNote(force: true);
   }
 
   void _addTask(String label) {
@@ -278,7 +321,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     _note = _note!.copyWith(tasks: tasks);
     _taskController.clear();
     setState(() {});
-    _saveNote();
+    _saveNote(force: true);
   }
 
   void _toggleTask(int index) {
@@ -288,7 +331,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     tasks[index]['completed'] = !(tasks[index]['completed'] == true);
     _note = _note!.copyWith(tasks: tasks);
     setState(() {});
-    _saveNote();
+    _saveNote(force: true);
   }
 
   void _deleteTask(int index) {
@@ -297,7 +340,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     tasks.removeAt(index);
     _note = _note!.copyWith(tasks: tasks);
     setState(() {});
-    _saveNote();
+    _saveNote(force: true);
   }
 
   void _editTask(int index, String newLabel) {
@@ -306,7 +349,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     tasks[index]['label'] = newLabel.trim();
     _note = _note!.copyWith(tasks: tasks);
     setState(() {});
-    _saveNote();
+    _saveNote(force: true);
   }
 
   void _showEditTaskSheet(int index, String currentLabel) {
@@ -1055,7 +1098,7 @@ Future<void> _editHabits() async {
                 initialState[h] = false;
               }
               _note = _note!.copyWith(habitsState: initialState);
-              _saveNote();
+              _saveNote(force: true);
             }
           }
         });
@@ -1084,7 +1127,17 @@ Future<void> _editHabits() async {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (_note != null && _journalController.text != _lastSavedJournal) {
+        _saveNote();
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounceTimer?.cancel();
     _journalController.removeListener(_onJournalChanged);
     if (_note != null && _journalController.text != _lastSavedJournal) {
@@ -1818,38 +1871,45 @@ Future<void> _editHabits() async {
       onToggle: () => setState(() {
         isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
       }),
-      trailing: AnimatedOpacity(
-        duration: const Duration(milliseconds: 250),
-        opacity: _journalController.text != _lastSavedJournal ? 1.0 : 0.0,
-        child: IgnorePointer(
-          ignoring: _journalController.text == _lastSavedJournal,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _manualSave,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent.withValues(alpha: 0.25), width: 0.8),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(accent),
-                        ),
-                      )
-                    : Icon(
-                        Icons.check_rounded,
-                        color: accent,
-                        size: 18,
-                      ),
+      trailing: AnimatedBuilder(
+        animation: _journalController,
+        builder: (context, child) {
+          final hasUnsaved = _journalController.text != _lastSavedJournal;
+          return AnimatedOpacity(
+            duration: const Duration(milliseconds: 250),
+            opacity: hasUnsaved ? 1.0 : 0.0,
+            child: IgnorePointer(
+              ignoring: !hasUnsaved,
+              child: child,
+            ),
+          );
+        },
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _manualSave,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(color: accent.withValues(alpha: 0.25), width: 0.8),
               ),
+              child: _saving
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    )
+                  : Icon(
+                      Icons.check_rounded,
+                      color: accent,
+                      size: 18,
+                    ),
             ),
           ),
         ),

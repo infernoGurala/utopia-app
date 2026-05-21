@@ -136,7 +136,7 @@ class FocusSupabaseService {
   // ──────────────────────────── Daily Notes ────────────────────────────
 
   /// Save a note: write to SQLite first (optimistic), then sync to Supabase
-  Future<void> saveNote(FocusNote note) async {
+  Future<FocusNote> saveNote(FocusNote note) async {
     final now = DateTime.now();
     final noteWithId = note.copyWith(
       id: note.id ?? _uuid.v4(),
@@ -210,6 +210,7 @@ class FocusSupabaseService {
         rethrow;
       }
     }
+    return noteWithId;
   }
 
   /// Get local note from SQLite directly without any network calls
