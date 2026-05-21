@@ -295,7 +295,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
             Text(
               _getFormattedDate(),
               style: GoogleFonts.outfit(
-                color: U.dim,
+                color: U.sub,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,

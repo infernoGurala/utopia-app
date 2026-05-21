@@ -550,7 +550,7 @@ Future<AppInitializationState> _initializeApp() async {
     // Initialize global Supabase in the background (used by notes, events, etc.)
     unawaited(() async {
       try {
-        final doc = await FirebaseFirestore.instance.collection('config').doc('supabase-focus-1').get();
+        final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
           final url = data['url'] as String?;

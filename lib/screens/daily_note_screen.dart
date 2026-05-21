@@ -32,6 +32,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   final Set<String> _collapsedSections = {};
   bool _isDraggingCalendar = false;
   bool _isDraggingBack = false;
+  Timer? _debounceTimer;
 
   final _journalController = TextEditingController();
   final _taskController = TextEditingController();
@@ -69,7 +70,18 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     super.initState();
     _calendarController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
     _calendarController.addListener(() => setState(() {}));
+    _journalController.addListener(_onJournalChanged);
     _init();
+  }
+
+  void _onJournalChanged() {
+    if (_note == null) return;
+    if (_journalController.text == _note!.journal) return;
+
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 1500), () {
+      _saveNote();
+    });
   }
 
   Future<void> _init() async {
@@ -1055,6 +1067,8 @@ Future<void> _editHabits() async {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _journalController.removeListener(_onJournalChanged);
     if (_note != null && _journalController.text != _note!.journal) {
       _saveNote();
     }
@@ -1083,128 +1097,139 @@ Future<void> _editHabits() async {
         systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
       ),
-      child: Scaffold(
-        backgroundColor: U.bg,
-        body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onHorizontalDragStart: (details) {
-          final startX = details.globalPosition.dx;
-          final isOpen = _calendarController.value > 0.5;
-          final startFromRight = startX > screenWidth * 0.45;
-
-          // Swipe from left edge → navigate back
-          if (!isOpen && startX < 40) {
-            _isDraggingCalendar = false;
-            _isDraggingBack = true;
-            return;
-          }
-
-          _isDraggingBack = false;
-          if (isOpen || startFromRight) {
-            _isDraggingCalendar = true;
-            _calendarController.stop();
-          } else {
-            _isDraggingCalendar = false;
-          }
-        },
-        onHorizontalDragUpdate: (details) {
-          if (_isDraggingBack || !_isDraggingCalendar) return;
-          // Multiplying dx by 1.6 to make the slider extremely responsive and direct!
-          _calendarController.value = (_calendarController.value - (details.delta.dx * 1.6) / contentWidth).clamp(0.0, 1.0);
-        },
-        onHorizontalDragEnd: (details) {
-          if (_isDraggingBack) {
-            _isDraggingBack = false;
-            if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
-              Navigator.of(context).pop();
+      child: PopScope(
+        canPop: true,
+        onPopInvoked: (didPop) {
+          if (didPop) {
+            _debounceTimer?.cancel();
+            if (_note != null && _journalController.text != _note!.journal) {
+              _saveNote();
             }
-            return;
-          }
-          if (!_isDraggingCalendar) return;
-          _isDraggingCalendar = false;
-          // Lowered velocity trigger from 200 to 140, and value threshold from 0.3 to 0.18 for instant spring activation
-          if (details.primaryVelocity != null && details.primaryVelocity! < -140) {
-            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
-          } else if (details.primaryVelocity != null && details.primaryVelocity! > 140) {
-            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
-          } else if (_calendarController.value > 0.18) {
-            _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
-          } else {
-            _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
           }
         },
-        child: Stack(
-          children: [
-            // Background Image (Extended for smooth transition)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: MediaQuery.sizeOf(context).height * 0.8,
-              child: Image.asset(
-                bgImage,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            ),
-            // Gradient overlay: top half clear, bottom half smooth fade
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: MediaQuery.sizeOf(context).height * 0.8,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      U.bg.withValues(alpha: 0.0),
-                      U.bg.withValues(alpha: 0.0),
-                      U.bg,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
+        child: Scaffold(
+          backgroundColor: U.bg,
+          body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: (details) {
+            final startX = details.globalPosition.dx;
+            final isOpen = _calendarController.value > 0.5;
+            final startFromRight = startX > screenWidth * 0.45;
+
+            // Swipe from left edge → navigate back
+            if (!isOpen && startX < 40) {
+              _isDraggingCalendar = false;
+              _isDraggingBack = true;
+              return;
+            }
+
+            _isDraggingBack = false;
+            if (isOpen || startFromRight) {
+              _isDraggingCalendar = true;
+              _calendarController.stop();
+            } else {
+              _isDraggingCalendar = false;
+            }
+          },
+          onHorizontalDragUpdate: (details) {
+            if (_isDraggingBack || !_isDraggingCalendar) return;
+            // Multiplying dx by 1.6 to make the slider extremely responsive and direct!
+            _calendarController.value = (_calendarController.value - (details.delta.dx * 1.6) / contentWidth).clamp(0.0, 1.0);
+          },
+          onHorizontalDragEnd: (details) {
+            if (_isDraggingBack) {
+              _isDraggingBack = false;
+              if (details.primaryVelocity != null && details.primaryVelocity! > 200) {
+                Navigator.of(context).pop();
+              }
+              return;
+            }
+            if (!_isDraggingCalendar) return;
+            _isDraggingCalendar = false;
+            // Lowered velocity trigger from 200 to 140, and value threshold from 0.3 to 0.18 for instant spring activation
+            if (details.primaryVelocity != null && details.primaryVelocity! < -140) {
+              _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+            } else if (details.primaryVelocity != null && details.primaryVelocity! > 140) {
+              _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+            } else if (_calendarController.value > 0.18) {
+              _calendarController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+            } else {
+              _calendarController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
+            }
+          },
+          child: Stack(
+            children: [
+              // Background Image (Extended for smooth transition)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: MediaQuery.sizeOf(context).height * 0.8,
+                child: Image.asset(
+                  bgImage,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                 ),
               ),
-            ),
-            
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  Expanded(child: _loading ? _buildLoading() : _buildNoteBody()),
-                ],
-              ),
-            ),
-
-            // Backdrop dimming overlay scrim
-            if (_calendarController.value > 0.0)
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: _closeCalendar,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(
-                        sigmaX: 5 * _calendarController.value,
-                        sigmaY: 5 * _calendarController.value,
-                      ),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.12 * _calendarController.value),
-                      ),
+              // Gradient overlay: top half clear, bottom half smooth fade
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: MediaQuery.sizeOf(context).height * 0.8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        U.bg.withValues(alpha: 0.0),
+                        U.bg.withValues(alpha: 0.0),
+                        U.bg,
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
                     ),
                   ),
                 ),
               ),
-            
-            // Sliding calendar panel
-            _buildSlidingCalendarPanel(),
-          ],
+              
+              SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(),
+                    Expanded(child: _loading ? _buildLoading() : _buildNoteBody()),
+                  ],
+                ),
+              ),
+
+              // Backdrop dimming overlay scrim
+              if (_calendarController.value > 0.0)
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: _closeCalendar,
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(
+                          sigmaX: 5 * _calendarController.value,
+                          sigmaY: 5 * _calendarController.value,
+                        ),
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.12 * _calendarController.value),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              
+              // Sliding calendar panel
+              _buildSlidingCalendarPanel(),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+      ),
+    );
 }
 
   Widget _buildHeader() {

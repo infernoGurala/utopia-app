@@ -47,8 +47,42 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
 
     try {
       final repo = NewsBriefRepository();
-      final briefs = await repo.getTodaysBriefs();
-      
+
+      // 1. Load cached briefs first for fast display
+      var briefs = await repo.getTodaysBriefs();
+
+      // 2. Query the actual last edge function run time from the server
+      final serverFetchedAt = await repo.getLastFetchedAt();
+
+      // 3. If the server has newer data than what we have cached, force refresh
+      if (serverFetchedAt != null && briefs.isNotEmpty) {
+        DateTime? cachedFetchedAt;
+        for (final list in briefs.values) {
+          for (final b in list) {
+            if (b.fetchedAt != null) {
+              if (cachedFetchedAt == null || b.fetchedAt!.isAfter(cachedFetchedAt)) {
+                cachedFetchedAt = b.fetchedAt;
+              }
+            }
+          }
+        }
+
+        // Server has newer data — auto-refresh
+        if (cachedFetchedAt == null || serverFetchedAt.isAfter(cachedFetchedAt)) {
+          debugPrint('NewsBriefDashboardCard: Server has newer data (server=$serverFetchedAt, cached=$cachedFetchedAt). Auto-refreshing...');
+          final freshBriefs = await repo.forceRefreshTodaysBriefs();
+          if (freshBriefs.isNotEmpty) {
+            briefs = freshBriefs;
+          }
+        }
+      } else if (briefs.isEmpty) {
+        // No cached data at all — try force refresh
+        final freshBriefs = await repo.forceRefreshTodaysBriefs();
+        if (freshBriefs.isNotEmpty) {
+          briefs = freshBriefs;
+        }
+      }
+
       final allAvailableBriefs = <NewsBrief>[];
       int activeCategories = 0;
 
@@ -62,21 +96,8 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
       // Shuffle them so they roll randomly!
       allAvailableBriefs.shuffle();
 
-      // Find the last cron run time: prefer fetchedAt (exact), fall back to
-      // the most recent publishedAt (close approximation).
-      DateTime? lastCronRun;
-      DateTime? latestPublished;
-      for (final b in allAvailableBriefs) {
-        if (b.fetchedAt != null) {
-          if (lastCronRun == null || b.fetchedAt!.isAfter(lastCronRun)) {
-            lastCronRun = b.fetchedAt;
-          }
-        }
-        if (latestPublished == null || b.publishedAt.isAfter(latestPublished)) {
-          latestPublished = b.publishedAt;
-        }
-      }
-      final effectiveTime = lastCronRun ?? latestPublished;
+      // Use the server-side edge function run time for the "Updated" label
+      final effectiveTime = serverFetchedAt;
 
       if (mounted) {
         setState(() {
@@ -94,11 +115,13 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
               _lastUpdatedStr = 'Updated ${diff.inMinutes} min ago';
             } else if (diff.inHours == 1) {
               _lastUpdatedStr = 'Updated 1 hour ago';
-            } else {
+            } else if (diff.inHours < 24) {
               _lastUpdatedStr = 'Updated ${diff.inHours} hours ago';
+            } else {
+              _lastUpdatedStr = 'Updated ${diff.inDays}d ago';
             }
           } else {
-            _lastUpdatedStr = 'Updated just now';
+            _lastUpdatedStr = '';
           }
         });
 
