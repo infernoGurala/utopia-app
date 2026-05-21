@@ -26,7 +26,6 @@ import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
 import 'services/focus_supabase_service.dart';
-import 'services/news_brief_repository.dart';
 import 'widgets/app_update_prompt.dart';
 import 'screens/event_details_screen.dart';
 import 'services/event_service.dart';
@@ -548,29 +547,17 @@ Future<AppInitializationState> _initializeApp() async {
       unawaited(NotificationService.initialize());
     }
 
-    // Initialize Supabase in the background to avoid blocking the splash screen
+    // Initialize global Supabase in the background (used by notes, events, etc.)
     unawaited(() async {
       try {
-        final doc = await FirebaseFirestore.instance.collection('config').doc('supabase').get();
+        final doc = await FirebaseFirestore.instance.collection('config').doc('supabase-focus-1').get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
           final url = data['url'] as String?;
           final anonKey = data['anon_key'] as String?;
           if (url != null && anonKey != null) {
             await Supabase.initialize(url: url, anonKey: anonKey);
-            debugPrint('Supabase Init: Initialized Supabase with URL: $url');
-
-            // One-time cache buster to force clear trapped mock news cache once on next boot
-            final hasBusted = await CacheService().getAppSetting('has_busted_news_mock_cache_v3');
-            if (hasBusted != 'true') {
-              try {
-                await NewsBriefRepository().forceRefreshTodaysBriefs();
-                await CacheService().saveAppSetting('has_busted_news_mock_cache_v3', 'true');
-                debugPrint('Supabase Init: Successfully busted mock news cache once.');
-              } catch (e) {
-                debugPrint('Supabase Init: Failed to force refresh news briefs: $e');
-              }
-            }
+            debugPrint('Supabase Init: Initialized global Supabase with URL: $url');
           } else {
             debugPrint('Supabase config missing url or anon_key');
           }

@@ -71,7 +71,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
     );
   }
 
-  Future<void> _loadNewsBriefs({bool forceRefresh = false}) async {
+  Future<void> _loadNewsBriefs() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -80,9 +80,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
 
     try {
       final categories = await NewsBriefRepository().getActiveCategories();
-      final briefs = forceRefresh
-          ? await NewsBriefRepository().forceRefreshTodaysBriefs()
-          : await NewsBriefRepository().getTodaysBriefs();
+      final briefs = await NewsBriefRepository().forceRefreshTodaysBriefs();
 
       // Filter out any NewsBrief where headline is empty or null before displaying cards
       final Map<String, List<NewsBrief>> filteredBriefs = {};
@@ -212,7 +210,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
       bodyContent = RefreshIndicator(
         color: U.primary,
         backgroundColor: U.card,
-        onRefresh: () => _loadNewsBriefs(forceRefresh: true),
+        onRefresh: _loadNewsBriefs,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
@@ -251,7 +249,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
                 return RefreshIndicator(
                   color: U.primary,
                   backgroundColor: U.card,
-                  onRefresh: () => _loadNewsBriefs(forceRefresh: true),
+                  onRefresh: _loadNewsBriefs,
                   child: ListView.builder(
                     padding: const EdgeInsets.only(top: 8, bottom: 32),
                     itemCount: list.length,
@@ -316,7 +314,7 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh_rounded, color: U.text),
-            onPressed: () => _loadNewsBriefs(forceRefresh: true),
+            onPressed: _loadNewsBriefs,
           ),
           const SizedBox(width: 8),
         ],

@@ -147,6 +147,15 @@ class CacheService {
     );
   }
 
+  Future<void> deleteAppSettingsByPrefix(String prefix) async {
+    final database = await db;
+    await database.delete(
+      'app_settings',
+      where: 'key LIKE ?',
+      whereArgs: ['$prefix%'],
+    );
+  }
+
   Future<void> saveFolders(List<Map<String, dynamic>> folders) async {
     final database = await db;
     final batch = database.batch();
