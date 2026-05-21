@@ -33,6 +33,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   bool _isDraggingCalendar = false;
   bool _isDraggingBack = false;
   Timer? _debounceTimer;
+  String _lastSavedJournal = '';
 
   final _journalController = TextEditingController();
   final _taskController = TextEditingController();
@@ -76,7 +77,9 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
 
   void _onJournalChanged() {
     if (_note == null) return;
-    if (_journalController.text == _note!.journal) return;
+    if (mounted) setState(() {});
+
+    if (_journalController.text == _lastSavedJournal) return;
 
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 1500), () {
@@ -163,6 +166,7 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     }
 
     _note = finalNote;
+    _lastSavedJournal = finalNote.journal;
     if (_journalController.text != _note!.journal && !FocusScope.of(context).hasFocus) {
       _journalController.text = _note!.journal;
     }
@@ -200,14 +204,28 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
 
   Future<void> _saveNote() async {
     if (_note == null || _userId.isEmpty) return;
+    if (_journalController.text == _lastSavedJournal) return;
     
+    _lastSavedJournal = _journalController.text;
     final updatedNote = _note!.copyWith(
-      journal: _journalController.text,
+      journal: _lastSavedJournal,
     );
-    await _service.saveNote(updatedNote);
-    if (!mounted) return;
-    setState(() => _note = updatedNote);
-    _loadMonthDots();
+    try {
+      await _service.saveNote(updatedNote);
+      if (!mounted) return;
+      setState(() => _note = updatedNote);
+      _loadMonthDots();
+    } catch (e) {
+      debugPrint('ERROR SAVING NOTE: $e');
+      if (mounted) {
+        showUtopiaSnackBar(
+          context,
+          message: 'Error saving note: $e',
+          tone: UtopiaSnackBarTone.error,
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<void> _manualSave() async {
@@ -1069,7 +1087,7 @@ Future<void> _editHabits() async {
   void dispose() {
     _debounceTimer?.cancel();
     _journalController.removeListener(_onJournalChanged);
-    if (_note != null && _journalController.text != _note!.journal) {
+    if (_note != null && _journalController.text != _lastSavedJournal) {
       _saveNote();
     }
     _calendarController.dispose();
@@ -1102,7 +1120,7 @@ Future<void> _editHabits() async {
         onPopInvoked: (didPop) {
           if (didPop) {
             _debounceTimer?.cancel();
-            if (_note != null && _journalController.text != _note!.journal) {
+            if (_note != null && _journalController.text != _lastSavedJournal) {
               _saveNote();
             }
           }
@@ -1587,14 +1605,23 @@ Future<void> _editHabits() async {
   }
 
   Widget _buildNoteBody() {
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
-      children: [
-        _buildHabitsSection(),
-        _buildTasksSection(),
-        _buildJournalSection(),
-      ],
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadData(backgroundFetch: true);
+        await _loadMonthDots(backgroundFetch: true);
+      },
+      color: U.primary,
+      backgroundColor: U.surface,
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          _buildHabitsSection(),
+          _buildTasksSection(),
+          _buildJournalSection(),
+        ],
+      ),
     );
   }
 
@@ -1791,6 +1818,42 @@ Future<void> _editHabits() async {
       onToggle: () => setState(() {
         isCollapsed ? _collapsedSections.remove(title) : _collapsedSections.add(title);
       }),
+      trailing: AnimatedOpacity(
+        duration: const Duration(milliseconds: 250),
+        opacity: _journalController.text != _lastSavedJournal ? 1.0 : 0.0,
+        child: IgnorePointer(
+          ignoring: _journalController.text == _lastSavedJournal,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _manualSave,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accent.withValues(alpha: 0.25), width: 0.8),
+                ),
+                child: _saving
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(accent),
+                        ),
+                      )
+                    : Icon(
+                        Icons.check_rounded,
+                        color: accent,
+                        size: 18,
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
       child: Focus(
         onFocusChange: (hasFocus) {
           if (!hasFocus) _saveNote();
@@ -1902,6 +1965,7 @@ class _SectionWrapper extends StatefulWidget {
   final Widget child;
   final String? subtitle;
   final double? progress;
+  final Widget? trailing;
 
   const _SectionWrapper({
     required this.title,
@@ -1912,6 +1976,7 @@ class _SectionWrapper extends StatefulWidget {
     required this.child,
     this.subtitle,
     this.progress,
+    this.trailing,
   });
 
   @override
@@ -1982,6 +2047,10 @@ class _SectionWrapperState extends State<_SectionWrapper> with SingleTickerProvi
                   ),
                 ),
                 const Spacer(),
+                if (widget.trailing != null) ...[
+                  widget.trailing!,
+                  const SizedBox(width: 12),
+                ],
                 if (widget.subtitle != null) ...[
                   Text(
                     widget.subtitle!,

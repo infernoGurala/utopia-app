@@ -28,7 +28,7 @@ class FocusDatabaseService {
     final path = p.join(dir.path, 'focus_data.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('DROP TABLE IF EXISTS daily_notes');
@@ -54,6 +54,11 @@ class FocusDatabaseService {
               sync_status TEXT NOT NULL DEFAULT 'pending'
             )
           ''');
+        }
+        if (oldVersion < 3) {
+          try {
+            await db.execute("ALTER TABLE daily_notes ADD COLUMN journal TEXT NOT NULL DEFAULT ''");
+          } catch (_) {}
         }
       },
       onCreate: (db, version) async {

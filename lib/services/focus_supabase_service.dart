@@ -207,7 +207,7 @@ class FocusSupabaseService {
         } else {
           debugPrint('Focus Supabase note sync failed: $e');
         }
-        // stays pending, will retry later
+        rethrow;
       }
     }
   }
