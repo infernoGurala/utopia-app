@@ -13,8 +13,7 @@ import '../widgets/app_motion.dart';
 import 'user_profile_screen.dart';
 
 class PeopleScreen extends StatefulWidget {
-  const PeopleScreen({super.key, this.universityId});
-  final String? universityId;
+  const PeopleScreen({super.key});
 
   @override
   State<PeopleScreen> createState() => _PeopleScreenState();
@@ -27,14 +26,6 @@ class _PeopleScreenState extends State<PeopleScreen> {
   String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _buildStream() {
-    final uniId = widget.universityId;
-    if (uniId != null && uniId.isNotEmpty) {
-      return FirebaseFirestore.instance
-          .collection('users')
-          .where('selectedUniversityId', isEqualTo: uniId)
-          .orderBy('displayName')
-          .snapshots();
-    }
     return FirebaseFirestore.instance
         .collection('users')
         .orderBy('displayName')
@@ -179,9 +170,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                     child: Text(
-                      widget.universityId != null && widget.universityId!.isNotEmpty
-                          ? 'People at your university$countStr'
-                          : 'Everyone on UTOPIA$countStr',
+                      'Everyone on UTOPIA$countStr',
                       style: GoogleFonts.outfit(fontSize: 12, color: U.sub),
                     ),
                   );

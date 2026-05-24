@@ -192,157 +192,91 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final titleColor = isDark
-        ? (appThemeNotifier.value.key == 'gruvbox'
-            ? const Color(0xFFFB4934)
-            : appThemeNotifier.value.key == 'everforest'
-                ? const Color(0xFFA7C080)
-                : appThemeNotifier.value.key == 'github-dark'
-                    ? const Color(0xFF58A6FF)
-                    : appThemeNotifier.value.key == 'orchid'
-                        ? const Color(0xFFCBA6F7)
-                        : Colors.white)
-        : ImageOverlayColors.titleColor(appThemeNotifier.value.key, 'morning');
-
-    final subtitleColor = isDark
-        ? U.sub
-        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key, 'morning');
+    final titleColor = ImageOverlayColors.titleColor(appThemeNotifier.value.key, 'morning');
+    final subtitleColor = ImageOverlayColors.subtitleColor(appThemeNotifier.value.key, 'morning');
 
     return Scaffold(
       backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // Background Image with dark mode blending
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: Opacity(
-              opacity: isDark ? 0.35 : 0.6,
-              child: Image.asset(
-                'assets/semesters/background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                color: isDark ? U.bg : null,
-                colorBlendMode: isDark ? BlendMode.multiply : null,
-              ),
-            ),
-          ),
-          // Gradient fade — top fully clear/shaded, bottom solid to blend with background
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark
-                      ? [
-                          U.bg.withValues(alpha: 0.45),
-                          U.bg.withValues(alpha: 0.15),
-                          U.bg.withValues(alpha: 1.0),
-                        ]
-                      : [
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg.withValues(alpha: 1.0),
-                        ],
-                  stops: const [0.0, 0.55, 1.0],
-                ),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Semesters',
+                          style: GoogleFonts.newsreader(
+                            color: U.text,
+                            fontSize: 38,
+                            fontWeight: FontWeight.w400,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Access academic resources.',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: U.sub,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Semesters',
-                              style: GoogleFonts.playfairDisplay(
-                                color: titleColor,
-                                fontSize: 42,
-                                fontWeight: FontWeight.w700,
-                                fontStyle: FontStyle.normal,
-                                letterSpacing: -1,
-                              ),
-                            ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Access your academic resources',
-                              style: GoogleFonts.outfit(
-                                color: subtitleColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
-                          ],
+                      AnimatedOpacity(
+                        opacity: (_isLoading || _isSyncing) ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 400),
+                        child: SizedBox(
+                          width: 30,
+                          child: LinearProgressIndicator(
+                            backgroundColor: U.border,
+                            valueColor: AlwaysStoppedAnimation<Color>(U.primary),
+                            minHeight: 2,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedOpacity(
-                            opacity: (_isLoading || _isSyncing) ? 1.0 : 0.0,
-                            duration: const Duration(milliseconds: 400),
-                            child: SizedBox(
-                              width: 30,
-                              child: LinearProgressIndicator(
-                                backgroundColor: U.border,
-                                valueColor: AlwaysStoppedAnimation<Color>(U.primary),
-                                minHeight: 2,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: U.surface,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.03),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: Icon(Icons.calendar_month_rounded, color: U.text, size: 20),
-                              tooltip: 'Timetable',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                                );
-                              },
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ).animate().fadeIn(delay: 200.ms, duration: 500.ms).scale(curve: Curves.easeOutBack),
-                        ],
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: U.card,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: U.border, width: 0.5),
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.calendar_month_rounded, color: U.primary, size: 18),
+                          tooltip: 'Timetable',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                            );
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
               child: _isLoading && _classes.isEmpty
                   ? const Center(child: UtopiaLoader(scale: 0.7))
                   : RefreshIndicator(
@@ -356,7 +290,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                         padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
                         childAspectRatio: 0.75,
                         children: <Widget>[
-                          // ── Community Notes (Design A) ──
+                          // ── Community Notes ──
                           _buildCommunityTile(context),
 
                           // ── User classes (pinned first) ──
@@ -376,7 +310,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
                           // ── New Class ──
                           _buildActionTile(
-                            label: 'NEW CLASS',
+                            label: 'New Class',
                             icon: Icons.add_circle_outline,
                             onTap: _showNewClassMenu,
                           ),
@@ -391,8 +325,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
           ],
         ),
       ),
-      ],
-      ),
     );
   }
 
@@ -402,8 +334,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
   Widget _buildCommunityTile(BuildContext context) {
     return _buildModernCard(
       context: context,
-      title: 'COMMUNITY',
-      description: 'Connect, collaborate\nand grow together',
+      title: 'Community',
+      description: 'Shared study notes.',
       icon: Icons.people_alt_rounded,
       color: U.blue,
       topRightBracket: true,
@@ -431,8 +363,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
       onLongPress: () => _showClassLongPressMenu(c),
       child: _buildModernCard(
         context: context,
-        title: c.name.toUpperCase(),
-        description: 'Explore notes, PYQs\nand study material',
+        title: c.name,
+        description: 'Class resources.',
         icon: Icons.menu_book_rounded,
         color: U.peach,
         topRightBracket: false,
@@ -706,8 +638,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     return _buildModernCard(
       context: context,
       title: label,
-      description: 'Create a new class\nand get started',
-      icon: Icons.add_circle_outline,
+      description: 'Create a folder.',
+      icon: icon,
       color: U.teal,
       topRightBracket: false,
       backgroundShape: Icon(Icons.layers, size: 110, color: U.teal.withValues(alpha: 0.05)),
@@ -727,156 +659,76 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     bool showPin = false,
     bool showTriangle = false,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: U.surface,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              U.surface,
-              Color.lerp(U.surface, color, isDark ? 0.1 : 0.05) ?? U.surface,
-            ],
-          ),
+          borderRadius: BorderRadius.circular(6),
+          color: U.card,
           border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white.withValues(alpha: 0.5), 
-            width: 1.0,
+            color: U.border,
+            width: 0.5,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+        ),
+        child: Stack(
+          children: [
+            if (showPin)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Icon(Icons.push_pin_rounded, size: 14, color: U.primary),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: U.primary, size: 20),
+                  const Spacer(),
+                  Text(
+                    title,
+                    style: GoogleFonts.newsreader(
+                      color: U.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w400,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -0.3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.sub,
+                      fontSize: 11,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        'EXPLORE',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.primary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_rounded, color: U.primary, size: 12),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              // Background Shapes
-              if (backgroundShape != null)
-                Positioned(
-                  right: -25,
-                  bottom: -25,
-                  child: backgroundShape,
-                ),
-              // Corner Bracket
-              if (showTriangle)
-                Positioned(
-                  top: 0,
-                  right: topRightBracket ? 0 : null,
-                  left: topRightBracket ? null : 0,
-                  child: CustomPaint(
-                    size: const Size(48, 48),
-                    painter: _SolidTrianglePainter(color: color, topRight: topRightBracket),
-                  ),
-                ),
-              if (showPin)
-                Positioned(
-                  top: 14,
-                  right: 14,
-                  child: Icon(Icons.push_pin_rounded, size: 18, color: color.withValues(alpha: 0.6)),
-                ),
-              // Content
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Circular Icon
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: U.surface,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            color.withValues(alpha: isDark ? 0.15 : 0.1),
-                            color.withValues(alpha: isDark ? 0.05 : 0.02),
-                          ]
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.6), width: 1),
-                      ),
-                      child: Center(
-                        child: Icon(icon, color: color, size: 28),
-                      ),
-                    ),
-                    const Spacer(),
-                    // Title
-                    Text(
-                      title,
-                      style: GoogleFonts.outfit(
-                        color: U.text,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    // Dash
-                    Container(
-                      width: 24,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    // Description
-                    Text(
-                      description,
-                      style: GoogleFonts.outfit(
-                        color: U.dim,
-                        fontSize: 10.5,
-                        height: 1.3,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 10),
-                    // Bottom Left Arrow
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isDark ? U.surface : Colors.white,
-                        border: isDark ? Border.all(color: color.withValues(alpha: 0.3), width: 1) : null,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.arrow_forward_rounded, color: color, size: 16),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );

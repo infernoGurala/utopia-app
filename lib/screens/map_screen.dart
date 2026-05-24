@@ -621,16 +621,31 @@ class _MapScreenState extends State<MapScreen> {
       return Scaffold(
         backgroundColor: U.bg,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF1E1E2E),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
-            onPressed: () => Navigator.pop(context),
+          backgroundColor: U.bg,
+          elevation: 0,
+          leadingWidth: 70,
+          leading: Center(
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: U.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: U.border, width: 0.5),
+                ),
+                child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+              ),
+            ),
           ),
           title: Text(
             'Campus Map',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.newsreader(
               color: U.text,
-              fontWeight: FontWeight.w700,
+              fontSize: 24,
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.italic,
             ),
           ),
         ),
@@ -643,14 +658,14 @@ class _MapScreenState extends State<MapScreen> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: U.card,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: U.border),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: U.border, width: 0.5),
                 ),
                 child: Text(
                   'Campus map depends on Google Maps and mobile location APIs that are not enabled for Windows in this app yet.',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.sub,
-                    fontSize: 14,
+                    fontSize: 13.5,
                     height: 1.5,
                   ),
                 ),
@@ -661,34 +676,53 @@ class _MapScreenState extends State<MapScreen> {
       );
     }
 
+    final isDarkTheme = appThemeNotifier.value.isDark;
+
     return Scaffold(
       backgroundColor: U.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E2E),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
-          onPressed: () => Navigator.pop(context),
+        backgroundColor: U.bg,
+        elevation: 0,
+        leadingWidth: 70,
+        leading: Center(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: U.border, width: 0.5),
+              ),
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+            ),
+          ),
         ),
         title: Text(
           'Campus Map',
-          style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w700),
+          style: GoogleFonts.newsreader(
+            color: U.text,
+            fontSize: 24,
+            fontWeight: FontWeight.w400,
+            fontStyle: FontStyle.italic,
+          ),
         ),
         actions: [
           IconButton(
             onPressed: _openIAA,
             tooltip: 'IAA',
-            icon: const Icon(Icons.auto_awesome, color: Color(0xFF7F77DD)),
+            icon: Icon(Icons.auto_awesome, color: U.gold),
           ),
           Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: U.card,
-              borderRadius: BorderRadius.circular(999),
+              color: U.surface,
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: _isGpsEnabled
-                    ? U.primary.withValues(alpha: 0.45)
-                    : U.border,
+                color: U.border,
+                width: 0.5,
               ),
             ),
             child: Row(
@@ -699,26 +733,33 @@ class _MapScreenState extends State<MapScreen> {
                       ? Icons.location_on_rounded
                       : Icons.location_off_rounded,
                   color: _isGpsEnabled ? U.primary : U.sub,
-                  size: 18,
+                  size: 16,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   'GPS',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.text,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Switch(
-                  value: _isGpsEnabled,
-                  onChanged: _setSharing,
-                  activeThumbColor: U.bg,
-                  activeTrackColor: U.primary,
-                  inactiveThumbColor: U.sub,
-                  inactiveTrackColor: U.surface,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                SizedBox(
+                  width: 36,
+                  height: 20,
+                  child: Transform.scale(
+                    scale: 0.75,
+                    child: Switch(
+                      value: _isGpsEnabled,
+                      onChanged: _setSharing,
+                      activeThumbColor: U.bg,
+                      activeTrackColor: U.primary,
+                      inactiveThumbColor: U.sub,
+                      inactiveTrackColor: U.surface,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -759,21 +800,15 @@ class _MapScreenState extends State<MapScreen> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: U.green.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: U.green.withValues(alpha: 0.22),
-                        blurRadius: 16,
-                        spreadRadius: 1,
-                      ),
-                    ],
+                    color: U.primary,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.border, width: 0.5),
                   ),
                   child: Text(
-                    '📍 Sharing your location',
-                    style: GoogleFonts.outfit(
-                      color: const Color(0xFF0F0F17),
-                      fontSize: 12,
+                    '📍 Sharing location',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: isDarkTheme ? Colors.black : Colors.white,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -837,46 +872,35 @@ class _MapModeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onToggle,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: U.card.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: U.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
+    return GestureDetector(
+      onTap: onToggle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: U.border, width: 0.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isAerialMode
+                  ? Icons.layers_rounded
+                  : Icons.satellite_alt_rounded,
+              color: U.primary,
+              size: 15,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isAerialMode ? 'Blocks' : 'Aerial',
+              style: GoogleFonts.plusJakartaSans(
+                color: U.text,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isAerialMode
-                    ? Icons.layers_rounded
-                    : Icons.satellite_alt_rounded,
-                color: U.primary,
-                size: 16,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isAerialMode ? 'Blocks' : 'Aerial',
-                style: GoogleFonts.outfit(
-                  color: U.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -890,40 +914,29 @@ class _CampusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: U.card.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: U.border),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.18),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: U.border, width: 0.5),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.school_rounded, color: U.primary, size: 15),
+            const SizedBox(width: 6),
+            Text(
+              'Go to campus',
+              style: GoogleFonts.plusJakartaSans(
+                color: U.text,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.school_rounded, color: U.primary, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                'Go to campus',
-                style: GoogleFonts.outfit(
-                  color: U.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -945,33 +958,23 @@ class _MapActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Ink(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: U.card.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: U.border),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Icon(icon, color: U.primary, size: 20),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: U.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: U.border, width: 0.5),
           ),
+          child: Icon(icon, color: U.primary, size: 18),
         ),
       ),
     );
   }
 }
+
 
 class _VisiblePerson {
   const _VisiblePerson({

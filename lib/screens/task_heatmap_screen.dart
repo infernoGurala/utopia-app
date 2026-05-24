@@ -1,4 +1,4 @@
-import 'dart:ui';
+// UTOPIA - task_heatmap_screen.dart - Detailed habit tracking & visual heatmap grid
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../models/focus_models.dart';
 import '../services/focus_supabase_service.dart';
-import '../theme/image_overlay_colors.dart';
 import '../widgets/utopia_loader.dart';
 
 class TaskHeatmapScreen extends StatefulWidget {
@@ -90,24 +89,13 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
         ? widget.taskName[0].toUpperCase() + widget.taskName.substring(1)
         : widget.taskName;
 
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    final timeSlot = ImageOverlayColors.getTimeSlot();
-    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
-    final themeKey = appThemeNotifier.value.key;
-    final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
-    final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
-
-    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
     final isDarkTheme = appThemeNotifier.value.isDark;
-    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: U.surface,
         systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
@@ -116,308 +104,258 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
         backgroundColor: U.bg,
         body: _loading
             ? const Center(child: UtopiaLoader(scale: 0.7))
-            : Stack(
-                children: [
-                  // ── Background Image Cover (Extended for premium bleed through) ──
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: screenHeight * 0.75,
-                    child: Image.asset(
-                      bgImagePath,
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                    ),
-                  ),
-
-                  // ── Gradient Overlay ──
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: screenHeight * 0.75,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            U.bg.withValues(alpha: 0.0),
-                            U.bg.withValues(alpha: 0.2),
-                            U.bg,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // ── Scrollable Body Content ──
-                  Positioned.fill(
-                    child: ListView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(0, topPadding + 8, 0, 40),
-                      children: [
-                        // Header
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 24, 8),
-                          child: Row(
-                            children: [
-                              IconButton(
-                                onPressed: () => Navigator.pop(context),
-                                icon: Icon(Icons.arrow_back_ios_new_rounded, color: onImageTitleColor, size: 20),
-                                splashColor: Colors.transparent,
-                                highlightColor: Colors.transparent,
+            : SafeArea(
+                child: ListView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: U.surface,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: U.border, width: 0.5),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      displayName,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w700,
-                                        color: onImageTitleColor,
-                                        letterSpacing: -0.6,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Daily consistency matrix',
-                                      style: GoogleFonts.outfit(
-                                        color: onImageSubtitleColor,
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, duration: 500.ms),
-                        const SizedBox(height: 20),
-
-                        // Year grid card
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.55),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65),
-                                    width: 1.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.02),
-                                      blurRadius: 15,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildYearGrid(),
-                                    const SizedBox(height: 18),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // Heatmap Legend (Binary)
-                                        Row(
-                                          children: [
-                                            _buildLegendCell(false),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Not completed',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 11,
-                                                color: U.sub.withValues(alpha: 0.8),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 16),
-                                            _buildLegendCell(true),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Completed',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 11,
-                                                color: U.sub.withValues(alpha: 0.8),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        // Clean clear selection if tooltip active
-                                        if (_tooltipDate != null)
-                                          GestureDetector(
-                                            onTap: () {
-                                              setState(() {
-                                                _tooltipDate = null;
-                                                _tooltipCount = null;
-                                              });
-                                            },
-                                            child: Text(
-                                              'Clear selection',
-                                              style: GoogleFonts.outfit(
-                                                color: U.primary,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                              child: Icon(
+                                Icons.arrow_back_rounded,
+                                color: U.primary,
+                                size: 18,
                               ),
                             ),
                           ),
-                        ).animate().fadeIn(delay: 150.ms, duration: 550.ms).slideY(begin: 0.08, end: 0, delay: 150.ms, duration: 550.ms),
-
-                        // Tooltip Detail Container
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 200),
-                          child: _tooltipDate != null
-                              ? Padding(
-                                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                                        decoration: BoxDecoration(
-                                          color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.55),
-                                          borderRadius: BorderRadius.circular(24),
-                                          border: Border.all(color: U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65)),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.03),
-                                              blurRadius: 12,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              padding: const EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                color: (_tooltipCount ?? 0) > 0
-                                                    ? U.primary.withValues(alpha: 0.12)
-                                                    : U.text.withValues(alpha: 0.05),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                (_tooltipCount ?? 0) > 0
-                                                    ? Icons.check_circle_rounded
-                                                    : Icons.radio_button_unchecked_rounded,
-                                                color: (_tooltipCount ?? 0) > 0 ? U.primary : U.sub,
-                                                size: 20,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    _formatTooltipDate(_tooltipDate!),
-                                                    style: GoogleFonts.outfit(
-                                                      color: U.text,
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 3),
-                                                  Text(
-                                                    (_tooltipCount ?? 0) > 0
-                                                        ? 'Habit Completed'
-                                                        : 'No completion recorded',
-                                                    style: GoogleFonts.outfit(
-                                                      color: (_tooltipCount ?? 0) > 0 ? U.primary : U.sub,
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  displayName,
+                                  style: GoogleFonts.newsreader(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w400,
+                                    fontStyle: FontStyle.italic,
+                                    color: U.text,
+                                    letterSpacing: -0.5,
                                   ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // Performance Metrics Section
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            'PERFORMANCE METRICS',
-                            style: GoogleFonts.outfit(
-                              color: onImageSubtitleColor.withValues(alpha: 0.7),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1.85,
-                            children: [
-                              _buildStatCard('Current Streak', '${_currentStreak}d', Icons.local_fire_department_rounded, Colors.orange, isDarkTheme),
-                              _buildStatCard('Longest Streak', '${_longestStreak}d', Icons.emoji_events_rounded, Colors.amber, isDarkTheme),
-                              _buildStatCard('Total Completed', '$_totalDone', Icons.check_circle_outline_rounded, U.teal, isDarkTheme),
-                              _buildStatCard('This Month', '$_thisMonth', Icons.calendar_month_rounded, U.blue, isDarkTheme),
-                            ],
-                          ),
-                        ).animate().fadeIn(delay: 250.ms, duration: 500.ms).slideY(begin: 0.08, end: 0, delay: 250.ms, duration: 500.ms),
-
-                        // Last active bottom notice
-                        if (_lastActive != '—') ...[
-                          const SizedBox(height: 24),
-                          Center(
-                            child: Text(
-                              'Last Active: $_lastActive',
-                              style: GoogleFonts.outfit(
-                                color: U.sub.withValues(alpha: 0.6),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Daily consistency matrix',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: U.sub,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ],
+                      ),
+                    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0, duration: 400.ms),
+                    const SizedBox(height: 20),
+
+                    // Year grid card
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: U.surface,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: U.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildYearGrid(),
+                            const SizedBox(height: 18),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Heatmap Legend (Binary)
+                                Row(
+                                  children: [
+                                    _buildLegendCell(false),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Not completed',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        color: U.sub,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    _buildLegendCell(true),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Completed',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 11,
+                                        color: U.sub,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                // Clean clear selection if tooltip active
+                                if (_tooltipDate != null)
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _tooltipDate = null;
+                                        _tooltipCount = null;
+                                      });
+                                    },
+                                    child: Text(
+                                      'Clear selection',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: U.primary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 100.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, delay: 100.ms, duration: 400.ms),
+
+                    // Tooltip Detail Container
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      child: _tooltipDate != null
+                          ? Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                decoration: BoxDecoration(
+                                  color: U.surface,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: U.border, width: 0.5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: (_tooltipCount ?? 0) > 0
+                                            ? U.primary.withValues(alpha: 0.08)
+                                            : U.text.withValues(alpha: 0.04),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: (_tooltipCount ?? 0) > 0 ? U.primary.withValues(alpha: 0.2) : Colors.transparent,
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        (_tooltipCount ?? 0) > 0
+                                            ? Icons.check_circle_rounded
+                                            : Icons.radio_button_unchecked_rounded,
+                                        color: (_tooltipCount ?? 0) > 0 ? U.primary : U.sub,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _formatTooltipDate(_tooltipDate!),
+                                            style: GoogleFonts.plusJakartaSans(
+                                              color: U.text,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            (_tooltipCount ?? 0) > 0
+                                                ? 'Habit Completed'
+                                                : 'No completion recorded',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              color: (_tooltipCount ?? 0) > 0 ? U.primary : U.sub,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 24),
+
+                    // Performance Metrics Section
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'PERFORMANCE METRICS',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.sub,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 1.85,
+                        children: [
+                          _buildStatCard('Current Streak', '${_currentStreak}d', Icons.local_fire_department_rounded, Colors.orange),
+                          _buildStatCard('Longest Streak', '${_longestStreak}d', Icons.emoji_events_rounded, Colors.amber),
+                          _buildStatCard('Total Completed', '$_totalDone', Icons.check_circle_outline_rounded, U.teal),
+                          _buildStatCard('This Month', '$_thisMonth', Icons.calendar_month_rounded, U.blue),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 150.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, delay: 150.ms, duration: 400.ms),
+
+                    // Last active bottom notice
+                    if (_lastActive != '—') ...[
+                      const SizedBox(height: 24),
+                      Center(
+                        child: Text(
+                          'Last Active: $_lastActive',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: U.sub.withValues(alpha: 0.6),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
       ),
     );
@@ -431,18 +369,11 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
       decoration: BoxDecoration(
         color: completed
             ? U.primary
-            : U.text.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(3.5),
+            : U.text.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(3),
         border: completed
             ? null
-            : Border.all(color: U.border.withValues(alpha: 0.2), width: 0.5),
-        boxShadow: completed ? [
-          BoxShadow(
-            color: U.primary.withValues(alpha: 0.3),
-            blurRadius: 4,
-            spreadRadius: 0.5,
-          )
-        ] : null,
+            : Border.all(color: U.border, width: 0.5),
       ),
     );
   }
@@ -457,73 +388,62 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
     }
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isDarkTheme) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.55),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isDarkTheme
-                      ? Color.lerp(color, Colors.black, 0.72)!.withValues(alpha: 0.85)
-                      : Color.lerp(color, Colors.white, 0.84)!,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: GoogleFonts.outfit(
-                        color: U.sub,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: GoogleFonts.outfit(
-                        color: U.text,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      decoration: BoxDecoration(
+        color: U.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: U.border,
+          width: 0.5,
         ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: color.withValues(alpha: 0.2),
+                width: 0.5,
+              ),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: U.sub,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: U.text,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -568,11 +488,11 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
             children: [
               const SizedBox(height: 20), // aligns with Month labels (16) + spacing (4)
               SizedBox(height: cellSize + gap), // Mon (skip)
-              SizedBox(height: cellSize + gap, child: Text('M', style: GoogleFonts.outfit(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
+              SizedBox(height: cellSize + gap, child: Text('M', style: GoogleFonts.plusJakartaSans(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
               SizedBox(height: cellSize + gap), // Wed (skip)
-              SizedBox(height: cellSize + gap, child: Text('W', style: GoogleFonts.outfit(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
+              SizedBox(height: cellSize + gap, child: Text('W', style: GoogleFonts.plusJakartaSans(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
               SizedBox(height: cellSize + gap), // Fri (skip)
-              SizedBox(height: cellSize + gap, child: Text('F', style: GoogleFonts.outfit(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
+              SizedBox(height: cellSize + gap, child: Text('F', style: GoogleFonts.plusJakartaSans(fontSize: 9, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))),
               SizedBox(height: cellSize + gap), // Sun (skip)
             ],
           ),
@@ -594,7 +514,7 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
                       return SizedBox(
                         width: cellSize + gap,
                         child: monthLabels.containsKey(col)
-                            ? Text(monthLabels[col]!, style: GoogleFonts.outfit(fontSize: 9.5, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))
+                            ? Text(monthLabels[col]!, style: GoogleFonts.plusJakartaSans(fontSize: 9.5, color: U.text.withValues(alpha: 0.65), fontWeight: FontWeight.w600))
                             : null,
                       );
                     }),
@@ -609,7 +529,7 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
                         final dayIndex = col * 7 + row;
                         final date = gridStart.add(Duration(days: dayIndex));
                         if (date.isAfter(now)) {
-                          return SizedBox(width: cellSize + gap, height: cellSize + gap);
+                           return SizedBox(width: cellSize + gap, height: cellSize + gap);
                         }
                         final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
                         final count = dateMap[dateStr] ?? 0;
@@ -631,20 +551,13 @@ class _TaskHeatmapScreenState extends State<TaskHeatmapScreen> {
                             decoration: BoxDecoration(
                               color: isCompleted
                                   ? U.primary
-                                  : U.text.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(3.5),
+                                  : U.text.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(3),
                               border: isCurrentTooltip
                                   ? Border.all(color: U.text, width: 1.5)
                                   : (!isCompleted
-                                      ? Border.all(color: U.border.withValues(alpha: 0.2), width: 0.5)
+                                      ? Border.all(color: U.border, width: 0.5)
                                       : null),
-                              boxShadow: isCompleted ? [
-                                BoxShadow(
-                                  color: U.primary.withValues(alpha: 0.25),
-                                  blurRadius: 3,
-                                  spreadRadius: 0.2,
-                                )
-                              ] : null,
                             ),
                           ),
                         );

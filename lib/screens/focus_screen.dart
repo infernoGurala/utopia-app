@@ -390,28 +390,17 @@ class _FocusScreenState extends State<FocusScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
     final topPadding = MediaQuery.paddingOf(context).top;
 
     final timeSlot = ImageOverlayColors.getTimeSlot();
     final greetingText = _generateRandomGreeting(timeSlot);
-    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
-    final themeKey = appThemeNotifier.value.key;
     final isDarkTheme = appThemeNotifier.value.isDark;
-
-    final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
-    final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
-    final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
-    final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
-
-    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
-    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
 
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: U.surface,
         systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
@@ -421,371 +410,218 @@ class _FocusScreenState extends State<FocusScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: U.surface,
         systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
       ),
       child: Scaffold(
         backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // ── Background Image ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.80,
-            child: Image.asset(
-              bgImagePath,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
 
-          // ── Gradient: top half clear, bottom half smooth fade ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.80,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg.withValues(alpha: 0.0),
-                    U.bg,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+                // ── Header: Utopia title ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Utopia',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'OrangeAvenue',
+                                fontSize: 38,
+                                fontWeight: FontWeight.w700,
+                                color: U.text,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Transform.rotate(
+                              angle: 30 * 3.1415926535 / 180,
+                              child: Transform.scale(
+                                scaleX: -1,
+                                child: Image.asset(
+                                  'assets/focus screen/leaves.png',
+                                  width: 22,
+                                  height: 22,
+                                  fit: BoxFit.contain,
+                                  color: U.primary,
+                                  colorBlendMode: BlendMode.srcIn,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Stay productive.',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.dim,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ).animate()
+                      .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+                      .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                 ),
-              ),
-            ),
-          ),
 
-          // ── Main scrollable content ──
-          Positioned.fill(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(height: topPadding + 16),
-
-                  // ── Header: Utopia title + Profile Avatar ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                // ── Greeting Section ──
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  child: IntrinsicHeight(
                     child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        Container(
+                          width: 2,
+                          color: U.border,
+                        ),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Utopia',
-                                    style: TextStyle(
-                                      fontFamily: 'OrangeAvenue',
-                                      fontSize: 42,
-                                      fontWeight: FontWeight.w700,
-                                      color: onImageTitleColor,
-                                      letterSpacing: -0.5,
-                                      height: 1.1,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 0),
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Transform.rotate(
-                                      angle: 30 * 3.1415926535 / 180,
-                                      child: Transform.scale(
-                                        scaleX: -1,
-                                        child: Image.asset(
-                                          'assets/focus screen/leaves.png',
-                                          width: 22,
-                                          height: 22,
-                                          fit: BoxFit.contain,
-                                          color: onImageTitleColor,
-                                          colorBlendMode: BlendMode.srcIn,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
                               Text(
-                                'Stay productive and track your habits',
-                                style: GoogleFonts.outfit(
-                                  color: onImageSubtitleColor,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w500,
+                                _userName.isEmpty ? greetingText : '$greetingText, $_userName.',
+                                style: GoogleFonts.newsreader(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w400,
+                                  fontStyle: FontStyle.italic,
+                                  color: U.text,
+                                  letterSpacing: -0.3,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _quote,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w400,
+                                  color: U.sub,
+                                  height: 1.5,
+                                  letterSpacing: 0.1,
                                 ),
                               ),
                             ],
-                          ).animate()
-                              .fadeIn(duration: 600.ms, curve: Curves.easeOut)
-                              .slideY(begin: 0.15, end: 0, duration: 600.ms, curve: Curves.easeOut),
+                          ),
                         ),
-
-                        // Profile Avatar
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            PageRouteBuilder(
-                              opaque: false,
-                              pageBuilder: (context, animation, secondaryAnimation) => const ProfileScreen(),
-                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                final slideAnimation = Tween<Offset>(
-                                  begin: const Offset(0.0, 0.12),
-                                  end: Offset.zero,
-                                ).animate(
-                                  CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOutCubic,
-                                  ),
-                                );
-                                final fadeAnimation = Tween<double>(
-                                  begin: 0.0,
-                                  end: 1.0,
-                                ).animate(
-                                  CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOut,
-                                  ),
-                                );
-                                return FadeTransition(
-                                  opacity: fadeAnimation,
-                                  child: SlideTransition(
-                                    position: slideAnimation,
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              transitionDuration: const Duration(milliseconds: 380),
-                            ),
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Animated Energy Ring
-                              Container(
-                                width: 54,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: SweepGradient(
-                                    colors: [
-                                      U.primary.withValues(alpha: 0.0),
-                                      U.primary,
-                                      U.primary.withValues(alpha: 0.0),
-                                    ],
-                                    stops: const [0.1, 0.5, 0.9],
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: U.primary.withValues(alpha: 0.3),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ).animate(onPlay: (controller) => controller.repeat()).rotate(duration: 3.seconds),
-
-                              // Inner Avatar
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: U.bg.withValues(alpha: 0.6), // Subtle inner separator
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: CircleAvatar(
-                                  backgroundColor: U.card,
-                                  backgroundImage: _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty
-                                      ? CachedNetworkImageProvider(_userPhotoUrl!)
-                                      : null,
-                                  child: _userPhotoUrl == null || _userPhotoUrl!.isEmpty
-                                      ? Icon(Icons.person, color: U.dim, size: 24)
-                                      : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ).animate()
-                            .fadeIn(delay: 200.ms, duration: 500.ms)
-                            .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), delay: 200.ms, duration: 500.ms, curve: Curves.easeOutBack),
                       ],
                     ),
                   ),
+                ).animate()
+                    .fadeIn(delay: 300.ms, duration: 500.ms)
+                    .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
 
-                  // ── Greeting Section ──
-                  SizedBox(height: screenHeight * 0.18),
-                  ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        decoration: BoxDecoration(
-                          // A very faint gradient to smooth out the text area without hard edges
-                          gradient: LinearGradient(
-                            colors: [
-                              U.surface.withValues(alpha: 0.0),
-                              U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.15),
-                              U.surface.withValues(alpha: 0.0),
-                            ],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
+                const SizedBox(height: 28),
+
+                // ── Feature Cards (2+1 Grid) ──
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: [
+                      // Top row: Daily Note + Reminders
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _FeatureCard(
+                              title: 'Daily Note',
+                              description: 'Write thoughts.',
+                              icon: Icons.event_repeat_rounded,
+                              svgAsset: 'assets/icons/routine_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
+                              iconColor: U.blue,
+                              statLabel: _dailyNoteInsight,
+                              statColor: U.blue,
+                              delay: 400,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const DailyNoteScreen()),
+                              ).then((_) => _loadData()),
+                            ),
                           ),
-                        ),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Container(
-                                width: 3,
-                                decoration: BoxDecoration(
-                                  color: greetingColor.withValues(alpha: 0.45),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _userName.isEmpty ? greetingText : '$greetingText, $_userName',
-                                      style: GoogleFonts.tiroGurmukhi(
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w500,
-                                        color: greetingColor,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      _motivationalText,
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                        color: motivationalColor,
-                                        height: 1.45,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _FeatureCard(
+                              title: 'Reminders',
+                              description: 'Manage tasks.',
+                              icon: Icons.alarm_on_rounded,
+                              svgAsset: 'assets/icons/alarm_smart_wake_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
+                              iconColor: U.lavender,
+                              statLabel: _remindersInsight,
+                              statColor: U.lavender,
+                              delay: 500,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                              ).then((_) => _loadData()),
+                            ),
                           ),
-                        ).animate()
-                            .fadeIn(delay: 300.ms, duration: 600.ms)
-                            .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 600.ms, curve: Curves.easeOut),
+                        ],
                       ),
-                    ),
+                    ],
                   ),
+                ),
 
-                  const SizedBox(height: 28),
+                const SizedBox(height: 12),
 
-                  // ── Feature Cards (2+1 Grid) ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        // Top row: Daily Note + Reminders
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _FeatureCard(
-                                title: 'Daily Note',
-                                description: 'Write your thoughts\nand ideas',
-                                icon: Icons.event_repeat_rounded,
-                                svgAsset: 'assets/icons/routine_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                                iconColor: U.blue,
-                                statLabel: _dailyNoteInsight,
-                                statColor: U.blue,
-                                delay: 400,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const DailyNoteScreen()),
-                                ).then((_) => _loadData()),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _FeatureCard(
-                                title: 'Reminders',
-                                description: 'Stay on top of your\nimportant tasks',
-                                icon: Icons.alarm_on_rounded,
-                                svgAsset: 'assets/icons/alarm_smart_wake_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                                iconColor: U.lavender,
-                                statLabel: _remindersInsight,
-                                statColor: U.lavender,
-                                delay: 500,
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const RemindersScreen()),
-                                ).then((_) => _loadData()),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                // ── Today's Brief Card ──
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: NewsBriefDashboardCard(),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Activity (full width)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _FeatureCard(
+                    title: 'Activity',
+                    description: 'Track habits.',
+                    icon: Icons.grid_view_rounded,
+                    svgAsset: 'assets/icons/full_stacked_bar_chart_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
+                    iconColor: U.peach,
+                    statLabel: '$_activeHabits habits active',
+                    statColor: U.peach,
+                    delay: 600,
+                    isWide: true,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
+                    ).then((_) => _loadData()),
                   ),
+                ),
 
-                  const SizedBox(height: 12),
-
-                  // ── Today's Brief Card ──
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: NewsBriefDashboardCard(),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Activity (full width)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _FeatureCard(
-                      title: 'Activity',
-                      description: 'Track your habits\nand progress',
-                      icon: Icons.grid_view_rounded,
-                      svgAsset: 'assets/icons/full_stacked_bar_chart_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                      iconColor: U.peach,
-                      statLabel: '$_activeHabits habits active',
-                      statColor: U.peach,
-                      delay: 600,
-                      isWide: true,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
-                      ).then((_) => _loadData()),
-                    ),
-                  ),
-
-                  // Bottom padding for nav bar
-                  const SizedBox(height: 120),
-                ],
-              ),
+                // Bottom padding for nav bar
+                const SizedBox(height: 120),
+              ],
             ),
           ),
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _FeatureCard extends StatelessWidget {
@@ -819,30 +655,17 @@ class _FeatureCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: U.surface.withValues(alpha: appThemeNotifier.value.isDark ? 0.4 : 0.55),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: U.border.withValues(alpha: appThemeNotifier.value.isDark ? 0.3 : 0.7),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: cardContent,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: U.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: U.border,
+            width: 0.5,
           ),
         ),
+        child: cardContent,
       ),
     ).animate()
         .fadeIn(delay: delay.ms, duration: 500.ms)
@@ -852,7 +675,7 @@ class _FeatureCard extends StatelessWidget {
   /// Square card layout (for Daily Note, Activity)
   Widget _buildSquareLayout() {
     return SizedBox(
-      height: 175,
+      height: 170,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -861,34 +684,28 @@ class _FeatureCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.22 : 0.15),
-                  borderRadius: BorderRadius.circular(14),
+                  color: U.surface,
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.35 : 0.25),
-                    width: 1,
-                  ),
-                ),
-                child: svgAsset != null
-                    ? SvgPicture.asset(svgAsset!, width: 22, height: 22, colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn))
-                    : Icon(icon, color: iconColor, size: 22),
-              ),
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: U.border,
                     width: 0.5,
                   ),
                 ),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: U.text.withValues(alpha: 0.8),
-                  size: 16,
-                ),
+                child: svgAsset != null
+                    ? SvgPicture.asset(
+                        svgAsset!,
+                        width: 20,
+                        height: 20,
+                        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                      )
+                    : Icon(icon, color: iconColor, size: 20),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: U.dim,
+                size: 16,
               ),
             ],
           ),
@@ -897,44 +714,36 @@ class _FeatureCard extends StatelessWidget {
           // Title
           Text(
             title,
-            style: GoogleFonts.outfit(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+            style: GoogleFonts.newsreader(
+              fontSize: 22,
+              fontWeight: FontWeight.w400,
+              fontStyle: FontStyle.italic,
               color: U.text,
+              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
 
           // Description
           Text(
             description,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               color: U.sub,
-              height: 1.35,
+              height: 1.4,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
-          // Stat line + label
-          Container(
-            width: 26,
-            height: 2.5,
-            decoration: BoxDecoration(
-              color: statColor,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 5),
+          // Stat line
           Text(
             statLabel,
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: statColor,
-              fontStyle: FontStyle.italic,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: U.dim,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -949,18 +758,23 @@ class _FeatureCard extends StatelessWidget {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.22 : 0.15),
-            borderRadius: BorderRadius.circular(14),
+            color: U.surface,
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: iconColor.withValues(alpha: appThemeNotifier.value.isDark ? 0.35 : 0.25),
-              width: 1,
+              color: U.border,
+              width: 0.5,
             ),
           ),
           child: svgAsset != null
-              ? SvgPicture.asset(svgAsset!, width: 24, height: 24, colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn))
-              : Icon(icon, color: iconColor, size: 24),
+              ? SvgPicture.asset(
+                  svgAsset!,
+                  width: 22,
+                  height: 22,
+                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+                )
+              : Icon(icon, color: iconColor, size: 22),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -969,40 +783,32 @@ class _FeatureCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                style: GoogleFonts.newsreader(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
                   color: U.text,
+                  letterSpacing: -0.3,
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               Text(
                 description.replaceAll('\n', ' '),
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   color: U.sub,
-                  height: 1.35,
+                  height: 1.4,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 8),
-              Container(
-                width: 26,
-                height: 2.5,
-                decoration: BoxDecoration(
-                  color: statColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 6),
               Text(
                 statLabel,
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: statColor,
-                  fontStyle: FontStyle.italic,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: U.dim,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1010,21 +816,10 @@ class _FeatureCard extends StatelessWidget {
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.18),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-              width: 0.5,
-            ),
-          ),
-          child: Icon(
-            Icons.chevron_right_rounded,
-            color: U.text.withValues(alpha: 0.8),
-            size: 16,
-          ),
+        Icon(
+          Icons.chevron_right_rounded,
+          color: U.dim,
+          size: 16,
         ),
       ],
     );

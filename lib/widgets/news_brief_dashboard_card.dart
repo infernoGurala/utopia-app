@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -177,30 +176,17 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
       child: AnimatedScale(
         scale: _isPressed ? 0.97 : 1.0,
         duration: 100.ms,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: U.surface.withValues(alpha: isDark ? 0.4 : 0.55),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: U.border.withValues(alpha: isDark ? 0.3 : 0.7),
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: cardContent,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: U.border,
+              width: 0.5,
             ),
           ),
+          child: cardContent,
         ),
       ),
     ).animate()
@@ -213,19 +199,19 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
       children: [
         // Premium Globe Icon
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: U.primary.withValues(alpha: isDark ? 0.22 : 0.12),
-            borderRadius: BorderRadius.circular(16),
+            color: U.surface,
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: U.primary.withValues(alpha: isDark ? 0.35 : 0.2),
-              width: 1,
+              color: U.border,
+              width: 0.5,
             ),
           ),
           child: Icon(
             Icons.newspaper_rounded,
             color: U.primary,
-            size: 22,
+            size: 20,
           ),
         ),
         const SizedBox(width: 14),
@@ -238,11 +224,12 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
             children: [
               Text(
                 "Today's Brief",
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.newsreader(
                   color: U.text,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  letterSpacing: 0.1,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                  fontSize: 22,
+                  letterSpacing: -0.3,
                 ),
               ),
               const SizedBox(height: 5),
@@ -274,10 +261,10 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
                         _allBriefs[_activeBriefIndex].headline,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          color: U.text.withValues(alpha: 0.9),
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.text.withValues(alpha: 0.8),
                           fontWeight: FontWeight.w500,
-                          fontSize: 14.5,
+                          fontSize: 13.5,
                         ),
                       ),
                     ),
@@ -290,10 +277,10 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
                 children: [
                   Text(
                     '$_categoryCount categories',
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.plusJakartaSans(
                       color: U.dim,
                       fontWeight: FontWeight.w500,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                   Text(
@@ -302,10 +289,10 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
                   ),
                   Text(
                     _lastUpdatedStr,
-                    style: GoogleFonts.inter(
+                    style: GoogleFonts.plusJakartaSans(
                       color: U.dim,
                       fontWeight: FontWeight.w500,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -315,22 +302,10 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
         ),
         const SizedBox(width: 10),
 
-        // Elegant chevron action indicator
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: U.text.withValues(alpha: isDark ? 0.08 : 0.05),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: U.text.withValues(alpha: 0.05),
-              width: 0.5,
-            ),
-          ),
-          child: Icon(
-            Icons.chevron_right_rounded,
-            color: U.text.withValues(alpha: 0.7),
-            size: 18,
-          ),
+        Icon(
+          Icons.chevron_right_rounded,
+          color: U.dim,
+          size: 16,
         ),
       ],
     );
@@ -407,18 +382,19 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
             children: [
               Text(
                 "Today's Brief",
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: U.text,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 "Failed to update daily news.",
-                style: GoogleFonts.inter(
+                style: GoogleFonts.plusJakartaSans(
                   color: U.sub,
-                  fontSize: 13,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -438,7 +414,7 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
         Icon(
           Icons.info_outline_rounded,
           color: U.dim,
-          size: 24,
+          size: 22,
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -448,18 +424,19 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
             children: [
               Text(
                 "Today's Brief",
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                   color: U.text,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 "No briefings fetched for today.",
-                style: GoogleFonts.inter(
+                style: GoogleFonts.plusJakartaSans(
                   color: U.dim,
-                  fontSize: 13,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],

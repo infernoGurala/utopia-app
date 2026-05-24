@@ -48,7 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: U.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: BorderSide(color: U.border, width: 0.5)),
         title: Column(
           children: [
             Container(
@@ -62,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
             Text(
               'Sign Out',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.plusJakartaSans(
                 color: U.text,
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -71,9 +71,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         content: Text(
-          'Are you sure you want to sign out of UTOPIA? You will need to sign back in to access your reminders, focus sessions, and academic data.',
+          'Are you sure you want to sign out of UTOPIA?',
           textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.plusJakartaSans(
             color: U.sub,
             fontSize: 14,
             height: 1.5,
@@ -95,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Text(
                     'Cancel',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -117,7 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: Text(
                     'Sign Out',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             backgroundColor: U.red,
             content: Text(
               'Could not update theme style',
-              style: GoogleFonts.outfit(color: U.bg),
+              style: GoogleFonts.plusJakartaSans(color: U.bg),
             ),
           ),
         );
@@ -201,14 +201,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: U.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: BorderSide(color: U.border, width: 0.5)),
         title: Row(
           children: [
             Icon(Icons.info_outline_rounded, color: U.primary, size: 24),
             const SizedBox(width: 10),
             Text(
               'Change Profile Photo',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.plusJakartaSans(
                 color: U.text,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -218,7 +218,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         content: Text(
           'Your profile photo is linked to your Google account.\n\nTo change it:\n1. Open your Google Account settings\n2. Update your profile picture there\n3. Sign out and sign back in to UTOPIA\n\nThe new photo will appear automatically after re-login.',
-          style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.5),
+          style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 14, height: 1.5),
         ),
         actions: [
           FilledButton(
@@ -228,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               foregroundColor: U.bg,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Got it', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            child: Text('Got it', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -291,11 +291,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Expanded(
                           child: Text(
                             'Profile',
-                            style: GoogleFonts.outfit(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w700,
+                            style: GoogleFonts.newsreader(
+                              fontSize: 38,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.italic,
                               color: U.text,
                               letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Share.share('Join me on UTOPIA! 🚀 The productivity platform.\n\nhttps://inferalis.space/download-utopia');
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: U.card,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: U.border),
+                            ),
+                            child: Icon(
+                              Icons.share_outlined,
+                              color: U.text,
+                              size: 20,
                             ),
                           ),
                         ),
@@ -304,7 +323,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 2),
                     Text(
                       'Manage your academic identity',
-                      style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.dim,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ],
                 )
@@ -340,7 +364,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     child: user?.photoURL == null
                                         ? Text(
                                             (user?.displayName ?? 'U')[0].toUpperCase(),
-                                            style: GoogleFonts.outfit(
+                                            style: GoogleFonts.plusJakartaSans(
                                               color: U.primary,
                                               fontSize: 32,
                                               fontWeight: FontWeight.w700,
@@ -372,7 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Flexible(
                               child: Text(
                                 user?.displayName ?? 'Student',
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.plusJakartaSans(
                                   color: U.text,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w700,
@@ -391,7 +415,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           user?.email ?? '',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.sub,
                             fontSize: 13,
                           ),
@@ -403,7 +427,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Text(
                               bio,
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.plusJakartaSans(
                                 color: U.text.withValues(alpha: 0.8),
                                 fontSize: 13,
                                 height: 1.4,
@@ -432,17 +456,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           icon: Icon(Icons.edit_outlined, size: 14, color: U.sub),
                           label: Text(
                             'Edit Profile',
-                            style: GoogleFonts.outfit(
+                            style: GoogleFonts.plusJakartaSans(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: U.sub,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: U.border),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            side: BorderSide(color: U.border, width: 0.5),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            backgroundColor: U.card.withValues(alpha: 0.5),
+                            backgroundColor: U.card,
                           ),
                         ),
                       ],
@@ -455,37 +479,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Container(
                   decoration: BoxDecoration(
                     color: U.card.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: U.border.withValues(alpha: 0.8)),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.border, width: 0.5),
                   ),
                   child: Column(
                     children: [
-                      // Public Profile
-                      _groupedTile(
-                        icon: Icons.public_outlined,
-                        label: 'Public Profile',
-                        sub: 'See how others view your profile',
-                        color: U.primary,
-                        onTap: () {
-                          if (user == null) return;
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => UserProfileScreen(
-                                uid: user.uid,
-                                displayName: user.displayName ?? 'Student',
-                                email: user.email ?? '',
-                                photoUrl: user.photoURL,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
                       // Switch Theme
                       _groupedTile(
                         icon: Icons.palette_outlined,
@@ -517,21 +516,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         thickness: 0.5,
                         color: U.border.withValues(alpha: 0.5),
                       ),
-                      // Share This App
-                      _groupedTile(
-                        icon: Icons.share_outlined,
-                        label: 'Share This App',
-                        sub: 'Invite friends to join UTOPIA',
-                        color: U.primary,
-                        onTap: () {
-                          Share.share('Join me on UTOPIA! 🚀 The productivity platform.\n\nhttps://inferalis.space/download-utopia');
-                        },
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
+
 
                       // UTOPIA Section
                       _groupedTile(
@@ -560,7 +545,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icon(Icons.logout_rounded, size: 16, color: U.red.withValues(alpha: 0.7)),
                     label: Text(
                       'Sign Out',
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.plusJakartaSans(
                         color: U.red.withValues(alpha: 0.7),
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -574,8 +559,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 16),
                 Center(
                   child: Text(
-                    'UTOPIA · Designed by Humans • Powered by AI',
-                    style: GoogleFonts.outfit(color: U.dim, fontSize: 11),
+                    'Designed by Humans, Powered by AI',
+                    style: GoogleFonts.plusJakartaSans(color: U.dim, fontSize: 11),
                   ),
                 ),
               ],
@@ -609,7 +594,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     label,
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.plusJakartaSans(
                       color: U.text,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -618,7 +603,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 2),
                   Text(
                     sub,
-                    style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                    style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 12),
                   ),
                 ],
               ),
@@ -640,9 +625,9 @@ class _ThemeStyleSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.80,
-      minChildSize: 0.48,
-      maxChildSize: 0.95,
+      initialChildSize: 0.45,
+      minChildSize: 0.30,
+      maxChildSize: 0.50,
       expand: false,
       builder: (context, scrollController) {
         return Container(
@@ -670,7 +655,7 @@ class _ThemeStyleSheet extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   'Theme',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                     color: U.text,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -679,7 +664,7 @@ class _ThemeStyleSheet extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   'Choose your vibe',
-                  style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                  style: GoogleFonts.inter(color: U.sub, fontSize: 13),
                 ),
                 const SizedBox(height: 18),
                 Expanded(
@@ -740,22 +725,6 @@ class _ThemePreviewCard extends StatelessWidget {
             color: selected ? theme.primary : theme.border,
             width: selected ? 2.0 : 1.0,
           ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: theme.primary.withValues(alpha: 0.30),
-                    blurRadius: 16,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(19),
@@ -926,7 +895,7 @@ class _ThemePreviewCard extends StatelessWidget {
                           children: [
                             Text(
                               theme.label,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.plusJakartaSans(
                                 color: theme.text,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -935,7 +904,7 @@ class _ThemePreviewCard extends StatelessWidget {
                             const SizedBox(height: 1),
                             Text(
                               theme.description,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.plusJakartaSans(
                                 color: theme.sub,
                                 fontSize: 9,
                                 fontWeight: FontWeight.w400,
@@ -1059,7 +1028,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: U.red,
-          content: Text('Name cannot be empty', style: GoogleFonts.outfit(color: U.bg)),
+          content: Text('Name cannot be empty', style: GoogleFonts.plusJakartaSans(color: U.bg)),
         ),
       );
       return;
@@ -1091,7 +1060,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: U.red,
-            content: Text('Could not update profile', style: GoogleFonts.outfit(color: U.bg)),
+            content: Text('Could not update profile', style: GoogleFonts.plusJakartaSans(color: U.bg)),
           ),
         );
       }
@@ -1107,7 +1076,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     return Container(
       decoration: BoxDecoration(
         color: U.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        border: Border(top: BorderSide(color: U.border, width: 0.5)),
       ),
       padding: EdgeInsets.only(
         left: 24,
@@ -1140,7 +1110,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   onPressed: _saving ? null : () => Navigator.pop(context),
                   child: Text(
                     'Cancel',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.plusJakartaSans(
                       color: U.sub,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
@@ -1149,7 +1119,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 Text(
                   'Edit Profile',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.text,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -1168,7 +1138,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         )
                       : Text(
                           'Save',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.primary,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -1181,7 +1151,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             // Name Field
             Text(
               'NAME',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.plusJakartaSans(
                 color: U.sub,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -1192,11 +1162,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             TextField(
               controller: _nameController,
               maxLength: 40,
-              style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+              style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
               cursorColor: U.primary,
               decoration: InputDecoration(
                 hintText: 'Enter your name...',
-                hintStyle: GoogleFonts.outfit(color: U.dim),
+                hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
                 counterText: '',
                 filled: true,
                 fillColor: U.bg,
@@ -1211,7 +1181,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             // Bio Field
             Text(
               'BIO',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.plusJakartaSans(
                 color: U.sub,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -1223,11 +1193,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               controller: _bioController,
               maxLines: 3,
               maxLength: 150,
-              style: GoogleFonts.outfit(color: U.text, fontSize: 15),
+              style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
               cursorColor: U.primary,
               decoration: InputDecoration(
                 hintText: 'Tell us about yourself...',
-                hintStyle: GoogleFonts.outfit(color: U.dim),
+                hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
                 filled: true,
                 fillColor: U.bg,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

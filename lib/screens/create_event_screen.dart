@@ -9,7 +9,6 @@ import '../services/file_upload_service.dart';
 import '../main.dart';
 import '../models/event_model.dart';
 import '../services/event_service.dart';
-import '../services/cloudinary_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class CreateEventScreen extends StatefulWidget {

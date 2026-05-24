@@ -374,19 +374,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Text(
                 'Utopia',
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 32,
+                style: TextStyle(
+                  fontFamily: 'OrangeAvenue',
+                  fontSize: 38,
                   fontWeight: FontWeight.w700,
                   color: U.primary,
-                  fontStyle: FontStyle.italic,
-                  letterSpacing: -1,
-                  shadows: [
-                    Shadow(
-                      color: U.primary.withValues(alpha: 0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Transform.rotate(
+                angle: 30 * 3.1415926535 / 180,
+                child: Transform.scale(
+                  scaleX: -1,
+                  child: Image.asset(
+                    'assets/focus screen/leaves.png',
+                    width: 22,
+                    height: 22,
+                    fit: BoxFit.contain,
+                    color: U.primary,
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
                 ),
               ),
             ),

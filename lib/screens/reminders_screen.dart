@@ -183,32 +183,14 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
     final topPadding = MediaQuery.paddingOf(context).top;
-
-    final timeSlot = ImageOverlayColors.getTimeSlot();
-    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
-    final themeKey = appThemeNotifier.value.key;
     final isDarkTheme = appThemeNotifier.value.isDark;
-
-    // In dark themes, the background image is dimmed down to 0.38 opacity, 
-    // blending with the dark theme scaffold background. Therefore, the text 
-    // and headers must always be high-contrast light text/icons.
-    final Color onImageTitleColor = isDarkTheme 
-        ? U.text 
-        : ImageOverlayColors.titleColor(themeKey, timeSlot);
-    final Color onImageSubtitleColor = isDarkTheme 
-        ? U.sub 
-        : ImageOverlayColors.subtitleColor(themeKey, timeSlot);
-
-    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
-    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
         systemNavigationBarColor: U.bg,
         systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
         systemNavigationBarDividerColor: Colors.transparent,
@@ -219,110 +201,79 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
             ? FloatingActionButton(
                 onPressed: () => _showReminderSheet(),
                 backgroundColor: U.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                foregroundColor: isDarkTheme ? Colors.black : Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: BorderSide(color: U.border, width: 0.5)),
+                elevation: 0,
+                hoverElevation: 0,
+                focusElevation: 0,
+                highlightElevation: 0,
                 child: const Icon(Icons.add_rounded, size: 28),
               )
             : null,
-        body: Stack(
-          children: [
-            // ── Background Cover Image ──
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.55,
-              child: Opacity(
-                opacity: isDarkTheme ? 0.38 : 0.88,
-                child: Image.asset(
-                  bgImagePath,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-            ),
-
-            // ── Gradient Overlay ──
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.55,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      U.bg.withValues(alpha: 0.0),
-                      U.bg.withValues(alpha: 0.2),
-                      U.bg,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Main Content ──
-            Positioned.fill(
-              child: _checkingPermissionState
-                  ? const Center(child: UtopiaLoader(scale: 0.7))
-                  : (!_hasNotificationPermission || !_hasAlarmPermission)
-                      ? _buildPermissionBlockedScreen(topPadding, onImageTitleColor, onImageSubtitleColor, isDarkTheme)
-                      : _buildMainContent(topPadding, onImageTitleColor, onImageSubtitleColor, isDarkTheme),
-            ),
-          ],
+        body: SafeArea(
+          child: _checkingPermissionState
+              ? const Center(child: UtopiaLoader(scale: 0.7))
+              : (!_hasNotificationPermission || !_hasAlarmPermission)
+                  ? _buildPermissionBlockedScreen(topPadding, isDarkTheme)
+                  : _buildMainContent(topPadding, isDarkTheme),
         ),
       ),
     );
   }
 
-  Widget _buildMainContent(double topPadding, Color onImageTitleColor, Color onImageSubtitleColor, bool isDarkTheme) {
+  Widget _buildMainContent(double topPadding, bool isDarkTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: topPadding + 8),
+        const SizedBox(height: 8),
 
         // Header
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 24, 8),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
           child: Row(
             children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: onImageTitleColor, size: 20),
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Reminders',
-                      style: GoogleFonts.outfit(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: onImageTitleColor,
-                        letterSpacing: -0.6,
+                      style: GoogleFonts.newsreader(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
+                        color: U.text,
+                        letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Manage scheduled alerts',
-                      style: GoogleFonts.outfit(
-                        color: onImageSubtitleColor,
-                        fontSize: 13.5,
+                      'Manage scheduled alerts.',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.sub,
+                        fontSize: 12,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () async {
+              GestureDetector(
+                onTap: () async {
                   await NotificationService.sendPersonalTestNotification(
                     message: 'Utopia reminders are working perfectly!',
                   );
@@ -334,110 +285,105 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                     );
                   }
                 },
-                icon: Icon(Icons.notifications_active_outlined, color: onImageTitleColor, size: 22),
-                tooltip: 'Test Instant Notification',
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.notifications_active_outlined, color: U.primary, size: 18),
+                ),
               ),
             ],
           ),
         ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, duration: 500.ms),
 
-        // Month Header + Week strip in a gorgeous glass container!
+        // Month Header + Week strip in a gorgeous solid flat panel!
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.55),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65),
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.02),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Month Navigation Header
-                    Builder(
-                      builder: (context) {
-                        final middleOfWeek = _weekStart.add(const Duration(days: 3));
-                        const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                        final monthStr = '${monthNames[middleOfWeek.month]} ${middleOfWeek.year}';
-                        return Row(
-                          children: [
-                            Text(
-                              monthStr,
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: U.text,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: Icon(Icons.chevron_left_rounded, color: U.sub, size: 20),
-                              onPressed: () => _shiftWeek(-1),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                            const SizedBox(width: 12),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _selectedDay = DateTime.now();
-                                  _weekStart = _getWeekStart(DateTime.now());
-                                  _filterActive = true;
-                                });
-                              },
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                backgroundColor: U.primary.withValues(alpha: 0.12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: Text(
-                                'Today',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: U.primary,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            IconButton(
-                              icon: Icon(Icons.chevron_right_rounded, color: U.sub, size: 20),
-                              onPressed: () => _shiftWeek(1),
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
-                        );
-                      }
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1, color: Colors.transparent),
-                    // Week Strip
-                    _buildWeekStrip(),
-                  ],
-                ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: U.surface,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: U.border,
+                width: 0.5,
               ),
+            ),
+            child: Column(
+              children: [
+                // Month Navigation Header
+                Builder(
+                  builder: (context) {
+                    final middleOfWeek = _weekStart.add(const Duration(days: 3));
+                    const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    final monthStr = '${monthNames[middleOfWeek.month]} ${middleOfWeek.year}';
+                    return Row(
+                      children: [
+                        Text(
+                          monthStr,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: U.text,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.chevron_left_rounded, color: U.sub, size: 20),
+                          onPressed: () => _shiftWeek(-1),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDay = DateTime.now();
+                              _weekStart = _getWeekStart(DateTime.now());
+                              _filterActive = true;
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: U.primary.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          child: Text(
+                            'Today',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: U.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: Icon(Icons.chevron_right_rounded, color: U.sub, size: 20),
+                          onPressed: () => _shiftWeek(1),
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    );
+                  }
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: Colors.transparent),
+                // Week Strip
+                _buildWeekStrip(),
+              ],
             ),
           ),
         ).animate().fadeIn(delay: 100.ms, duration: 550.ms).slideY(begin: 0.08, end: 0, delay: 100.ms, duration: 550.ms),
@@ -529,30 +475,38 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _buildPermissionBlockedScreen(double topPadding, Color onImageTitleColor, Color onImageSubtitleColor, bool isDarkTheme) {
+  Widget _buildPermissionBlockedScreen(double topPadding, bool isDarkTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: topPadding + 8),
+        const SizedBox(height: 8),
         // App header with Back button so they can leave the screen
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 24, 8),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
           child: Row(
             children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: onImageTitleColor, size: 20),
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.border, width: 0.5),
+                  ),
+                  child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
               Text(
                 'Reminders',
-                style: GoogleFonts.outfit(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: onImageTitleColor,
-                  letterSpacing: -0.6,
+                style: GoogleFonts.newsreader(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w400,
+                  fontStyle: FontStyle.italic,
+                  color: U.text,
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
@@ -566,19 +520,12 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.75),
-                  borderRadius: BorderRadius.circular(24),
+                  color: U.surface,
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: U.border.withValues(alpha: 0.5),
-                    width: 1,
+                    color: U.border,
+                    width: 0.5,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -598,8 +545,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                     const SizedBox(height: 20),
                     Text(
                       'Enable Permissions',
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: U.text,
                       ),
@@ -608,8 +555,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                     Text(
                       'Utopia requires notification and exact alarm permissions to trigger your focus reminders at the precise scheduled time.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
                         color: U.sub,
                         height: 1.45,
                       ),
@@ -645,7 +592,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                       child: OutlinedButton(
                         onPressed: _checkPermissions,
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: U.border),
+                          side: BorderSide(color: U.border, width: 0.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                           foregroundColor: U.text,
                         ),
                         child: Row(
@@ -655,7 +603,7 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                             const SizedBox(width: 8),
                             Text(
                               'I have granted permissions',
-                              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -680,8 +628,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: U.card.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
+        color: U.card,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(color: U.border, width: 0.5),
       ),
       child: Column(
@@ -692,8 +640,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
               Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: U.text,
                   ),
@@ -710,8 +658,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
           const SizedBox(height: 4),
           Text(
             description,
-            style: GoogleFonts.outfit(
-              fontSize: 12,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
               color: U.dim,
               height: 1.3,
             ),
@@ -726,17 +674,18 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.zero,
                   backgroundColor: U.primary,
+                  elevation: 0,
                   minimumSize: Size.zero,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                 ),
                 child: Text(
                   'Grant Permission',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: appThemeNotifier.value.isDark ? U.bg : Colors.white,
+                    color: appThemeNotifier.value.isDark ? Colors.black : Colors.white,
                   ),
                 ),
               ),
@@ -774,15 +723,15 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   decoration: BoxDecoration(
                     color: isSelected ? U.primary.withValues(alpha: 0.12) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         dayNames[i], 
-                        style: GoogleFonts.outfit(
-                          fontSize: 10, 
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9, 
                           fontWeight: FontWeight.w700, 
                           color: isSelected ? U.primary : U.dim, 
                           letterSpacing: 0.5
@@ -791,8 +740,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                       const SizedBox(height: 3),
                       Text(
                         '${day.day}', 
-                        style: GoogleFonts.outfit(
-                          fontSize: 14, 
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 13, 
                           fontWeight: isSelected || isToday ? FontWeight.w700 : FontWeight.w500, 
                           color: isSelected ? U.primary : (isToday ? U.primary : U.sub)
                         )
@@ -834,8 +783,8 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
               children: [
                 Text(
                   'Reminders for $dateFormatted',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: U.primary,
                     letterSpacing: 0.2,
@@ -848,14 +797,14 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: U.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           'Clear',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: U.primary,
@@ -930,14 +879,13 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
   }
 
   Widget _reminderTile(FocusReminder r) {
-    final isDarkTheme = appThemeNotifier.value.isDark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Dismissible(
         key: ValueKey(r.id),
         direction: DismissDirection.endToStart,
         background: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(6),
           child: Container(
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 20),
@@ -949,91 +897,83 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
           await _deleteReminder(r);
           return false; // handled by reload
         },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: U.surface.withValues(alpha: isDarkTheme ? 0.45 : 0.55),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: U.border.withValues(alpha: isDarkTheme ? 0.3 : 0.7),
-                  width: 1.0,
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _showReminderSheet(existing: r),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Opacity(
-                      opacity: r.isCompleted ? 0.62 : 1.0,
-                      child: Row(
-                        children: [
-                          // Left dynamic badge based on type
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: isDarkTheme
-                                  ? Color.lerp(U.primary, Colors.black, 0.72)!.withValues(alpha: 0.85)
-                                  : Color.lerp(U.primary, Colors.white, 0.84)!,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              r.type == 'one_time'
-                                  ? Icons.event_rounded
-                                  : (r.type == 'weekly' ? Icons.loop_rounded : Icons.calendar_month_rounded),
-                              color: r.isCompleted ? U.sub.withValues(alpha: 0.6) : U.primary,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  r.label,
-                                  style: GoogleFonts.outfit(
-                                    color: r.isCompleted ? U.sub.withValues(alpha: 0.7) : U.text,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w600,
-                                    decoration: r.isCompleted ? TextDecoration.lineThrough : null,
-                                    decorationColor: U.sub.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  r.scheduleSummary,
-                                  style: GoogleFonts.outfit(
-                                    color: U.sub.withValues(alpha: r.isCompleted ? 0.4 : 0.8),
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w500,
-                                    decoration: r.isCompleted ? TextDecoration.lineThrough : null,
-                                    decorationColor: U.sub.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (r.isCompleted)
-                            Icon(
-                              Icons.check_circle_rounded,
-                              color: U.primary.withValues(alpha: 0.65),
-                              size: 20,
-                            )
-                          else
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: U.sub.withValues(alpha: 0.5),
-                              size: 20,
-                            ),
-                        ],
+        child: Container(
+          decoration: BoxDecoration(
+            color: U.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: U.border,
+              width: 0.5,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _showReminderSheet(existing: r),
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Opacity(
+                  opacity: r.isCompleted ? 0.62 : 1.0,
+                  child: Row(
+                    children: [
+                      // Left dynamic badge based on type
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: U.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          r.type == 'one_time'
+                              ? Icons.event_rounded
+                              : (r.type == 'weekly' ? Icons.loop_rounded : Icons.calendar_month_rounded),
+                          color: r.isCompleted ? U.sub.withValues(alpha: 0.6) : U.primary,
+                          size: 18,
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              r.label,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: r.isCompleted ? U.sub.withValues(alpha: 0.7) : U.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                decoration: r.isCompleted ? TextDecoration.lineThrough : null,
+                                decorationColor: U.sub.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              r.scheduleSummary,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.sub.withValues(alpha: r.isCompleted ? 0.4 : 0.8),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                decoration: r.isCompleted ? TextDecoration.lineThrough : null,
+                                decorationColor: U.sub.withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (r.isCompleted)
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: U.primary.withValues(alpha: 0.65),
+                          size: 20,
+                        )
+                      else
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: U.sub.withValues(alpha: 0.5),
+                          size: 20,
+                        ),
+                    ],
                   ),
                 ),
               ),

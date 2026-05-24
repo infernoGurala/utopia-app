@@ -1133,7 +1133,6 @@ Future<void> _editHabits() async {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgImage = isDark ? 'assets/daily/dark.png' : 'assets/daily/light.png';
     final screenWidth = MediaQuery.sizeOf(context).width;
     const handleTouchWidth = 36.0;
     final panelWidth = screenWidth * 0.85;
@@ -1210,39 +1209,6 @@ Future<void> _editHabits() async {
           },
           child: Stack(
             children: [
-              // Background Image (Extended for smooth transition)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.sizeOf(context).height * 0.8,
-                child: Image.asset(
-                  bgImage,
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-              // Gradient overlay: top half clear, bottom half smooth fade
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.sizeOf(context).height * 0.8,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        U.bg.withValues(alpha: 0.0),
-                        U.bg.withValues(alpha: 0.0),
-                        U.bg,
-                      ],
-                      stops: const [0.0, 0.5, 1.0],
-                    ),
-                  ),
-                ),
-              ),
               
               SafeArea(
                 child: Column(
@@ -1289,23 +1255,18 @@ Future<void> _editHabits() async {
     Widget headerButton({required IconData icon, required VoidCallback onTap}) {
       return GestureDetector(
         onTap: onTap,
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.05),
-                  width: 0.5,
-                ),
-              ),
-              child: Icon(icon, color: U.text.withValues(alpha: 0.8), size: 19),
+        child: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: U.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: U.border,
+              width: 0.5,
             ),
           ),
+          child: Icon(icon, color: U.primary, size: 18),
         ),
       );
     }
@@ -1328,36 +1289,31 @@ Future<void> _editHabits() async {
                 behavior: HitTestBehavior.opaque,
                 child: Text(
                   '${_selectedDate.day} ${monthNames[_selectedDate.month]} ${_selectedDate.year}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: U.text.withValues(alpha: 0.95),
-                    letterSpacing: -0.2,
+                  style: GoogleFonts.newsreader(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                    color: U.text,
                   ),
                 ),
               ),
               const Spacer(),
               if (_saving)
-                ClipOval(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      width: 38,
-                      height: 38,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
+                Container(
+                  width: 38,
+                  height: 38,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: U.border,
+                      width: 0.5,
                     ),
+                  ),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(U.primary),
                   ),
                 )
               else

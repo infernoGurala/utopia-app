@@ -567,7 +567,7 @@ class _IAAScreenState extends State<IAAScreen> {
           decoration: BoxDecoration(
             color: U.surface.withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+            border: Border.all(color: U.border.withValues(alpha: 0.5)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -642,7 +642,7 @@ class _IAAScreenState extends State<IAAScreen> {
               onPressed: _initializeAI,
               style: FilledButton.styleFrom(
                 backgroundColor: U.primary,
-                foregroundColor: Colors.white,
+                foregroundColor: U.bg,
               ),
               child: const Text('Retry'),
             ),
@@ -719,7 +719,7 @@ class _IAAScreenState extends State<IAAScreen> {
                   _isLoading
                       ? Icons.more_horiz_rounded
                       : Icons.send_rounded,
-                  color: Colors.white,
+                  color: _initialized && !_isLoading ? U.bg : U.sub,
                   size: 20,
                 ),
               ),
@@ -916,7 +916,7 @@ class _MessageBubble extends StatelessWidget {
               ? Text(
                   message.text,
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
+                    color: U.bg,
                     height: 1.45,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
@@ -947,7 +947,7 @@ class _MessageBubble extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                     strong: GoogleFonts.outfit(
-                      color: Colors.white,
+                      color: U.text,
                       fontWeight: FontWeight.w700,
                     ),
                     em: GoogleFonts.outfit(

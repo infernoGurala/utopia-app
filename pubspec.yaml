@@ -70,10 +70,6 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/welcome_bg/one_light/
-    - assets/daily/
-    - assets/university/
-    - assets/semesters/
     - assets/focus screen/
     - assets/apps_icons/
     - assets/icon_cropped.png

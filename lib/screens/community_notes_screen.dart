@@ -646,7 +646,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 children: [
                   Text(
                     'Number',
-                    style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
+                    style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 13),
                   ),
                   const SizedBox(width: 12),
                   SizedBox(
@@ -656,14 +656,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       controller: numController,
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.plusJakartaSans(
                         color: U.teal,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                       decoration: InputDecoration(
                         hintText: '1',
-                        hintStyle: GoogleFonts.outfit(
+                        hintStyle: GoogleFonts.plusJakartaSans(
                           color: U.dim,
                           fontSize: 14,
                         ),
@@ -708,7 +708,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       ),
                       child: Text(
                         'Set',
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.plusJakartaSans(
                           color: U.teal,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -734,7 +734,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         ),
                         child: Text(
                           'Reset',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.red,
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -764,7 +764,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
                         child: Text(
                           catName,
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.dim,
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -872,7 +872,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             const SizedBox(width: 10),
             Text(
               'Edit Mode',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.plusJakartaSans(
                 color: U.text,
                 fontWeight: FontWeight.w600,
               ),
@@ -881,14 +881,14 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         ),
         content: Text(
           'You are entering edit mode for a shared community folder.\n\nAny changes you request will require approval from others. Please be respectful and maintain the quality of the notes.',
-          style: GoogleFonts.outfit(color: U.sub, fontSize: 14, height: 1.4),
+          style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
             },
-            child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
           ),
           FilledButton(
             onPressed: () {
@@ -906,7 +906,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             ),
             child: Text(
               'I Understand',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -1109,7 +1109,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           backgroundColor: U.surface,
           title: Text(
             'Add Branch',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.plusJakartaSans(
               color: U.text,
               fontWeight: FontWeight.w600,
             ),
@@ -1120,15 +1120,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             children: [
               Text(
                 'Creates a sample semester, course, and unit structure.',
-                style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 12),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
-                style: GoogleFonts.outfit(color: U.text),
+                style: GoogleFonts.plusJakartaSans(color: U.text),
                 decoration: InputDecoration(
                   hintText: 'Branch name',
-                  hintStyle: GoogleFonts.outfit(color: U.sub),
+                  hintStyle: GoogleFonts.plusJakartaSans(color: U.sub),
                   filled: true,
                   fillColor: U.bg,
                   border: OutlineInputBorder(
@@ -1142,7 +1142,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
             ),
             FilledButton(
               onPressed: isCreating
@@ -1202,7 +1202,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isCreating ? 'Creating...' : 'Create',
-                style: GoogleFonts.outfit(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.bg),
               ),
             ),
           ],
@@ -1223,7 +1223,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           backgroundColor: U.surface,
           title: Text(
             'Add Item',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.plusJakartaSans(
               color: U.text,
               fontWeight: FontWeight.w600,
             ),
@@ -1239,7 +1239,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         'File',
-                        style: GoogleFonts.outfit(color: U.text, fontSize: 14),
+                        style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 14),
                       ),
                       value: true,
                       groupValue: isFile,
@@ -1252,7 +1252,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(
                         'Folder',
-                        style: GoogleFonts.outfit(color: U.text, fontSize: 14),
+                        style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 14),
                       ),
                       value: false,
                       groupValue: isFile,
@@ -1265,10 +1265,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: controller,
-                style: GoogleFonts.outfit(color: U.text),
+                style: GoogleFonts.plusJakartaSans(color: U.text),
                 decoration: InputDecoration(
                   hintText: isFile ? 'File name' : 'Folder name',
-                  hintStyle: GoogleFonts.outfit(color: U.sub),
+                  hintStyle: GoogleFonts.plusJakartaSans(color: U.sub),
                   filled: true,
                   fillColor: U.bg,
                   border: OutlineInputBorder(
@@ -1282,7 +1282,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
             ),
             FilledButton(
               onPressed: isCreating
@@ -1363,7 +1363,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isCreating ? 'Creating...' : 'Create',
-                style: GoogleFonts.outfit(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.bg),
               ),
             ),
           ],
@@ -1421,11 +1421,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: U.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: U.primary.withValues(alpha: 0.2),
+                      width: 0.5,
+                    ),
                   ),
                   child: Text(
                     _displayName(segments[i]),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.plusJakartaSans(
                       color: U.primary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -1443,11 +1447,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       _displayName(segments[i]),
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.plusJakartaSans(
                         color: U.sub,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -1464,6 +1468,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkTheme = appThemeNotifier.value.isDark;
     final bool isAtRoot = _currentPath.isEmpty;
     final displayItems = _displayItems;
     // Show breadcrumbs from depth >= 1 (inside a program folder, starting at semester level)
@@ -1479,6 +1484,24 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       child: Scaffold(
         backgroundColor: U.bg,
         appBar: AppBar(
+          backgroundColor: U.bg,
+          elevation: 0,
+          leadingWidth: 70,
+          leading: Center(
+            child: GestureDetector(
+              onTap: _navigateBack,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: U.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: U.border, width: 0.5),
+                ),
+                child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+              ),
+            ),
+          ),
           title: Row(
             children: [
               Expanded(
@@ -1488,10 +1511,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   children: [
                     Text(
                       'Utopia Notes',
-                      style: GoogleFonts.outfit(
-                        color: U.primary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                      style: GoogleFonts.newsreader(
+                        color: U.text,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w400,
+                        fontStyle: FontStyle.italic,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1499,9 +1523,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                     if (_universityName.isNotEmpty)
                       Text(
                         _universityName,
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.plusJakartaSans(
                           color: U.sub,
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w400,
                         ),
                         maxLines: 1,
@@ -1526,11 +1550,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               ),
             ],
           ),
-          backgroundColor: U.bg,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: U.text),
-            onPressed: _navigateBack,
-          ),
           actions: [
             // + button only visible in edit mode (Placed first)
             if (_isEditMode) ...[
@@ -1550,101 +1569,47 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             ],
             // Edit mode toggle — Premium Chip
             Padding(
-              padding: const EdgeInsets.only(right: 12.0),
+              padding: const EdgeInsets.only(right: 16.0),
               child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOutCubic,
-                  decoration: BoxDecoration(
-                    color: _isEditMode ? U.primary : U.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _isEditMode
-                          ? U.primary
-                          : U.border.withValues(alpha: 0.5),
-                      width: 1,
-                    ),
-                    boxShadow: _isEditMode
-                        ? [
-                            BoxShadow(
-                              color: U.primary.withValues(alpha: 0.25),
-                              blurRadius: 10,
-                              spreadRadius: 1,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        _enterEditMode();
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      splashColor: _isEditMode
-                          ? U.bg.withValues(alpha: 0.2)
-                          : U.primary.withValues(alpha: 0.1),
-                      highlightColor: Colors.transparent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              transitionBuilder: (child, animation) =>
-                                  RotationTransition(
-                                    turns: Tween<double>(
-                                      begin: 0.8,
-                                      end: 1.0,
-                                    ).animate(animation),
-                                    child: FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    ),
-                                  ),
-                              child: Icon(
-                                _isEditMode
-                                    ? Icons.check_circle_rounded
-                                    : Icons.edit_note_rounded,
-                                key: ValueKey(_isEditMode),
-                                size: 18,
-                                color: _isEditMode ? U.bg : U.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            AnimatedSize(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.fastOutSlowIn,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                transitionBuilder: (child, animation) =>
-                                    FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    ),
-                                child: Text(
-                                  _isEditMode ? 'Done' : 'Edit Mode',
-                                  key: ValueKey(_isEditMode),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14,
-                                    fontWeight: _isEditMode
-                                        ? FontWeight.w700
-                                        : FontWeight.w600,
-                                    color: _isEditMode ? U.bg : U.text,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _enterEditMode();
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _isEditMode ? U.primary : U.surface,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: U.border,
+                        width: 0.5,
                       ),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _isEditMode
+                              ? Icons.check_circle_rounded
+                              : Icons.edit_note_rounded,
+                          size: 16,
+                          color: _isEditMode ? (isDarkTheme ? Colors.black : Colors.white) : U.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _isEditMode ? 'Done' : 'Edit',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _isEditMode ? (isDarkTheme ? Colors.black : Colors.white) : U.text,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1671,7 +1636,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                             children: [
                               Text(
                                 'No notes yet.',
-                                style: GoogleFonts.outfit(color: U.sub),
+                                style: GoogleFonts.plusJakartaSans(color: U.sub),
                               ),
                               if (isAtRoot) ...[
                                 const SizedBox(height: 16),
@@ -1680,10 +1645,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                   icon: Icon(Icons.add, color: U.bg),
                                   label: Text(
                                     'Add Branch',
-                                    style: GoogleFonts.outfit(color: U.bg),
+                                    style: GoogleFonts.plusJakartaSans(color: U.bg, fontWeight: FontWeight.w600),
                                   ),
                                   style: FilledButton.styleFrom(
                                     backgroundColor: U.primary,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1695,34 +1663,113 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           backgroundColor: U.surface,
                           onRefresh: () => _load(forceRefresh: true),
                           child: (isAtRoot && !_isEditMode)
-                              ? GridView.builder(
-                                  padding: const EdgeInsets.all(24),
-                                  gridDelegate:
-                                      const SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: 2,
-                                        crossAxisSpacing: 16,
-                                        mainAxisSpacing: 16,
-                                        childAspectRatio: 0.95,
+                              ? CustomScrollView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  slivers: [
+                                    // ── Premium Editorial Header ──
+                                    SliverToBoxAdapter(
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _universityName.isNotEmpty ? _universityName : widget.universityFolderName,
+                                              style: GoogleFonts.newsreader(
+                                                color: U.text,
+                                                fontSize: 34,
+                                                fontWeight: FontWeight.w400,
+                                                fontStyle: FontStyle.italic,
+                                                height: 1.15,
+                                                letterSpacing: -0.5,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  decoration: BoxDecoration(
+                                                    color: U.primary,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'ACADEMIC REPOSITORY',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    color: U.primary,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 1.5,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Text(
+                                                  '${displayItems.length} PROGRAMS',
+                                                  style: GoogleFonts.plusJakartaSans(
+                                                    color: U.sub,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: 0.5,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 14),
+                                            Divider(
+                                              color: U.border,
+                                              height: 1,
+                                              thickness: 0.5,
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'Notes shared by the community to help you in your academic journey. Be good and responsible, and don\'t cause any casualties...',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: U.sub,
+                                                fontSize: 12,
+                                                height: 1.45,
+                                                fontWeight: FontWeight.w400,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                  itemCount: displayItems.length,
-                                  itemBuilder: (context, index) {
-                                    final item = displayItems[index];
-                                    final name = item['name'] as String;
-                                    final path = item['path'] as String;
+                                    ),
+                                    // ── Grid of Program Cards ──
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 116),
+                                      sliver: SliverGrid(
+                                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 2,
+                                          crossAxisSpacing: 16,
+                                          mainAxisSpacing: 16,
+                                          childAspectRatio: 0.95,
+                                        ),
+                                        delegate: SliverChildBuilderDelegate(
+                                          (context, index) {
+                                            final item = displayItems[index];
+                                            final name = item['name'] as String;
+                                            final path = item['path'] as String;
 
-                                    return _buildProgramCard(
-                                      index: index,
-                                      title: _displayName(name),
-                                      folderPath: path,
-                                      onTap: () => _navigateToFolder(name),
-                                      isEditMode: _isEditMode,
-                                      lastModified: _lastModifiedDates[path],
-                                      onEditTap: _isEditMode
-                                          ? () =>
-                                                _showRootFolderEditOptions(item)
-                                          : null,
-                                    );
-                                  },
+                                            return _buildProgramCard(
+                                              index: index,
+                                              title: _displayName(name),
+                                              folderPath: path,
+                                              onTap: () => _navigateToFolder(name),
+                                              isEditMode: _isEditMode,
+                                              lastModified: _lastModifiedDates[path],
+                                              onEditTap: _isEditMode
+                                                  ? () => _showRootFolderEditOptions(item)
+                                                  : null,
+                                            );
+                                          },
+                                          childCount: displayItems.length,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 )
                               : ReorderableListView.builder(
                                   padding: const EdgeInsets.only(bottom: 116),
@@ -1862,7 +1909,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                           child: Center(
                                                             child: Text(
                                                               numBadge,
-                                                              style: GoogleFonts.outfit(
+                                                              style: GoogleFonts.plusJakartaSans(
                                                                 color: U.teal,
                                                                 fontSize: 12,
                                                                 fontWeight:
@@ -1910,7 +1957,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                               child: Center(
                                                                 child: Text(
                                                                   numText,
-                                                                  style: GoogleFonts.outfit(
+                                                                  style: GoogleFonts.plusJakartaSans(
                                                                     color:
                                                                         U.teal,
                                                                     fontSize:
@@ -1954,7 +2001,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                               )
                                                               .trim(),
                                                           style:
-                                                              GoogleFonts.outfit(
+                                                              GoogleFonts.plusJakartaSans(
                                                                 fontSize:
                                                                     isFolder
                                                                     ? 16
@@ -1987,7 +2034,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                                     as int,
                                                               ),
                                                               style:
-                                                                  GoogleFonts.outfit(
+                                                                  GoogleFonts.plusJakartaSans(
                                                                     color:
                                                                         U.sub,
                                                                     fontSize:
@@ -2028,7 +2075,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                                           as String,
                                                                     ),
                                                                   ),
-                                                                  style: GoogleFonts.outfit(
+                                                                  style: GoogleFonts.plusJakartaSans(
                                                                     color:
                                                                         U.dim,
                                                                     fontSize:
@@ -2045,7 +2092,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                                   ),
                                                                   Text(
                                                                     '•',
-                                                                    style: GoogleFonts.outfit(
+                                                                    style: GoogleFonts.plusJakartaSans(
                                                                       color:
                                                                           U.dim,
                                                                       fontSize:
@@ -2068,7 +2115,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                                                   Text(
                                                                     item['updated_by_name']
                                                                         as String,
-                                                                    style: GoogleFonts.outfit(
+                                                                    style: GoogleFonts.plusJakartaSans(
                                                                       color:
                                                                           U.dim,
                                                                       fontSize:
@@ -2187,7 +2234,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 const SizedBox(width: 10),
                 Text(
                   'Move to Trash',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.text,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2196,12 +2243,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             ),
             content: Text(
               'Moving "$displayName" to trash. It can be recovered within 30 days from the trash view.',
-              style: GoogleFonts.outfit(color: U.sub, fontSize: 14),
+              style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 14),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+                child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
               ),
               FilledButton(
                 onPressed: isDeleting
@@ -2251,7 +2298,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 style: FilledButton.styleFrom(backgroundColor: U.red),
                 child: Text(
                   isDeleting ? 'Trashing...' : 'Move to Trash',
-                  style: GoogleFonts.outfit(color: U.bg),
+                  style: GoogleFonts.plusJakartaSans(color: U.bg),
                 ),
               ),
             ],
@@ -2278,17 +2325,17 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           backgroundColor: U.surface,
           title: Text(
             'Rename',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.plusJakartaSans(
               color: U.text,
               fontWeight: FontWeight.w600,
             ),
           ),
           content: TextField(
             controller: controller,
-            style: GoogleFonts.outfit(color: U.text),
+            style: GoogleFonts.plusJakartaSans(color: U.text),
             decoration: InputDecoration(
               hintText: 'New name',
-              hintStyle: GoogleFonts.outfit(color: U.sub),
+              hintStyle: GoogleFonts.plusJakartaSans(color: U.sub),
               filled: true,
               fillColor: U.bg,
               border: OutlineInputBorder(
@@ -2300,7 +2347,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.outfit(color: U.sub)),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
             ),
             FilledButton(
               onPressed: isRenaming
@@ -2381,7 +2428,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isRenaming ? 'Renaming...' : 'Rename',
-                style: GoogleFonts.outfit(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.bg),
               ),
             ),
           ],
@@ -2585,7 +2632,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       children: [
                         Text(
                           displayName,
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.text,
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
@@ -2596,7 +2643,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         const SizedBox(height: 2),
                         Text(
                           isFolder ? 'Folder' : 'Note',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.plusJakartaSans(
                             color: U.sub,
                             fontSize: 13,
                             fontWeight: FontWeight.w400,
@@ -2623,7 +2670,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'CUSTOMIZE',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.dim,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -2691,7 +2738,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'ACTIONS',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.plusJakartaSans(
                     color: U.dim,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -2763,7 +2810,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               const SizedBox(height: 6),
               Text(
                 label,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.plusJakartaSans(
                   color: color,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -2813,7 +2860,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   children: [
                     Text(
                       label,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.plusJakartaSans(
                         color: U.text,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -2821,7 +2868,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                     ),
                     Text(
                       subtitle,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.plusJakartaSans(
                         color: U.sub,
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
@@ -2881,7 +2928,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           const SizedBox(height: 16),
           Text(
             'Pick a Color',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.plusJakartaSans(
               color: U.text,
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -2957,13 +3004,13 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
         backgroundColor: U.surface,
         title: Text(
           'Deletion Failed',
-          style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600),
+          style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.w600),
         ),
-        content: Text(reason, style: GoogleFonts.outfit(color: U.sub)),
+        content: Text(reason, style: GoogleFonts.plusJakartaSans(color: U.sub)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('OK', style: GoogleFonts.outfit(color: U.primary)),
+            child: Text('OK', style: GoogleFonts.plusJakartaSans(color: U.primary)),
           ),
         ],
       ),
@@ -2980,83 +3027,37 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     VoidCallback? onEditTap,
   }) {
     final isPinned = _pinnedPaths.contains(folderPath);
-    // Curated color pairs for vibrant gradients — guaranteed no two adjacent same
-    final colorPairs = [
-      [const Color(0xFF6366F1), const Color(0xFFA855F7)], // Indigo -> Purple
-      [const Color(0xFFEC4899), const Color(0xFFF43F5E)], // Pink -> Rose
-      [const Color(0xFFF59E0B), const Color(0xFFD97706)], // Amber -> Orange
-      [const Color(0xFF10B981), const Color(0xFF059669)], // Emerald -> Green
-      [const Color(0xFF3B82F6), const Color(0xFF2563EB)], // Blue -> Deep Blue
-      [
-        const Color(0xFF8B5CF6),
-        const Color(0xFF7C3AED),
-      ], // Violet -> Dark Violet
-    ];
-
-    // Use sequential index to guarantee no two adjacent cards share the same color
-    final pair = colorPairs[index % colorPairs.length];
-
-    final gradient = LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [pair[0], pair[1]],
-    );
 
     return InkWell(
       onTap: onTap,
       onLongPress: () => _togglePin(folderPath),
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(6),
       child: Container(
         decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: pair[0].withValues(alpha: 0.25),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          color: U.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: U.border,
+            width: 0.5,
+          ),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(6),
           child: Stack(
             children: [
-              // Abstract background shape
-              Positioned(
-                right: -20,
-                top: -20,
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -30,
-                bottom: -30,
-                child: Icon(
-                  Icons.folder_copy_rounded,
-                  color: Colors.white.withValues(alpha: 0.05),
-                  size: 140,
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(16),
+                        color: U.bg,
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          width: 1,
+                          color: U.border.withValues(alpha: 0.2),
+                          width: 0.5,
                         ),
                       ),
                       child: Builder(
@@ -3065,9 +3066,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                           if (iconKey != null && iconKey.startsWith('num_')) {
                             return Text(
                               iconKey.replaceFirst('num_', ''),
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: 16,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.primary,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w800,
                               ),
                             );
@@ -3076,11 +3077,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               (iconKey != null &&
                                   kFolderIconCatalogue.containsKey(iconKey))
                               ? kFolderIconCatalogue[iconKey]!.$1
-                              : Icons.collections_bookmark_rounded;
+                              : Icons.collections_bookmark_outlined;
                           return Icon(
                             resolvedIcon,
-                            color: Colors.white,
-                            size: 22,
+                            color: U.primary,
+                            size: 18,
                           );
                         },
                       ),
@@ -3088,11 +3089,12 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                     const Spacer(),
                     Text(
                       title,
-                      style: GoogleFonts.outfit(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        height: 1.1,
+                      style: GoogleFonts.newsreader(
+                        color: U.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        fontStyle: FontStyle.italic,
+                        height: 1.2,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -3100,21 +3102,21 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
 
                     // ── Last updated (always visible on root cards) ──
                     if (lastModified != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
                             Icons.schedule_rounded,
-                            size: 10,
-                            color: Colors.white.withValues(alpha: 0.45),
+                            size: 11,
+                            color: U.sub,
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 4),
                           Text(
                             _formatRelativeTime(lastModified),
-                            style: GoogleFonts.outfit(
-                              color: Colors.white.withValues(alpha: 0.45),
-                              fontSize: 10,
+                            style: GoogleFonts.plusJakartaSans(
+                              color: U.sub,
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
@@ -3130,12 +3132,31 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   top: 8,
                   left: 8,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
+                      color: U.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.4),
+                        width: 0.5,
+                      ),
                     ),
-                    child: Icon(Icons.push_pin, color: Colors.white, size: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.push_pin_rounded, color: U.primary, size: 8),
+                        const SizedBox(width: 3),
+                        Text(
+                          'PINNED',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: U.primary,
+                            fontSize: 7,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               // Edit icon overlay when in edit mode
@@ -3146,15 +3167,19 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                   child: GestureDetector(
                     onTap: onEditTap,
                     child: Container(
-                      padding: const EdgeInsets.all(6),
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(10),
+                        color: U.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: U.border,
+                          width: 0.5,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.edit_outlined,
-                        color: Colors.white,
-                        size: 16,
+                      child: Icon(
+                        Icons.edit_note_rounded,
+                        color: U.primary,
+                        size: 14,
                       ),
                     ),
                   ),

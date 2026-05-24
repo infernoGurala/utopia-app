@@ -4,10 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
-import '../theme/image_overlay_colors.dart';
 import 'iaa_screen.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
@@ -60,247 +58,169 @@ class _UniversityScreenState extends State<UniversityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final titleColor = isDark
-        ? (appThemeNotifier.value.key == 'gruvbox'
-            ? const Color(0xFFFB4934)
-            : appThemeNotifier.value.key == 'everforest'
-                ? const Color(0xFFA7C080)
-                : appThemeNotifier.value.key == 'github-dark'
-                    ? const Color(0xFF58A6FF)
-                    : appThemeNotifier.value.key == 'orchid'
-                        ? const Color(0xFFCBA6F7)
-                        : Colors.white)
-        : ImageOverlayColors.titleColor(appThemeNotifier.value.key, 'morning');
-
-    final subtitleColor = isDark
-        ? U.sub
-        : ImageOverlayColors.subtitleColor(appThemeNotifier.value.key, 'morning');
-
     return Scaffold(
       backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // Background Image (Extended for smooth transition)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Opacity(
-              opacity: isDark ? 0.35 : 0.6,
-              child: Image.asset(
-                'assets/university/background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                color: isDark ? U.bg : null,
-                colorBlendMode: isDark ? BlendMode.multiply : null,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'University',
+                    style: GoogleFonts.newsreader(
+                      color: U.text,
+                      fontSize: 38,
+                      fontWeight: FontWeight.w400,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Explore your campus network',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.dim,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          // Gradient overlay: top half clear, bottom half smooth fade
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark
-                      ? [
-                          U.bg.withValues(alpha: 0.45),
-                          U.bg.withValues(alpha: 0.15),
-                          U.bg.withValues(alpha: 1.0),
-                        ]
-                      : [
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg,
-                        ],
-                  stops: const [0.0, 0.5, 1.0],
+            const SizedBox(height: 16),
+            if (_isLoading)
+              const Expanded(
+                child: Center(
+                  child: UtopiaLoader(scale: 0.7),
                 ),
-              ),
-            ),
-          ),
-          
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'University',
-                              style: GoogleFonts.playfairDisplay(
-                                color: titleColor,
-                                fontSize: 42,
-                                fontWeight: FontWeight.w700,
-                                fontStyle: FontStyle.normal,
-                                letterSpacing: -1,
-                              ),
-                            ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Explore your campus network',
-                              style: GoogleFonts.outfit(
-                                color: subtitleColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ).animate().fadeIn(delay: 100.ms, duration: 500.ms),
-                          ],
+              )
+            else
+              Expanded(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: 0.9,
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    _UniversityCard(
+                      title: 'Attendance',
+                      subtitle: 'Track presence.',
+                      icon: Icons.fact_check_outlined,
+                      color: U.primary,
+                      delay: 100,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AttendanceScreen()),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'People',
+                      subtitle: 'Campus network.',
+                      icon: Icons.public_outlined,
+                      color: U.blue,
+                      delay: 150,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PeopleScreen(),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                if (_isLoading)
-                  Expanded(
-                    child: Center(
-                      child: const UtopiaLoader(scale: 0.7),
                     ),
-                  )
-                else
-                  Expanded(
-                    child: GridView.count(
-                      crossAxisCount: 2,
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.9,
-                      physics: const BouncingScrollPhysics(),
-                      children: [
-                        _UniversityCard(
-                          title: 'Attendance',
-                          subtitle: 'Track your\nclass presence',
-                          icon: Icons.fact_check_outlined,
-                          color: U.primary,
-                          delay: 100,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'People',
-                          subtitle: 'Explore the\ncampus community',
-                          icon: Icons.public_outlined,
-                          color: U.blue,
-                          delay: 150,
-                          onTap: () => Navigator.push(
+                    _UniversityCard(
+                      title: 'Friends',
+                      subtitle: 'Your connections.',
+                      icon: Icons.groups_outlined,
+                      color: U.peach,
+                      delay: 200,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const FriendsScreen()),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'Events',
+                      subtitle: 'Happenings.',
+                      icon: Icons.event_available_outlined,
+                      color: const Color(0xFF10B981), // green
+                      delay: 250,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const EventsScreen()),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'Uni Chat',
+                      subtitle: 'Group chat.',
+                      icon: Icons.forum_outlined,
+                      color: U.teal,
+                      delay: 300,
+                      onTap: () async {
+                        if (_universityId.isNotEmpty) {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => PeopleScreen(
-                                universityId: _universityId.isNotEmpty
-                                    ? _universityId
-                                    : null,
-                              ),
+                              builder: (_) => UniChatScreen(universityId: _universityId),
                             ),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Friends',
-                          subtitle: 'Connect with\nyour peers',
-                          icon: Icons.groups_outlined,
-                          color: U.peach,
-                          delay: 200,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const FriendsScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Events',
-                          subtitle: 'Campus happenings\nand activities',
-                          icon: Icons.event_available_outlined,
-                          color: const Color(0xFF10B981), // green
-                          delay: 250,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const EventsScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Uni Chat',
-                          subtitle: 'Chat with students\nand groups',
-                          icon: Icons.forum_outlined,
-                          color: U.teal,
-                          delay: 300,
-                          onTap: () async {
-                            if (_universityId.isNotEmpty) {
-                              await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => UniChatScreen(universityId: _universityId),
-                                ),
-                              );
-                            }
-                          },
-                        ),
-                        _UniversityCard(
-                          title: 'Docs',
-                          subtitle: 'Access important\nresources',
-                          icon: Icons.description_outlined,
-                          color: const Color(0xFF7C6AF7),
-                          delay: 350,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const DocsScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'IAA',
-                          subtitle: 'Ask your academic\nAI assistant',
-                          icon: Icons.auto_awesome_rounded,
-                          color: const Color(0xFF7F77DD),
-                          delay: 400,
-                          onTap: () => Navigator.push(
-                            context,
-                            IAAScreen.route(),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Map',
-                          subtitle: 'Navigate campus\neasily',
-                          icon: Icons.map_outlined,
-                          color: U.red,
-                          delay: 450,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const MapScreen()),
-                          ),
-                        ),
-                        _UniversityCard(
-                          title: 'Timetable',
-                          subtitle: 'Plan your day\nand lectures',
-                          icon: Icons.calendar_month_rounded,
-                          color: const Color(0xFFF43F5E),
-                          delay: 500,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                          ),
-                        ),
-                      ],
+                          );
+                        }
+                      },
                     ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+                    _UniversityCard(
+                      title: 'Docs',
+                      subtitle: 'Resources.',
+                      icon: Icons.description_outlined,
+                      color: const Color(0xFF7C6AF7),
+                      delay: 350,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const DocsScreen()),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'IAA',
+                      subtitle: 'AI Assistant.',
+                      icon: Icons.auto_awesome_rounded,
+                      color: const Color(0xFF7F77DD),
+                      delay: 400,
+                      onTap: () => Navigator.push(
+                        context,
+                        IAAScreen.route(),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'Map',
+                      subtitle: 'Campus map.',
+                      icon: Icons.map_outlined,
+                      color: U.red,
+                      delay: 450,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MapScreen()),
+                      ),
+                    ),
+                    _UniversityCard(
+                      title: 'Timetable',
+                      subtitle: 'Schedule.',
+                      icon: Icons.calendar_month_rounded,
+                      color: const Color(0xFFF43F5E),
+                      delay: 500,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -327,88 +247,50 @@ class _UniversityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: isComingSoon ? null : onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: U.surface,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.08 : 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          color: U.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: U.border,
+            width: 0.5,
+          ),
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isComingSoon 
-                    ? const Color(0xFF10B981).withValues(alpha: 0.1) // Light green for Events
-                    : color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: isComingSoon ? const Color(0xFF10B981) : color, size: 26),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: U.primary, size: 20),
+                Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
+              ],
             ),
             const Spacer(),
             Text(
               title,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.newsreader(
+                fontSize: 22,
+                fontWeight: FontWeight.w400,
+                fontStyle: FontStyle.italic,
                 color: U.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
               ),
             ),
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Text(
-                    subtitle,
-                    style: GoogleFonts.outfit(
-                      color: U.sub,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-                if (isComingSoon)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Soon',
-                      style: GoogleFonts.outfit(
-                        color: const Color(0xFF10B981),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
-                    ),
-                  ),
-              ],
+            const SizedBox(height: 4),
+            Text(
+              subtitle.replaceAll('\n', ' '),
+              style: GoogleFonts.plusJakartaSans(
+                color: U.sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

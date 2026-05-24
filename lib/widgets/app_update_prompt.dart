@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 
 import '../services/app_update_service.dart';
+import '../main.dart';
 
 class AppUpdatePrompt extends StatefulWidget {
   const AppUpdatePrompt({super.key, required this.info, required this.onSkip});
@@ -207,7 +208,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
     final buttonHeight = shortHeight ? 46.0 : 52.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F17),
+      backgroundColor: U.bg,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -216,9 +217,9 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
               constraints: const BoxConstraints(maxWidth: 420),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1F1F2E),
+                  color: U.card,
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF2A2A3D)),
+                  border: Border.all(color: U.border),
                 ),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.all(cardPadding),
@@ -230,14 +231,14 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                         width: iconSize,
                         height: iconSize,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFCBA6F7).withValues(alpha: 0.14),
+                          color: U.primary.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(
                             shortHeight ? 14 : 16,
                           ),
                         ),
                         child: Icon(
                           Icons.system_update_alt_rounded,
-                          color: const Color(0xFFCBA6F7),
+                          color: U.primary,
                           size: shortHeight ? 22 : 26,
                         ),
                       ),
@@ -245,7 +246,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                       Text(
                         widget.info.title,
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFFE8E8F0),
+                          color: U.text,
                           fontSize: shortHeight ? 20 : 24,
                           fontWeight: FontWeight.w700,
                         ),
@@ -254,7 +255,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                       Text(
                         widget.info.message,
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFF8888A8),
+                          color: U.sub,
                           fontSize: shortHeight ? 13 : 14,
                           height: 1.5,
                         ),
@@ -263,7 +264,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                       Text(
                         'Current: ${widget.info.currentVersion}  •  Latest: ${widget.info.latestVersion}  •  Arch: $_deviceAbi  •  Size: $_apkSize',
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFF94E2D5),
+                          color: U.teal,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -276,9 +277,9 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                           child: LinearProgressIndicator(
                             minHeight: 7,
                             value: _progress,
-                            backgroundColor: const Color(0xFF2A2A3D),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFCBA6F7),
+                            backgroundColor: U.border.withValues(alpha: 0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              U.primary,
                             ),
                           ),
                         ),
@@ -290,7 +291,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                               ? 'Downloading update...'
                               : 'Downloading update... ${(_progress! * 100).toStringAsFixed(0)}%',
                           style: GoogleFonts.outfit(
-                            color: const Color(0xFF8888A8),
+                            color: U.sub,
                             fontSize: 12,
                           ),
                         ),
@@ -300,7 +301,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                         Text(
                           'Installer opened. Complete the installation there. If nothing appeared, tap Update now again.',
                           style: GoogleFonts.outfit(
-                            color: const Color(0xFF94E2D5),
+                            color: U.teal,
                             fontSize: 12,
                             height: 1.5,
                           ),
@@ -311,7 +312,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                         Text(
                           _error!,
                           style: GoogleFonts.outfit(
-                            color: const Color(0xFFF38BA8),
+                            color: U.red,
                             fontSize: 12,
                             height: 1.5,
                           ),
@@ -327,9 +328,9 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                                     ? null
                                     : widget.onSkip,
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF8888A8),
-                                  side: const BorderSide(
-                                    color: Color(0xFF2A2A3D),
+                                  foregroundColor: U.sub,
+                                  side: BorderSide(
+                                    color: U.border,
                                   ),
                                   minimumSize: Size.fromHeight(buttonHeight),
                                   shape: RoundedRectangleBorder(
@@ -351,8 +352,8 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                                   ? null
                                   : _downloadAndInstall,
                               style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFFCBA6F7),
-                                foregroundColor: const Color(0xFF0F0F17),
+                                backgroundColor: U.primary,
+                                foregroundColor: U.bg,
                                 minimumSize: Size.fromHeight(buttonHeight),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
@@ -375,7 +376,7 @@ class _AppUpdatePromptState extends State<AppUpdatePrompt> {
                         Text(
                           'This update is required to continue using the app.',
                           style: GoogleFonts.outfit(
-                            color: const Color(0xFF8888A8),
+                            color: U.sub,
                             fontSize: 11,
                           ),
                         ),

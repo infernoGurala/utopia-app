@@ -116,308 +116,85 @@ class AppTheme {
   final String mermaidLine;
 }
 
-const _orchidTheme = AppTheme(
-  key: 'orchid',
-  label: 'Orchid',
-  description: 'Soft purple with warm undertones',
+const _primaryLightTheme = AppTheme(
+  key: 'primary-light',
+  label: 'Utopia Light',
+  description: 'Warm gold-tinted editorial parchment',
+  isDark: false,
+  bg: Color(0xFFFAF7F2),
+  surface: Color(0xFFEFEADF),
+  card: Color(0xFFFCFAF7),
+  border: Color(0xFF1E1A16),
+  text: Color(0xFF1E1A16),
+  sub: Color(0xFF5E544B),
+  dim: Color(0xFF948A7D),
+  primary: Color(0xFF1E1A16),
+  teal: Color(0xFF3A322A),
+  red: Color(0xFFC93B4A),
+  green: Color(0xFF4A4036),
+  peach: Color(0xFF5A4D40),
+  blue: Color(0xFF1E1A16),
+  gold: Color(0xFFB59970),
+  sky: Color(0xFF6E6050),
+  lavender: Color(0xFF5E5245),
+  gray: Color(0xFF8A7F72),
+  mdH1: Color(0xFF1E1A16),
+  mdH2: Color(0xFF2E2720),
+  mdH3: Color(0xFF4E4338),
+  mdBold: Color(0xFF1E1A16),
+  mdItalic: Color(0xFF4E4338),
+  mdCode: Color(0xFF1E1A16),
+  mdLink: Color(0xFF1E1A16),
+  mdBlockquote: Color(0xFF5E544B),
+  mdDel: Color(0xFF948A7D),
+  mermaidPrimary: '#1e1a15',
+  mermaidBackground: '#efeadf',
+  mermaidLine: '#1e1a15',
+);
+
+const _primaryDarkTheme = AppTheme(
+  key: 'primary-dark',
+  label: 'Utopia Dark',
+  description: 'Luxurious royal velvet midnight violet',
   isDark: true,
-  bg: Color(0xFF0F0F17),
-  surface: Color(0xFF1A1A27),
-  card: Color(0xFF1F1F2E),
-  border: Color(0xFF2A2A3D),
-  text: Color(0xFFE8E8F0),
-  sub: Color(0xFF8888A8),
-  dim: Color(0xFF44445A),
-  primary: Color(0xFFCBA6F7),
-  teal: Color(0xFF94E2D5),
+  bg: Color(0xFF0B0612),
+  surface: Color(0xFF140C1F),
+  card: Color(0xFF1C122C),
+  border: Color(0xFF312347),
+  text: Color(0xFFF2EBFA),
+  sub: Color(0xFFA79BC2),
+  dim: Color(0xFF685B85),
+  primary: Color(0xFFF2EBFA),
+  teal: Color(0xFFECE6F5),
   red: Color(0xFFF38BA8),
-  green: Color(0xFFA6E3A1),
-  peach: Color(0xFFFAB387),
-  blue: Color(0xFF89B4FA),
-  gold: Color(0xFFF9E2AF),
-  sky: Color(0xFF89DCEB),
-  lavender: Color(0xFFB4BEFE),
-  gray: Color(0xFFA6ADC8),
-  mdH1: Color(0xFFCBA6F7),
-  mdH2: Color(0xFF94E2D5),
-  mdH3: Color(0xFFB4BEFE),
-  mdBold: Color(0xFFFAB387),
-  mdItalic: Color(0xFFA6E3A1),
-  mdCode: Color(0xFFF38BA8),
-  mdLink: Color(0xFF89B4FA),
-  mdBlockquote: Color(0xFFCBA6F7),
-  mdDel: Color(0xFF44445A),
-  mermaidPrimary: '#CBA6F7',
-  mermaidBackground: '#1F1F2E',
-  mermaidLine: '#CBA6F7',
-);
-
-
-const _gruvboxTheme = AppTheme(
-  key: 'gruvbox',
-  label: 'Gruvbox',
-  description: 'Retro warmth with dark background',
-  isDark: true,
-  bg: Color(0xFF282828),
-  surface: Color(0xFF32302F),
-  card: Color(0xFF3C3836),
-  border: Color(0xFF504945),
-  text: Color(0xFFEBDBB2),
-  sub: Color(0xFFC4B59C),
-  dim: Color(0xFF665C54),
-  primary: Color(0xFFFB4934),
-  teal: Color(0xFF8EC07C),
-  red: Color(0xFFFB4934),
-  green: Color(0xFFB8BB26),
-  peach: Color(0xFFE6B450),
-  blue: Color(0xFF83A598),
-  gold: Color(0xFFFAB387),
-  sky: Color(0xFF8EC07C),
-  lavender: Color(0xFF83A598),
-  gray: Color(0xFFA89984),
-  mdH1: Color(0xFFFB4934),
-  mdH2: Color(0xFF8EC07C),
-  mdH3: Color(0xFF83A598),
-  mdBold: Color(0xFFE6B450),
-  mdItalic: Color(0xFFB8BB26),
-  mdCode: Color(0xFFFB4934),
-  mdLink: Color(0xFF83A598),
-  mdBlockquote: Color(0xFFFB4934),
-  mdDel: Color(0xFF665C54),
-  mermaidPrimary: '#FB4934',
-  mermaidBackground: '#3C3836',
-  mermaidLine: '#FB4934',
-);
-
-const _everforestTheme = AppTheme(
-  key: 'everforest',
-  label: 'Everforest',
-  description: 'Low contrast forest theme',
-  isDark: true,
-  bg: Color(0xFF272E33),
-  surface: Color(0xFF333C43),
-  card: Color(0xFF3E474C),
-  border: Color(0xFF4E5660),
-  text: Color(0xFFD5C4A1),
-  sub: Color(0xFFB0B0B0),
-  dim: Color(0xFF5A6268),
-  primary: Color(0xFFA7C080),
-  teal: Color(0xFF7FAAA7),
-  red: Color(0xFFE67F5C),
-  green: Color(0xFFA7C080),
-  peach: Color(0xFFFAB387),
-  blue: Color(0xFF7FAAA7),
-  gold: Color(0xFFE6B450),
-  sky: Color(0xFF7FAAA7),
-  lavender: Color(0xFF8DA101),
-  gray: Color(0xFFB0B0B0),
-  mdH1: Color(0xFFA7C080),
-  mdH2: Color(0xFF7FAAA7),
-  mdH3: Color(0xFF7FAAA7),
-  mdBold: Color(0xFFFAB387),
-  mdItalic: Color(0xFFA7C080),
-  mdCode: Color(0xFFE67F5C),
-  mdLink: Color(0xFF7FAAA7),
-  mdBlockquote: Color(0xFFA7C080),
-  mdDel: Color(0xFF5A6268),
-  mermaidPrimary: '#A7C080',
-  mermaidBackground: '#3E474C',
-  mermaidLine: '#A7C080',
-);
-
-const _mintLightTheme = AppTheme(
-  key: 'mint-light',
-  label: 'Mint Light',
-  description: 'Crisp and refreshing minty whites',
-  isDark: false,
-  bg: Color(0xFFF2FBF7),
-  surface: Color(0xFFE5F5ED),
-  card: Color(0xFFFFFFFF),
-  border: Color(0xFFBCE3CE),
-  text: Color(0xFF2C4336),
-  sub: Color(0xFF567C65),
-  dim: Color(0xFF86A391),
-  primary: Color(0xFF1E8F6A),
-  teal: Color(0xFF0C7A65),
-  red: Color(0xFFE05B5B),
-  green: Color(0xFF2C9C4E),
-  peach: Color(0xFFE88A4A),
-  blue: Color(0xFF2B7ABF),
-  gold: Color(0xFFD69A1C),
-  sky: Color(0xFF3899B5),
-  lavender: Color(0xFF8B6CBF),
-  gray: Color(0xFF7A9386),
-  mdH1: Color(0xFF1E8F6A),
-  mdH2: Color(0xFF0C7A65),
-  mdH3: Color(0xFF8B6CBF),
-  mdBold: Color(0xFFE88A4A),
-  mdItalic: Color(0xFF2C9C4E),
-  mdCode: Color(0xFFE05B5B),
-  mdLink: Color(0xFF2B7ABF),
-  mdBlockquote: Color(0xFF567C65),
-  mdDel: Color(0xFF86A391),
-  mermaidPrimary: '#1E8F6A',
-  mermaidBackground: '#E5F5ED',
-  mermaidLine: '#1E8F6A',
-);
-
-const _oneLightTheme = AppTheme(
-  key: 'one-light',
-  label: 'One Light',
-  description: 'Atom inspired daylight',
-  isDark: false,
-  bg: Color(0xFFFAFAFA),
-  surface: Color(0xFFF0F0F1),
-  card: Color(0xFFFFFFFF),
-  border: Color(0xFFE5E5E6),
-  text: Color(0xFF383A42),
-  sub: Color(0xFF696C77),
-  dim: Color(0xFFA0A1A7),
-  primary: Color(0xFF4078F2),
-  teal: Color(0xFF0184BC),
-  red: Color(0xFFE45649),
-  green: Color(0xFF50A14F),
-  peach: Color(0xFFD19A66),
-  blue: Color(0xFF4078F2),
-  gold: Color(0xFFC18401),
-  sky: Color(0xFF0184BC),
-  lavender: Color(0xFFA626A4),
-  gray: Color(0xFF696C77),
-  mdH1: Color(0xFF4078F2),
-  mdH2: Color(0xFF0184BC),
-  mdH3: Color(0xFFA626A4),
-  mdBold: Color(0xFFD19A66),
-  mdItalic: Color(0xFF50A14F),
-  mdCode: Color(0xFFE45649),
-  mdLink: Color(0xFF4078F2),
-  mdBlockquote: Color(0xFF696C77),
-  mdDel: Color(0xFFA0A1A7),
-  mermaidPrimary: '#4078F2',
-  mermaidBackground: '#F0F0F1',
-  mermaidLine: '#4078F2',
-);
-
-const _githubDarkTheme = AppTheme(
-  key: 'github-dark',
-  label: 'GitHub Dark',
-  description: 'GitHub dark mode inspired',
-  isDark: true,
-  bg: Color(0xFF0D1117),
-  surface: Color(0xFF161B22),
-  card: Color(0xFF21262D),
-  border: Color(0xFF30363D),
-  text: Color(0xFFC9D1D9),
-  sub: Color(0xFF8B949E),
-  dim: Color(0xFF484F58),
-  primary: Color(0xFF58A6FF),
-  teal: Color(0xFF3FB950),
-  red: Color(0xFFF85149),
-  green: Color(0xFF56D364),
-  peach: Color(0xFFD29922),
-  blue: Color(0xFF58A6FF),
-  gold: Color(0xFFD29922),
-  sky: Color(0xFF56D364),
-  lavender: Color(0xFFA371F7),
-  gray: Color(0xFF8B949E),
-  mdH1: Color(0xFF58A6FF),
-  mdH2: Color(0xFF3FB950),
-  mdH3: Color(0xFFA371F7),
-  mdBold: Color(0xFFD29922),
-  mdItalic: Color(0xFF3FB950),
-  mdCode: Color(0xFFF85149),
-  mdLink: Color(0xFF58A6FF),
-  mdBlockquote: Color(0xFF58A6FF),
-  mdDel: Color(0xFF484F58),
-  mermaidPrimary: '#58A6FF',
-  mermaidBackground: '#21262D',
-  mermaidLine: '#58A6FF',
-);
-
-const _catppuccinLatteTheme = AppTheme(
-  key: 'catppuccin-latte',
-  label: 'Catppuccin Latte',
-  description: 'Soft daylight with balanced contrast',
-  isDark: false,
-  bg: Color(0xFFEFF1F5),
-  surface: Color(0xFFDCE0E8),
-  card: Color(0xFFCCD0DA),
-  border: Color(0xFFBCC0CC),
-  text: Color(0xFF4C4F69),
-  sub: Color(0xFF6C6F85),
-  dim: Color(0xFF8C8FA1),
-  primary: Color(0xFF8839EF),
-  teal: Color(0xFF179299),
-  red: Color(0xFFD20F39),
-  green: Color(0xFF40A02B),
-  peach: Color(0xFFFE640B),
-  blue: Color(0xFF1E66F5),
-  gold: Color(0xFFDF8E1D),
-  sky: Color(0xFF04A5E5),
-  lavender: Color(0xFF7287FD),
-  gray: Color(0xFF9CA0B0),
-  mdH1: Color(0xFF8839EF),
-  mdH2: Color(0xFF179299),
-  mdH3: Color(0xFF7287FD),
-  mdBold: Color(0xFFFE640B),
-  mdItalic: Color(0xFF40A02B),
-  mdCode: Color(0xFFD20F39),
-  mdLink: Color(0xFF1E66F5),
-  mdBlockquote: Color(0xFF8839EF),
-  mdDel: Color(0xFF8C8FA1),
-  mermaidPrimary: '#8839EF',
-  mermaidBackground: '#CCD0DA',
-  mermaidLine: '#8839EF',
-);
-
-const _rosePineDawnTheme = AppTheme(
-  key: 'rose-pine-dawn',
-  label: 'Rosé Pine Dawn',
-  description: 'Warm pastel light theme',
-  isDark: false,
-  bg: Color(0xFFFAF4ED),
-  surface: Color(0xFFF2E9E1),
-  card: Color(0xFFFFFAF3),
-  border: Color(0xFFDFDAD9),
-  text: Color(0xFF575279),
-  sub: Color(0xFF797593),
-  dim: Color(0xFF9893A5),
-  primary: Color(0xFFD7827E),
-  teal: Color(0xFF286983),
-  red: Color(0xFFB4637A),
-  green: Color(0xFF286983),
-  peach: Color(0xFFEA9D34),
-  blue: Color(0xFF286983),
-  gold: Color(0xFFEA9D34),
-  sky: Color(0xFF56949F),
-  lavender: Color(0xFF907AA9),
-  gray: Color(0xFF797593),
-  mdH1: Color(0xFFD7827E),
-  mdH2: Color(0xFF56949F),
-  mdH3: Color(0xFF907AA9),
-  mdBold: Color(0xFFEA9D34),
-  mdItalic: Color(0xFF286983),
-  mdCode: Color(0xFFB4637A),
-  mdLink: Color(0xFF56949F),
-  mdBlockquote: Color(0xFF9893A5),
-  mdDel: Color(0xFF9893A5),
-  mermaidPrimary: '#D7827E',
-  mermaidBackground: '#FFFAF3',
-  mermaidLine: '#D7827E',
+  green: Color(0xFFF2EBFA),
+  peach: Color(0xFFDCCBED),
+  blue: Color(0xFFF2EBFA),
+  gold: Color(0xFFBA8CF7),
+  sky: Color(0xFFB8A9D6),
+  lavender: Color(0xFFD0C2EA),
+  gray: Color(0xFF7C6E96),
+  mdH1: Color(0xFFF2EBFA),
+  mdH2: Color(0xFFE2D6F3),
+  mdH3: Color(0xFFA79BC2),
+  mdBold: Color(0xFFF2EBFA),
+  mdItalic: Color(0xFFA79BC2),
+  mdCode: Color(0xFFF2EBFA),
+  mdLink: Color(0xFFF2EBFA),
+  mdBlockquote: Color(0xFFA79BC2),
+  mdDel: Color(0xFF685B85),
+  mermaidPrimary: '#f2ebfa',
+  mermaidBackground: '#140c1f',
+  mermaidLine: '#f2ebfa',
 );
 
 const appThemes = [
-  _catppuccinLatteTheme,
-  _rosePineDawnTheme,
-  _mintLightTheme,
-  _oneLightTheme,
-  _orchidTheme,
-  _gruvboxTheme,
-  _everforestTheme,
-  _githubDarkTheme,
+  _primaryLightTheme,
+  _primaryDarkTheme,
 ];
 
 final ValueNotifier<AppTheme> appThemeNotifier = ValueNotifier<AppTheme>(
-  _orchidTheme,
+  _primaryLightTheme,
 );
 
 
@@ -659,7 +436,7 @@ class U {
         return theme;
       }
     }
-    return _orchidTheme;
+    return _primaryLightTheme;
   }
 
   static void applyTheme(String? key) {
@@ -738,7 +515,7 @@ class UtopiaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = GoogleFonts.outfitTextTheme();
+    final base = GoogleFonts.interTextTheme();
     return ValueListenableBuilder<AppTheme>(
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
@@ -778,14 +555,13 @@ class UtopiaApp extends StatelessWidget {
                 ),
             scaffoldBackgroundColor: U.bg,
             cardTheme: CardThemeData(
-              color: U.surface,
+              color: U.card,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.06),
+                  color: U.border,
+                  width: 0.8,
                 ),
               ),
               margin: EdgeInsets.zero,
@@ -797,80 +573,70 @@ class UtopiaApp extends StatelessWidget {
                 foregroundColor: isDark ? U.bg : Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                textStyle: GoogleFonts.outfit(
-                  fontSize: 16,
+                textStyle: GoogleFonts.inter(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
-                minimumSize: const Size(double.infinity, 54),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
             outlinedButtonTheme: OutlinedButtonThemeData(
               style: OutlinedButton.styleFrom(
                 elevation: 0,
-                foregroundColor: U.primary,
-                side: BorderSide(color: U.primary.withValues(alpha: 0.4)),
+                foregroundColor: U.text,
+                side: BorderSide(color: U.border, width: 1.0),
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                textStyle: GoogleFonts.outfit(
-                  fontSize: 16,
+                textStyle: GoogleFonts.inter(
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
-                minimumSize: const Size(double.infinity, 54),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
             inputDecorationTheme: InputDecorationTheme(
               filled: true,
-              fillColor: isDark
-                  ? Colors.white.withValues(alpha: 0.04)
-                  : Colors.black.withValues(alpha: 0.02),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              fillColor: U.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: U.border, width: 0.8),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: U.primary.withValues(alpha: 0.15),
-                ),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: U.border, width: 0.8),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: U.primary, width: 1.5),
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: U.primary, width: 1.2),
               ),
-              hintStyle: GoogleFonts.outfit(
-                color: U.sub.withValues(alpha: 0.5),
-                fontSize: 14,
+              hintStyle: GoogleFonts.inter(
+                color: U.dim,
+                fontSize: 13,
               ),
             ),
             chipTheme: ChipThemeData(
-              backgroundColor: isDark
-                  ? Colors.white.withValues(alpha: 0.04)
-                  : Colors.black.withValues(alpha: 0.02),
-              labelStyle: GoogleFonts.outfit(
+              backgroundColor: U.surface,
+              labelStyle: GoogleFonts.inter(
                 color: U.text,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.06),
-                ),
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: U.border, width: 0.8),
               ),
             ),
             dividerTheme: DividerThemeData(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.06),
-              thickness: 0.5,
-              space: 0.5,
+              color: U.border,
+              thickness: 0.8,
+              space: 0.8,
             ),
             iconTheme: IconThemeData(color: U.sub),
             bottomNavigationBarTheme: BottomNavigationBarThemeData(
@@ -881,29 +647,29 @@ class UtopiaApp extends StatelessWidget {
             ),
             navigationBarTheme: NavigationBarThemeData(
               backgroundColor: U.surface,
-              indicatorColor: U.primary.withValues(alpha: 0.15),
-              labelTextStyle: MaterialStateProperty.resolveWith((states) {
-                if (states.contains(MaterialState.selected)) {
-                  return GoogleFonts.outfit(
+              indicatorColor: U.border.withValues(alpha: 0.1),
+              labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return GoogleFonts.inter(
                     color: U.primary,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   );
                 }
-                return GoogleFonts.outfit(
+                return GoogleFonts.inter(
                   color: U.sub,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 );
               }),
-              iconTheme: MaterialStateProperty.resolveWith((states) {
-                if (states.contains(MaterialState.selected)) {
+              iconTheme: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
                   return IconThemeData(color: U.primary, size: 22);
                 }
                 return IconThemeData(color: U.dim, size: 22);
               }),
               elevation: 0,
-              height: 64,
+              height: 60,
             ),
             appBarTheme: AppBarTheme(
               backgroundColor: Colors.transparent,
@@ -920,10 +686,11 @@ class UtopiaApp extends StatelessWidget {
                     isDark ? Brightness.light : Brightness.dark,
                 systemNavigationBarDividerColor: Colors.transparent,
               ),
-              titleTextStyle: GoogleFonts.outfit(
+              titleTextStyle: GoogleFonts.inter(
                 color: U.text,
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
               iconTheme: IconThemeData(color: U.text),
             ),
@@ -949,14 +716,14 @@ class UtopiaApp extends StatelessWidget {
               }),
               todayForegroundColor: WidgetStateProperty.all(U.primary),
               todayBackgroundColor: WidgetStateProperty.all(Colors.transparent),
-              todayBorder: BorderSide(color: U.primary, width: 1.5),
+              todayBorder: BorderSide(color: U.primary, width: 1.2),
               confirmButtonStyle: TextButton.styleFrom(
                 foregroundColor: U.primary,
-                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               cancelButtonStyle: TextButton.styleFrom(
                 foregroundColor: U.sub,
-                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+                textStyle: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
             ),
              timePickerTheme: TimePickerThemeData(
@@ -968,15 +735,15 @@ class UtopiaApp extends StatelessWidget {
               hourMinuteColor: U.bg,
               hourMinuteTextColor: U.text,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(16),
               ),
               confirmButtonStyle: TextButton.styleFrom(
                 foregroundColor: U.primary,
-                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
               cancelButtonStyle: TextButton.styleFrom(
                 foregroundColor: U.sub,
-                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+                textStyle: GoogleFonts.inter(fontWeight: FontWeight.w500),
               ),
             ),
           ),
@@ -1029,11 +796,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     NotificationService.setAppForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
-      unawaited(ChatService().touchPresence());
+      unawaited(() async {
+        final init = await _appInit;
+        if (init.firebaseReady) {
+          await ChatService().touchPresence();
+        }
+      }());
       if (PlatformSupport.supportsNotifications) {
         unawaited(NotificationService.ensureNotificationPermissions());
         unawaited(NotificationService.refreshTokenRegistration());
-
       }
     }
   }
@@ -1472,7 +1243,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'UTOPIA · Designed by Humans • Powered by AI',
+                  'Designed by Humans, Powered by AI',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     color: U.dim,
