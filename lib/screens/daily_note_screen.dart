@@ -175,25 +175,17 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
     // Check if the user has typed unsaved edits based on the PREVIOUS _lastSavedJournal
     final hasUnsavedEdits = currentText != _lastSavedJournal;
 
-    debugPrint('DEBUG_LOAD: Incoming remote journal length: ${incomingJournal.length}');
-    debugPrint('DEBUG_LOAD: Current local text length: ${currentText.length}');
-    debugPrint('DEBUG_LOAD: hasUnsavedEdits=$hasUnsavedEdits, previous_lastSavedJournalLength=${_lastSavedJournal.length}');
-
     _note = finalNote;
 
     if (incomingJournal.isEmpty && currentText.isNotEmpty) {
       _lastSavedJournal = currentText;
-      debugPrint('DEBUG_LOAD: Preserving local text over empty incoming.');
     } else {
       _lastSavedJournal = incomingJournal;
       // We only overwrite the text field if the text field has no unsaved edits.
       // This is safe even if the user has focus on the text field, as long as they
       // haven't started typing yet.
       if (currentText != incomingJournal && !hasUnsavedEdits) {
-        debugPrint('DEBUG_LOAD: Overwriting local text with incoming remote text!');
         _journalController.text = incomingJournal;
-      } else {
-        debugPrint('DEBUG_LOAD: Not overwriting local text. hasUnsaved=$hasUnsavedEdits');
       }
     }
   }
@@ -229,35 +221,23 @@ class _DailyNoteScreenState extends State<DailyNoteScreen> with TickerProviderSt
   }
 
   Future<void> _saveNote({bool force = false}) async {
-    if (_note == null || _userId.isEmpty) {
-      debugPrint('DEBUG_SAVE: Aborting save. note is null? ${_note == null}, userId is empty? ${_userId.isEmpty}');
-      return;
-    }
+    if (_note == null || _userId.isEmpty) return;
     
     final journalText = _journalController.text;
     final journalChanged = journalText != _lastSavedJournal;
     
-    debugPrint('DEBUG_SAVE: force=$force, journalChanged=$journalChanged');
-    debugPrint('DEBUG_SAVE: old text length=${_lastSavedJournal.length}, new text length=${journalText.length}');
-    
-    if (!force && !journalChanged) {
-      debugPrint('DEBUG_SAVE: Returning early because not forced and journal not changed.');
-      return;
-    }
+    if (!force && !journalChanged) return;
     
     _lastSavedJournal = journalText;
     final updatedNote = _note!.copyWith(
       journal: _lastSavedJournal,
     );
     
-    debugPrint('DEBUG_SAVE: Attempting to save note with journal length: ${updatedNote.journal.length}');
-    
     try {
       final savedNote = await _service.saveNote(updatedNote);
       if (!mounted) return;
       setState(() => _note = savedNote);
       _loadMonthDots();
-      debugPrint('DEBUG_SAVE: Save completed successfully.');
     } catch (e) {
       debugPrint('ERROR SAVING NOTE: $e');
       if (mounted) {
