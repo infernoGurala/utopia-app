@@ -22,9 +22,13 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'package:utopia_app/models/focus_models.dart';
 import 'package:utopia_app/services/user_timetable_service.dart';
 import 'package:utopia_app/models/user_timetable.dart';
+import 'package:utopia_app/screens/calendar_screen.dart';
+import 'package:utopia_app/services/focus_database_service.dart';
+import 'package:utopia_app/services/focus_supabase_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -160,8 +164,24 @@ class NotificationService {
             if (response.payload != null) {
               unawaited(_handleNotificationPayload(response.payload!));
             }
+            if (response.actionId != null && response.payload != null) {
+              final decoded = jsonDecode(response.payload!);
+              if (decoded is Map<String, dynamic> && decoded['type'] == 'focus_reminder') {
+                final habitId = decoded['habitId']?.toString();
+                final userId = decoded['userId']?.toString();
+                if (habitId != null && userId != null) {
+                  unawaited(_handleBackgroundHabitAction(
+                    actionId: response.actionId,
+                    habitId: habitId,
+                    userId: userId,
+                    notificationId: response.id,
+                  ));
+                }
+              }
+            }
           } catch (e) {}
         },
+        onDidReceiveBackgroundNotificationResponse: onDidReceiveBackgroundNotificationResponse,
       );
 
       final launchDetails = await _localNotifications
@@ -544,6 +564,15 @@ class NotificationService {
       }
       return;
     }
+    if (type == 'calendar') {
+      final navigator = navigatorKey.currentState;
+      if (navigator != null) {
+        await navigator.push(
+          MaterialPageRoute(builder: (_) => const CalendarScreen()),
+        );
+      }
+      return;
+    }
   }
 
   static Future<bool> _openChatFromNotification({
@@ -745,6 +774,27 @@ class NotificationService {
     String? payload,
     DateTimeComponents? matchDateTimeComponents,
   }) async {
+    List<AndroidNotificationAction>? actions;
+    if (payload != null) {
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is Map<String, dynamic> && decoded['habitId'] != null) {
+          actions = const [
+            AndroidNotificationAction(
+              'action_completed',
+              'Completed',
+              showsUserInterface: false,
+            ),
+            AndroidNotificationAction(
+              'action_not_done',
+              'Not Done',
+              showsUserInterface: false,
+            ),
+          ];
+        }
+      } catch (_) {}
+    }
+
     // 1. Try EXACT scheduling WITH Large Icon
     try {
       await _localNotifications.zonedSchedule(
@@ -763,6 +813,7 @@ class NotificationService {
             enableVibration: true,
             icon: 'ic_notification',
             largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+            actions: actions,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -794,6 +845,7 @@ class NotificationService {
             playSound: true,
             enableVibration: true,
             icon: 'ic_notification',
+            actions: actions,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -826,6 +878,7 @@ class NotificationService {
             enableVibration: true,
             icon: 'ic_notification',
             largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
+            actions: actions,
           ),
         ),
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -856,6 +909,7 @@ class NotificationService {
           playSound: true,
           enableVibration: true,
           icon: 'ic_notification',
+          actions: actions,
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
@@ -1000,7 +1054,38 @@ class NotificationService {
       final now = tz.TZDateTime.now(ist);
       debugPrint("NOTIF: Hashed baseId=$baseId. Current timezone time: $now");
 
-      if (reminder.type == 'one_time' && reminder.remindDate != null) {
+      final payloadString = jsonEncode({
+        'type': 'focus_reminder',
+        'reminderId': reminder.id,
+        'habitId': reminder.habitId,
+        'userId': reminder.userId,
+        'label': reminder.label,
+      });
+
+      final notifTitle = reminder.label.trim().isEmpty ? 'Reminder' : reminder.label;
+      final notifBody = (reminder.description != null && reminder.description!.isNotEmpty)
+          ? reminder.description!
+          : reminder.scheduleSummary;
+
+      if (reminder.type == 'daily') {
+        debugPrint("NOTIF: Scheduling daily repeating reminder: ${reminder.label} at $hour:$minute");
+        var scheduledDate = tz.TZDateTime(ist, now.year, now.month, now.day, hour, minute);
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+
+        await _safeZonedSchedule(
+          id: baseId,
+          title: notifTitle,
+          body: notifBody,
+          scheduledDate: scheduledDate,
+          channelId: 'utopia_high_importance',
+          channelName: 'UTOPIA Notifications',
+          channelDescription: 'Focus reminders and task alerts',
+          matchDateTimeComponents: DateTimeComponents.time,
+          payload: payloadString,
+        );
+      } else if (reminder.type == 'one_time' && reminder.remindDate != null) {
         final dateParts = reminder.remindDate!.split('-');
         final year = int.parse(dateParts[0]);
         final month = int.parse(dateParts[1]);
@@ -1015,12 +1100,13 @@ class NotificationService {
 
         await _safeZonedSchedule(
           id: baseId,
-          title: 'Focus Reminder',
-          body: reminder.label,
+          title: notifTitle,
+          body: notifBody,
           scheduledDate: scheduledDate,
           channelId: 'utopia_high_importance',
           channelName: 'UTOPIA Notifications',
           channelDescription: 'Focus reminders and task alerts',
+          payload: payloadString,
         );
       } else if (reminder.type == 'weekly' && reminder.weekdays != null) {
         debugPrint("NOTIF: Scheduling weekly reminder for weekdays: ${reminder.weekdays}");
@@ -1037,13 +1123,14 @@ class NotificationService {
           final dayId = baseId + weekday;
           await _safeZonedSchedule(
             id: dayId,
-            title: 'Weekly Reminder',
-            body: reminder.label,
+            title: notifTitle,
+            body: notifBody,
             scheduledDate: scheduledDate,
             channelId: 'utopia_high_importance',
             channelName: 'UTOPIA Notifications',
             channelDescription: 'Focus reminders and task alerts',
             matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            payload: payloadString,
           );
         }
       } else if (reminder.type == 'monthly_date' && reminder.monthDay != null) {
@@ -1055,13 +1142,14 @@ class NotificationService {
 
         await _safeZonedSchedule(
           id: baseId,
-          title: 'Monthly Reminder',
-          body: reminder.label,
+          title: notifTitle,
+          body: notifBody,
           scheduledDate: scheduledDate,
           channelId: 'utopia_high_importance',
           channelName: 'UTOPIA Notifications',
           channelDescription: 'Focus reminders and task alerts',
           matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+          payload: payloadString,
         );
       }
     } catch (e, stack) {
@@ -1084,6 +1172,78 @@ class NotificationService {
       debugPrint("NOTIF: Focus reminder cancelled successfully: $reminderId (baseId=$baseId)");
     } catch (e) {
       debugPrint("NOTIF: Error cancelling focus reminder: $e");
+    }
+  }
+
+  @pragma('vm:entry-point')
+  static void onDidReceiveBackgroundNotificationResponse(NotificationResponse response) {
+    try {
+      if (response.payload != null && response.payload!.isNotEmpty) {
+        final payload = response.payload!;
+        final decoded = jsonDecode(payload);
+        if (decoded is Map<String, dynamic>) {
+          final type = decoded['type']?.toString();
+          if (type == 'focus_reminder') {
+            final actionId = response.actionId;
+            final habitId = decoded['habitId']?.toString();
+            final userId = decoded['userId']?.toString();
+            if (habitId != null && userId != null) {
+              unawaited(_handleBackgroundHabitAction(
+                actionId: actionId,
+                habitId: habitId,
+                userId: userId,
+                notificationId: response.id,
+              ));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in onDidReceiveBackgroundNotificationResponse: $e');
+    }
+  }
+
+  static Future<void> _handleBackgroundHabitAction({
+    String? actionId,
+    required String habitId,
+    required String userId,
+    int? notificationId,
+  }) async {
+    try {
+      debugPrint("NOTIF: Handling background/foreground habit action: $actionId for habit: $habitId");
+      try {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      } catch (_) {}
+
+      final now = DateTime.now();
+      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final db = FocusDatabaseService();
+      final habit = await db.getHabit(habitId);
+      final targetValue = habit?.targetValue ?? 1.0;
+      final existingRecord = await db.getRecord(habitId, dateStr);
+
+      final record = HabitRecord(
+        id: existingRecord?.id ?? const Uuid().v4(),
+        habitId: habitId,
+        userId: userId,
+        date: dateStr,
+        value: actionId == 'action_completed' ? targetValue : 0.0,
+        targetValue: targetValue,
+        completed: actionId == 'action_completed',
+        syncStatus: 'pending',
+        updatedAt: DateTime.now(),
+      );
+
+      final supabaseService = FocusSupabaseService();
+      await supabaseService.saveRecord(record);
+      debugPrint("NOTIF: Background habit action success - saved HabitRecord: completed=${record.completed}");
+
+      if (notificationId != null) {
+        await _localNotifications.cancel(notificationId);
+      }
+    } catch (e) {
+      debugPrint("NOTIF: Error in background habit action handler: $e");
     }
   }
 

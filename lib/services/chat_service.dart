@@ -476,6 +476,9 @@ class ChatService {
     }
   }
 
+  String? _cachedSupabaseUrl;
+  String? _cachedSupabaseAnonKey;
+
   Future<void> _dispatchChatNotification({
     required String senderId,
     required String senderName,
@@ -484,64 +487,46 @@ class ChatService {
     required String message,
   }) async {
     try {
-      final configDoc = await _firestore
-          .collection('config')
-          .doc('github')
-          .get();
-      final data = configDoc.data();
-      final pat = data?['pat'] as String?;
-      if (pat == null || pat.isEmpty) {
+      // Load and cache Supabase config from Firestore
+      if (_cachedSupabaseUrl == null || _cachedSupabaseAnonKey == null) {
+        final configDoc = await _firestore
+            .collection('config')
+            .doc('supabase-focus-1')
+            .get();
+        final data = configDoc.data();
+        _cachedSupabaseUrl = (data?['url'] as String?)?.trim();
+        _cachedSupabaseAnonKey = (data?['anon_key'] as String?)?.trim();
+      }
+
+      if (_cachedSupabaseUrl == null ||
+          _cachedSupabaseUrl!.isEmpty ||
+          _cachedSupabaseAnonKey == null ||
+          _cachedSupabaseAnonKey!.isEmpty) {
         return;
       }
 
-      final owner =
-          (data?['chatWorkflowOwner'] as String?)?.trim().isNotEmpty == true
-          ? (data?['chatWorkflowOwner'] as String).trim()
-          : 'infernoGurala';
-      final repo =
-          (data?['chatWorkflowRepo'] as String?)?.trim().isNotEmpty == true
-          ? (data?['chatWorkflowRepo'] as String).trim()
-          : 'utopia_app';
-      final workflowFile =
-          (data?['chatWorkflowFile'] as String?)?.trim().isNotEmpty == true
-          ? (data?['chatWorkflowFile'] as String).trim()
-          : 'chat-notification.yml';
-      final ref =
-          (data?['chatWorkflowRef'] as String?)?.trim().isNotEmpty == true
-          ? (data?['chatWorkflowRef'] as String).trim()
-          : 'main';
-
       final uri = Uri.parse(
-        'https://api.github.com/repos/$owner/$repo/actions/workflows/$workflowFile/dispatches',
+        '$_cachedSupabaseUrl/functions/v1/send-chat-notification',
       );
 
       final preview = message.length > 160
           ? '${message.substring(0, 157)}...'
           : message;
 
-      final response = await http.post(
+      await http.post(
         uri,
         headers: {
-          'Authorization': 'Bearer $pat',
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_cachedSupabaseAnonKey',
         },
         body: jsonEncode({
-          'ref': ref,
-          'inputs': {
-            'chat_id': chatId,
-            'sender_id': senderId,
-            'sender_name': senderName,
-            'recipient_id': recipientId,
-            'message_text': preview,
-          },
+          'sender_id': senderId,
+          'sender_name': senderName,
+          'recipient_id': recipientId,
+          'chat_id': chatId,
+          'message_text': preview,
         }),
       );
-
-      if (response.statusCode != 204) {
-        return;
-      }
     } catch (_) {}
   }
 }

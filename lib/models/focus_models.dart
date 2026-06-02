@@ -240,6 +240,8 @@ class FocusReminder {
   final String? id;
   final String userId;
   final String label;
+  final String? description;
+  final String? habitId;
   final String type; // 'one_time', 'weekly', 'monthly_date'
   final String reminderTime; // HH:MM (24h)
   final String? remindDate; // YYYY-MM-DD, only for one_time
@@ -250,11 +252,14 @@ class FocusReminder {
   final String syncStatus;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String? gcalEventId; // linked Google Calendar event ID
 
   const FocusReminder({
     this.id,
     required this.userId,
     required this.label,
+    this.description,
+    this.habitId,
     required this.type,
     required this.reminderTime,
     this.remindDate,
@@ -265,12 +270,15 @@ class FocusReminder {
     this.syncStatus = 'pending',
     this.createdAt,
     this.updatedAt,
+    this.gcalEventId,
   });
 
   FocusReminder copyWith({
     String? id,
     String? userId,
     String? label,
+    String? description,
+    String? habitId,
     String? type,
     String? reminderTime,
     String? remindDate,
@@ -279,11 +287,16 @@ class FocusReminder {
     List<int>? activeMonths,
     bool? isActive,
     String? syncStatus,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? gcalEventId,
   }) {
     return FocusReminder(
       id: id ?? this.id,
       userId: userId ?? this.userId,
       label: label ?? this.label,
+      description: description ?? this.description,
+      habitId: habitId ?? this.habitId,
       type: type ?? this.type,
       reminderTime: reminderTime ?? this.reminderTime,
       remindDate: remindDate ?? this.remindDate,
@@ -292,6 +305,9 @@ class FocusReminder {
       activeMonths: activeMonths ?? this.activeMonths,
       isActive: isActive ?? this.isActive,
       syncStatus: syncStatus ?? this.syncStatus,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      gcalEventId: gcalEventId ?? this.gcalEventId,
     );
   }
 
@@ -300,6 +316,8 @@ class FocusReminder {
       if (id != null) 'id': id,
       'user_id': userId,
       'label': label,
+      'description': description,
+      'habit_id': habitId,
       'type': type,
       'reminder_time': reminderTime,
       'remind_date': remindDate,
@@ -310,6 +328,7 @@ class FocusReminder {
       'sync_status': syncStatus,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
       'updated_at': (updatedAt ?? DateTime.now()).toIso8601String(),
+      'gcal_event_id': gcalEventId,
     };
   }
 
@@ -348,6 +367,8 @@ class FocusReminder {
       id: map['id']?.toString(),
       userId: map['user_id'] as String,
       label: map['label'] as String,
+      description: map['description'] as String?,
+      habitId: map['habit_id'] as String?,
       type: map['type'] as String,
       reminderTime: map['reminder_time'] as String,
       remindDate: map['remind_date'] as String?,
@@ -364,6 +385,7 @@ class FocusReminder {
       updatedAt: map['updated_at'] != null
           ? DateTime.tryParse(map['updated_at'] as String)
           : null,
+      gcalEventId: map['gcal_event_id'] as String?,
     );
   }
 
@@ -371,6 +393,8 @@ class FocusReminder {
     return {
       'user_id': userId,
       'label': label,
+      if (description != null) 'description': description,
+      if (habitId != null) 'habit_id': habitId,
       'type': type,
       'reminder_time': reminderTime,
       if (remindDate != null) 'remind_date': remindDate,
@@ -378,6 +402,7 @@ class FocusReminder {
       if (monthDay != null) 'month_day': monthDay,
       if (activeMonths != null) 'active_months': activeMonths,
       'is_active': isActive,
+      if (gcalEventId != null) 'gcal_event_id': gcalEventId,
     };
   }
 
@@ -397,6 +422,8 @@ class FocusReminder {
     final timeStr = '$displayHour:$minute $ampm';
 
     switch (type) {
+      case 'daily':
+        return 'Every day · $timeStr';
       case 'one_time':
         if (remindDate != null) {
           final parts = remindDate!.split('-');
@@ -469,3 +496,259 @@ class ExtractedTask {
     required this.completed,
   });
 }
+
+class FocusHabit {
+  final String id;
+  final String userId;
+  final String name;
+  final String? description;
+  final String type; // 'binary', 'measurable'
+  final double targetValue;
+  final String? unit;
+  final String frequencyType; // 'daily', 'days_of_week', 'weekly', 'monthly', 'interval'
+  final int frequencyValue;
+  final List<int>? daysOfWeek; // 0=Mon ... 6=Sun
+  final String? reminderTime; // HH:MM (24h)
+  final String color; // hex string color, e.g. '#08BB68'
+  final bool isArchived;
+  final String syncStatus; // 'synced', 'pending'
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const FocusHabit({
+    required this.id,
+    required this.userId,
+    required this.name,
+    this.description,
+    this.type = 'binary',
+    this.targetValue = 1.0,
+    this.unit,
+    this.frequencyType = 'daily',
+    this.frequencyValue = 1,
+    this.daysOfWeek,
+    this.reminderTime,
+    this.color = '#08BB68',
+    this.isArchived = false,
+    this.syncStatus = 'pending',
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  FocusHabit copyWith({
+    String? id,
+    String? userId,
+    String? name,
+    String? description,
+    String? type,
+    double? targetValue,
+    String? unit,
+    String? frequencyType,
+    int? frequencyValue,
+    List<int>? daysOfWeek,
+    String? reminderTime,
+    String? color,
+    bool? isArchived,
+    String? syncStatus,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return FocusHabit(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      type: type ?? this.type,
+      targetValue: targetValue ?? this.targetValue,
+      unit: unit ?? this.unit,
+      frequencyType: frequencyType ?? this.frequencyType,
+      frequencyValue: frequencyValue ?? this.frequencyValue,
+      daysOfWeek: daysOfWeek ?? this.daysOfWeek,
+      reminderTime: reminderTime ?? this.reminderTime,
+      color: color ?? this.color,
+      isArchived: isArchived ?? this.isArchived,
+      syncStatus: syncStatus ?? this.syncStatus,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'name': name,
+      'description': description,
+      'type': type,
+      'target_value': targetValue,
+      'unit': unit,
+      'frequency_type': frequencyType,
+      'frequency_value': frequencyValue,
+      'days_of_week': daysOfWeek?.join(','),
+      'reminder_time': reminderTime,
+      'color': color,
+      'is_archived': isArchived ? 1 : 0,
+      'sync_status': syncStatus,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  factory FocusHabit.fromMap(Map<String, dynamic> map) {
+    List<int>? parsedDays;
+    if (map['days_of_week'] != null && map['days_of_week'].toString().isNotEmpty) {
+      try {
+        parsedDays = map['days_of_week']
+            .toString()
+            .split(',')
+            .where((s) => s.trim().isNotEmpty)
+            .map((s) => int.parse(s.trim()))
+            .toList();
+      } catch (_) {}
+    }
+    return FocusHabit(
+      id: map['id'] as String,
+      userId: map['user_id'] as String,
+      name: map['name'] as String,
+      description: map['description'] as String?,
+      type: map['type'] as String? ?? 'binary',
+      targetValue: (map['target_value'] as num?)?.toDouble() ?? 1.0,
+      unit: map['unit'] as String?,
+      frequencyType: map['frequency_type'] as String? ?? 'daily',
+      frequencyValue: map['frequency_value'] as int? ?? 1,
+      daysOfWeek: parsedDays,
+      reminderTime: map['reminder_time'] as String?,
+      color: map['color'] as String? ?? '#08BB68',
+      isArchived: (map['is_archived'] is bool)
+          ? map['is_archived'] as bool
+          : (map['is_archived'] as int? ?? 0) == 1,
+      syncStatus: (map['sync_status'] as String?) ?? 'synced',
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'name': name,
+      'description': description,
+      'type': type,
+      'target_value': targetValue,
+      'unit': unit,
+      'frequency_type': frequencyType,
+      'frequency_value': frequencyValue,
+      'days_of_week': daysOfWeek?.join(','), // Represent as a string for safety in supabase too or array depending on setup
+      'reminder_time': reminderTime,
+      'color': color,
+      'is_archived': isArchived,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+}
+
+class HabitRecord {
+  final String id;
+  final String habitId;
+  final String userId;
+  final String date; // YYYY-MM-DD
+  final double value;
+  final double targetValue;
+  final bool completed;
+  final String? note;
+  final String syncStatus;
+  final DateTime updatedAt;
+
+  const HabitRecord({
+    required this.id,
+    required this.habitId,
+    required this.userId,
+    required this.date,
+    this.value = 0.0,
+    this.targetValue = 1.0,
+    this.completed = false,
+    this.note,
+    this.syncStatus = 'pending',
+    required this.updatedAt,
+  });
+
+  HabitRecord copyWith({
+    String? id,
+    String? habitId,
+    String? userId,
+    String? date,
+    double? value,
+    double? targetValue,
+    bool? completed,
+    String? note,
+    String? syncStatus,
+    DateTime? updatedAt,
+  }) {
+    return HabitRecord(
+      id: id ?? this.id,
+      habitId: habitId ?? this.habitId,
+      userId: userId ?? this.userId,
+      date: date ?? this.date,
+      value: value ?? this.value,
+      targetValue: targetValue ?? this.targetValue,
+      completed: completed ?? this.completed,
+      note: note ?? this.note,
+      syncStatus: syncStatus ?? this.syncStatus,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'habit_id': habitId,
+      'user_id': userId,
+      'date': date,
+      'value': value,
+      'target_value': targetValue,
+      'completed': completed ? 1 : 0,
+      'note': note,
+      'sync_status': syncStatus,
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  factory HabitRecord.fromMap(Map<String, dynamic> map) {
+    return HabitRecord(
+      id: map['id'] as String,
+      habitId: map['habit_id'] as String,
+      userId: map['user_id'] as String,
+      date: map['date'] as String,
+      value: (map['value'] as num?)?.toDouble() ?? 0.0,
+      targetValue: (map['target_value'] as num?)?.toDouble() ?? 1.0,
+      completed: (map['completed'] is bool)
+          ? map['completed'] as bool
+          : (map['completed'] as int? ?? 0) == 1,
+      note: map['note'] as String?,
+      syncStatus: (map['sync_status'] as String?) ?? 'synced',
+      updatedAt: map['updated_at'] != null
+          ? DateTime.parse(map['updated_at'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toSupabaseMap() {
+    return {
+      'id': id,
+      'habit_id': habitId,
+      'user_id': userId,
+      'date': date,
+      'value': value,
+      'target_value': targetValue,
+      'completed': completed,
+      'note': note,
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+}
+

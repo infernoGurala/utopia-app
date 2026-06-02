@@ -320,7 +320,8 @@ Future<AppInitializationState> _initializeApp() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     if (PlatformSupport.supportsNotifications) {
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      // Disabled background Dart VM execution for push messaging to prevent battery/background optimization alerts
+      // FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       unawaited(NotificationService.initialize());
     }
 
@@ -730,7 +731,12 @@ class UtopiaApp extends StatelessWidget {
               backgroundColor: U.surface,
               dialBackgroundColor: U.bg,
               dialHandColor: U.primary,
-              dialTextColor: U.text,
+              dialTextColor: WidgetStateColor.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return U.bg;
+                }
+                return U.text;
+              }),
               entryModeIconColor: U.primary,
               hourMinuteColor: U.bg,
               hourMinuteTextColor: U.text,

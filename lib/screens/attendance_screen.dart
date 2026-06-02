@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -2411,48 +2412,105 @@ class _TodayPulseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: [U.primary, U.primary.withValues(alpha: 0.85)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: U.primary.withValues(alpha: 0.3), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: U.primary.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
+    final isDark = appThemeNotifier.value.isDark;
+    
+    // Glassmorphic styling:
+    // Background is semi-transparent surface/card color to let underlying widgets blur through.
+    final glassBgColor = isDark 
+        ? U.card.withValues(alpha: 0.65) 
+        : Colors.white.withValues(alpha: 0.75);
+        
+    // Glowing text/icon color: using the theme's gorgeous U.gold (royal purple in dark, warm gold in light).
+    final glowColor = U.gold;
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        // Smooth breathing scale effect: 1.0 to 1.05
+        final scale = 1.0 + (animation.value * 0.05);
+        // Pulsing glowing border alpha
+        final borderAlpha = 0.4 + (animation.value * 0.25);
+        // Pulsing shadow blur and spread
+        final blurRadius = 12.0 + (animation.value * 10.0);
+        final spreadRadius = 1.0 + (animation.value * 2.0);
+
+        return Transform.scale(
+          scale: scale,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 22),
-                const SizedBox(width: 10),
-                Text(
-                  'Today',
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.25 + (animation.value * 0.15)),
+                  blurRadius: blurRadius,
+                  spreadRadius: spreadRadius,
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: glassBgColor,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: glowColor.withValues(alpha: borderAlpha),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(30),
+                      onTap: onTap,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Beautiful glowing sun icon
+                            Icon(
+                              Icons.wb_sunny_rounded,
+                              color: glowColor,
+                              size: 22,
+                              shadows: [
+                                Shadow(
+                                  color: glowColor.withValues(alpha: 0.6),
+                                  blurRadius: 8,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 10),
+                            // Beautiful glowing text
+                            Text(
+                              'Today',
+                              style: GoogleFonts.outfit(
+                                color: glowColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                shadows: [
+                                  Shadow(
+                                    color: glowColor.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

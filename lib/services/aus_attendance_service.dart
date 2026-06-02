@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
+import 'package:flutter_inappwebview/flutter_inappwebview.dart' hide Cookie;
 
 class AusAttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
@@ -16,7 +19,7 @@ class AusAttendanceService {
   static const String _ajaxJsPath = '$_prefix/JSFiles/AjaxMethods.js';
 
   static const Duration _timeout = Duration(seconds: 20);
-  static const String _userAgent =
+  static String _userAgent =
       'Mozilla/5.0 (Linux; Android 14; vivo I2305) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/123.0.0.0 Mobile Safari/537.36';
@@ -30,53 +33,221 @@ class AusAttendanceService {
     return aes.encrypt(password, iv: iv).base64;
   }
 
-  static Future<Map<String, String>> _getLoginTokens(
-    HttpClient client,
-    Map<String, String> cookies,
+  static Future<Map<String, String>> _loginViaWebView(
+    String rollNumber,
+    String password,
   ) async {
-    var response = await _sendRequest(
-      client,
-      method: 'GET',
-      path: _loginPath,
-      cookies: cookies,
-      followRedirects: true,
-    );
-    _debugResponse('GET login page (initial)', response.statusCode, response.body);
+    print('[AusAttendanceService] _loginViaWebView: started for $rollNumber');
+    final completer = Completer<Map<String, String>>();
+    final encryptedPassword = await _encryptPassword(password);
+    print('[AusAttendanceService] _loginViaWebView: password encrypted');
+    
+    HeadlessInAppWebView? headlessWebView;
+    Timer? timeoutTimer;
 
-    if (!response.body.contains('__VIEWSTATE')) {
-      _debugResponse('GET login page', response.statusCode, 'Gate detected, following authcheck');
-      await _sendRequest(
-        client,
-        method: 'GET',
-        path: '$_prefix/authcheck.aspx',
-        cookies: cookies,
-        followRedirects: true,
-      );
-      response = await _sendRequest(
-        client,
-        method: 'GET',
-        path: _loginPath,
-        cookies: cookies,
-        followRedirects: true,
-      );
-      _debugResponse('GET login page (retry)', response.statusCode, response.body);
+    void cleanup() {
+      print('[AusAttendanceService] _loginViaWebView: cleaning up...');
+      timeoutTimer?.cancel();
+      try {
+        headlessWebView?.dispose();
+        print('[AusAttendanceService] _loginViaWebView: WebView disposed.');
+      } catch (e) {
+        print('[AusAttendanceService] _loginViaWebView: dispose error: $e');
+      }
     }
 
-    final viewState = _extractHiddenInput(response.body, '__VIEWSTATE');
-    final viewStateGenerator = _extractHiddenInput(
-      response.body,
-      '__VIEWSTATEGENERATOR',
-    );
-    final eventValidation = _extractHiddenInput(
-      response.body,
-      '__EVENTVALIDATION',
+    timeoutTimer = Timer(const Duration(seconds: 30), () {
+      print('[AusAttendanceService] _loginViaWebView: 30s TIMEOUT reached!');
+      cleanup();
+      if (!completer.isCompleted) {
+        completer.completeError(
+          Exception('Could not sign in to the college portal'),
+        );
+      }
+    });
+
+    print('[AusAttendanceService] _loginViaWebView: constructing HeadlessInAppWebView');
+    headlessWebView = HeadlessInAppWebView(
+      initialSize: const Size(360, 800),
+      initialUrlRequest: URLRequest(
+        url: WebUri('https://$_portalHost$_loginPath'),
+      ),
+      initialSettings: InAppWebViewSettings(
+        javaScriptEnabled: true,
+        domStorageEnabled: true,
+        databaseEnabled: true,
+        thirdPartyCookiesEnabled: true,
+        javaScriptCanOpenWindowsAutomatically: true,
+      ),
+      onLoadStart: (controller, url) {
+        print('[AusAttendanceService] WebView LoadStart: $url');
+      },
+      onLoadStop: (controller, url) async {
+        final currentUrl = url?.toString() ?? '';
+        print('[AusAttendanceService] WebView LoadStop: $currentUrl');
+        
+        if (currentUrl.contains('default.aspx')) {
+          print('[AusAttendanceService] WebView default.aspx detected. Waiting for DOM...');
+          
+          // 1. Wait for username input to be present in DOM
+          bool isFormReady = false;
+          for (int i = 0; i < 20; i++) {
+            if (completer.isCompleted) {
+              print('[AusAttendanceService] WebView: task completed/timed out during DOM check. Aborting.');
+              return;
+            }
+            final checkForm = "document.querySelector('#txtUserId') !== null";
+            final res = await controller.evaluateJavascript(source: checkForm);
+            if (res == true) {
+              isFormReady = true;
+              break;
+            }
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+          print('[AusAttendanceService] WebView form ready: $isFormReady');
+          
+          if (!isFormReady) {
+            print('[AusAttendanceService] WebView: Form elements not detected. Aborting.');
+            return;
+          }
+
+          // 2. Check if Turnstile captcha is actually present on the page
+          final checkTurnstilePresence = "document.querySelector('.cf-turnstile') !== null || document.querySelector('[class*=\"cf-\"]') !== null || document.querySelector('iframe[src*=\"cloudflare\"]') !== null || document.querySelector('[name=\"cf-turnstile-response\"]') !== null";
+          final hasTurnstile = await controller.evaluateJavascript(source: checkTurnstilePresence) == true;
+          print('[AusAttendanceService] WebView hasTurnstile: $hasTurnstile');
+
+          if (hasTurnstile) {
+            print('[AusAttendanceService] WebView polling for Turnstile token...');
+            String turnstileToken = '';
+            for (int i = 0; i < 30; i++) {
+              if (completer.isCompleted) {
+                print('[AusAttendanceService] WebView: task completed/timed out during Turnstile check. Aborting.');
+                return;
+              }
+              final checkToken = "var el = document.querySelector('[name=\"cf-turnstile-response\"]'); el ? el.value : '';";
+              final tokenRes = await controller.evaluateJavascript(source: checkToken);
+              if (tokenRes != null && tokenRes.toString().isNotEmpty) {
+                turnstileToken = tokenRes.toString();
+                print('[AusAttendanceService] WebView Turnstile solved! Token length: ${turnstileToken.length}');
+                break;
+              }
+              print('[AusAttendanceService] WebView Turnstile not solved yet (attempt ${i + 1}/30)...');
+              await Future.delayed(const Duration(milliseconds: 500));
+            }
+
+            if (turnstileToken.isEmpty) {
+              print('[AusAttendanceService] WebView WARNING: Turnstile token is still empty after 15s!');
+            }
+          } else {
+            print('[AusAttendanceService] WebView: No Turnstile detected. Skipping Turnstile token polling.');
+          }
+
+          if (completer.isCompleted) {
+            print('[AusAttendanceService] WebView: task completed/timed out before JS injection. Aborting.');
+            return;
+          }
+
+          print('[AusAttendanceService] WebView Injecting JS credentials...');
+          final jsCode = """
+            (function() {
+              var txtUserId = document.querySelector('#txtUserId') || document.querySelector('#txtId2') || document.querySelector('#txtid2') || document.querySelector('[id*="txtUserId"]') || document.querySelector('[id*="txtId2"]');
+              var txtPassword = document.querySelector('#txtPassword') || document.querySelector('#txtPwd2') || document.querySelector('#txtpwd2') || document.querySelector('[id*="txtPassword"]') || document.querySelector('[id*="txtPwd2"]');
+              var hdnpwd = document.querySelector('#hdnpwd') || document.querySelector('#hdnpwd1') || document.querySelector('#hdnpwd2') || document.querySelector('#hdnpwd3') || document.querySelector('[id*="hdnpwd"]');
+              var rbtStudent = document.querySelector('#rbtStudent') || document.querySelector('#rbtStudent2') || document.querySelector('[id*="rbtStudent"]');
+
+              if (txtUserId) txtUserId.value = '${rollNumber.trim()}';
+              if (txtPassword) txtPassword.value = '$encryptedPassword';
+              if (hdnpwd) hdnpwd.value = '$encryptedPassword';
+              if (rbtStudent) rbtStudent.checked = true;
+
+              // Prioritize clicking the submit button directly
+              var loginBtn = document.querySelector('#btnLogin') || document.querySelector('[id*="btnLogin"]') || document.querySelector('#imgBtn2') || document.querySelector('[id*="imgBtn2"]');
+              if (loginBtn) {
+                loginBtn.click();
+              } else if (typeof __doPostBack === 'function') {
+                __doPostBack('btnLogin', '');
+              } else {
+                var form = document.querySelector('form');
+                if (form) form.submit();
+              }
+            })();
+          """;
+
+          try {
+            await controller.evaluateJavascript(source: jsCode);
+            print('[AusAttendanceService] WebView JS credentials successfully injected and submitted.');
+          } catch (e) {
+            print('[AusAttendanceService] WebView JS evaluation error: $e');
+          }
+        } else if (currentUrl.contains('StudentMaster.aspx')) {
+          if (completer.isCompleted) return;
+          print('[AusAttendanceService] WebView StudentMaster.aspx detected! Extracting cookies...');
+          try {
+            // Extract the actual WebView User-Agent to align all subsequent HttpClient requests
+            final ua = await controller.evaluateJavascript(source: "navigator.userAgent");
+            if (ua != null && ua.toString().isNotEmpty) {
+              _userAgent = ua.toString();
+              print('[AusAttendanceService] WebView resolved native User-Agent: $_userAgent');
+            }
+            final cookieManager = CookieManager.instance();
+            final cookiesList = await cookieManager.getCookies(
+              url: WebUri(currentUrl),
+            );
+            final extractedCookies = <String, String>{};
+            for (final cookie in cookiesList) {
+              extractedCookies[cookie.name] = cookie.value.toString();
+            }
+            print('[AusAttendanceService] WebView extracted cookies: ${extractedCookies.keys.toList()}');
+
+            final sessionId = extractedCookies['ASP.NET_SessionId'];
+            final frmAuth = extractedCookies['frmAuth'];
+
+            if (sessionId == null ||
+                sessionId.isEmpty ||
+                frmAuth == null ||
+                frmAuth.isEmpty) {
+              print('[AusAttendanceService] WebView error: SessionId or frmAuth missing/empty!');
+              if (!completer.isCompleted) {
+                completer.completeError(Exception('Invalid credentials'));
+              }
+            } else {
+              print('[AusAttendanceService] WebView login successful! Resolving extracted cookies.');
+              if (!completer.isCompleted) {
+                completer.complete(extractedCookies);
+              }
+            }
+          } catch (e) {
+            print('[AusAttendanceService] WebView cookie extraction exception: $e');
+            if (!completer.isCompleted) {
+              completer.completeError(e);
+            }
+          } finally {
+            cleanup();
+          }
+        }
+      },
+      onReceivedError: (controller, request, error) {
+        print('[AusAttendanceService] WebView Error: ${error.description} (code: ${error.type})');
+      },
+      onReceivedHttpError: (controller, request, errorResponse) {
+        print('[AusAttendanceService] WebView HTTP Error: ${errorResponse.statusCode} - ${errorResponse.reasonPhrase}');
+      },
+      onConsoleMessage: (controller, consoleMessage) {
+        print('[AusAttendanceService] WebView Console: [${consoleMessage.messageLevel}] ${consoleMessage.message}');
+      },
     );
 
-    return {
-      '__VIEWSTATE': viewState,
-      '__VIEWSTATEGENERATOR': viewStateGenerator,
-      '__EVENTVALIDATION': eventValidation,
-    };
+    try {
+      print('[AusAttendanceService] WebView running headlessWebView...');
+      await headlessWebView.run();
+      print('[AusAttendanceService] WebView headless run initiated.');
+    } catch (e) {
+      print('[AusAttendanceService] WebView run() error: $e');
+      cleanup();
+      completer.completeError(e);
+    }
+
+    return completer.future;
   }
 
   static Future<void> _login(
@@ -86,44 +257,12 @@ class AusAttendanceService {
     Map<String, String> cookies,
   ) async {
     try {
-      final tokens = await _getLoginTokens(client, cookies);
-      final encryptedPassword = await _encryptPassword(password);
-      final formBody = <String, String>{
-        '__VIEWSTATE': tokens['__VIEWSTATE'] ?? '',
-        '__VIEWSTATEGENERATOR': tokens['__VIEWSTATEGENERATOR'] ?? '',
-        '__EVENTVALIDATION': tokens['__EVENTVALIDATION'] ?? '',
-        'userType': 'rbtStudent',
-        'txtUserId': rollNumber.trim(),
-        'txtPassword': encryptedPassword,
-        'hdnpwd': encryptedPassword,
-        'btnLogin': 'LOGIN',
-      };
+      final webViewCookies = await _loginViaWebView(rollNumber, password);
+      cookies.addAll(webViewCookies);
 
-      final response = await _sendRequest(
-        client,
-        method: 'POST',
-        path: _loginPath,
-        cookies: cookies,
-        followRedirects: false,
-        contentType: 'application/x-www-form-urlencoded',
-        body: Uri(queryParameters: formBody).query,
-        extraHeaders: {
-          'origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$_loginPath',
-        },
-      );
-      _debugResponse('POST login', response.statusCode, response.body);
-
-      final location = response.location ?? '';
       final sessionId = cookies['ASP.NET_SessionId'];
       final frmAuth = cookies['frmAuth'];
-      final redirectedToStudentMaster =
-          (response.statusCode == HttpStatus.movedTemporarily ||
-              response.statusCode == HttpStatus.found ||
-              response.statusCode == HttpStatus.movedPermanently) &&
-          location.toLowerCase().contains('studentmaster.aspx');
-      if (!redirectedToStudentMaster ||
-          sessionId == null ||
+      if (sessionId == null ||
           frmAuth == null ||
           sessionId.isEmpty ||
           frmAuth.isEmpty) {
@@ -138,6 +277,7 @@ class AusAttendanceService {
       throw Exception('Could not sign in to the college portal');
     }
   }
+
 
   static Future<Map<String, dynamic>> fetchAttendance(
     String rollNumber,
@@ -577,48 +717,7 @@ class AusAttendanceService {
     return value;
   }
 
-  static String _extractHiddenInput(String html, String fieldName) {
-    final patterns = [
-      RegExp(
-        'id="$fieldName"[^>]*value="([^"]*)"',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        'name="$fieldName"[^>]*value="([^"]*)"',
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        "id='$fieldName'[^>]*value='([^']*)'",
-        caseSensitive: false,
-        dotAll: true,
-      ),
-      RegExp(
-        "name='$fieldName'[^>]*value='([^']*)'",
-        caseSensitive: false,
-        dotAll: true,
-      ),
-    ];
 
-    for (final pattern in patterns) {
-      final match = pattern.firstMatch(html);
-      final value = match?.group(1);
-      if (value != null) {
-        return value;
-      }
-    }
-
-    throw const FormatException('Portal login tokens were not found');
-  }
-
-  static String? _extractWebMethodToken(String html) {
-    final match = RegExp(
-      r"var\s+_tkn\s*=\s*'([^']+)'",
-      caseSensitive: true,
-    ).firstMatch(html);
-    return match?.group(1);
-  }
 
   static bool _looksLikeSubjectCell(String value) {
     final lower = value.toLowerCase();

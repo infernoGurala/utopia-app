@@ -1,23 +1,23 @@
-import 'dart:ui';
+import 'dart:convert';
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
-import '../theme/image_overlay_colors.dart';
-import 'daily_note_screen.dart';
-import 'heatmap_home_screen.dart';
-import 'profile_screen.dart';
+import 'habit_tracker_screen.dart';
 import 'reminders_screen.dart';
+import 'calendar_screen.dart';
+import 'rockets_screen.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
 import '../widgets/news_brief_dashboard_card.dart';
+import '../services/google_calendar_service.dart';
+import '../services/calendar_cache_service.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -28,166 +28,14 @@ class FocusScreen extends StatefulWidget {
 
 class _FocusScreenState extends State<FocusScreen> {
   final _service = FocusSupabaseService();
-  String _quote = '"Focus on progress, not perfection."';
-  final String _quoteSubtitle = 'Every small step moves you forward.';
+  String _quote = '';
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
   String _dailyNoteInsight = 'Write today';
   String _remindersInsight = 'No upcoming';
+  String _calendarInsight = 'Connect Google Account';
 
-
-  static const _motivationalTexts = [
-    'If one person believes something illogical, he is called a fool – but if ten million people believe the same illogical thing, it is called religion.',
-    'It is not who you are underneath, it\'s what you do that defines you.',
-    'Nothing is permanent, except change.',
-    'Every day, people straighten up their hair. Why not the heart?',
-    'I am not what happened to me, I am what I choose to become.',
-    'When walking, walk! When eating, eat!',
-    'Do what is right, not what is popular, nor what is easy.',
-    'Ignorance is the mother of all evil.',
-    'Regret comes from missed opportunities; discipline weighs ounces, and regret weighs tons.',
-    'The more pleasure we seek, the less happy we become. ~MA',
-    'Love is enough to get everything done in life; you would need power only when you want to do something harmful.',
-    'You don\'t have to be great to start, but you have to start to be great.',
-    'Courage isn\'t having the strength to go on, it is going on when you don\'t have the strength.',
-    'Anything that makes me weak, physically, intellectually, and spiritually, I reject as poison.',
-    'The cave you fear to enter holds the treasure you seek.',
-    'You could be good today, instead you choose tomorrow.',
-    'No one can make you upset; you choose to be.',
-    'A goal without a plan is just a wish.',
-    'The self is an illusion built by mental programming.',
-    'The key to evolution is variation.',
-    'You can\'t always control what happens, but you can control how you respond; that\'s where your power is.',
-    'The only limit to our realization of tomorrow is our doubts of today.',
-    'Do not wait for permission.',
-    'What you are not changing, you are choosing.',
-    'One good book is equal to a hundred good friends, but one good friend is equal to a library.',
-    'Winners are not those who never fail but those who never quit.',
-    'If you want to shine like the sun, first burn like the sun.',
-    'The greatest sin is to think yourself weak.',
-    'Time and tide wait for no man.',
-    'The greatest disability is the mind, not the body.',
-    'Don\'t think about doing the thing; do the thing.',
-  ];
-
-  String _generateRandomGreeting(String slot) {
-    final List<String> variants;
-    if (slot == 'morning') {
-      variants = const [
-        'Rise and shine',
-        'Good morning',
-        'Top of the morning',
-        'Have a beautiful morning',
-        'Wishing you a bright morning',
-        'Wake up and conquer',
-        'Hello, early bird',
-        'A fresh start today',
-        'Time to shine',
-        'Good morning, champion',
-        'Hope your day starts great',
-        'Good morning, legend',
-        'Start with a smile',
-        'Embrace the fresh day',
-        'Morning, superstar',
-        'Ready for a great day?',
-        'A beautiful morning to you',
-        'Make today count',
-        'Rise up and thrive',
-        'Hello there, sunshine',
-      ];
-    } else if (slot == 'afternoon') {
-      variants = const [
-        'Good afternoon',
-        'Hope your afternoon is great',
-        'Good afternoon, legend',
-        'Happy midday',
-        'Keep going strong',
-        'Crushing your day?',
-        'Stay focused this afternoon',
-        'A wonderful afternoon to you',
-        'Enjoy this beautiful afternoon',
-        'Afternoon, superstar',
-        'Halfway to your goals',
-        'Keep up the great momentum',
-        'Midday motivation is here',
-        'Hope your day is productive',
-        'Taking a breath?',
-        'Good afternoon, champion',
-        'Stay energized',
-        'Make the rest of the day count',
-        'Afternoon, early achiever',
-        'Doing amazing things today',
-      ];
-    } else if (slot == 'evening') {
-      variants = const [
-        'Good evening',
-        'Hope you had a great day',
-        'Good evening, legend',
-        'Unwind and relax',
-        'Time to ease into the evening',
-        'A peaceful evening to you',
-        'Evening, superstar',
-        'Reflect on today\'s wins',
-        'Hope your evening is cozy',
-        'Good evening, champion',
-        'Time to recharge',
-        'Evening, achiever',
-        'You did great today',
-        'Relax and reflect',
-        'Cozy evening vibes',
-        'Enjoy your evening rest',
-        'A calm evening to you',
-        'Great work today',
-        'Sunset vibes are here',
-      ];
-    } else {
-      variants = const [
-        'Good night',
-        'Rest well tonight',
-        'Time to wind down',
-        'Quiet night, sharp mind',
-        'Good night, champion',
-        'Sleep tight, legend',
-        'Sweet dreams',
-        'Late night grind?',
-        'Midnight focus',
-        'Working late, superstar?',
-        'Time to wrap up your day',
-        'Rest your eyes, legend',
-        'Sleep is the best meditation',
-        'Peaceful dreams ahead',
-        'Unwind and recharge',
-        'Still awake, champion?',
-        'Stars are shining, rest well',
-        'Cozy night vibes',
-      ];
-    }
-    final now = DateTime.now();
-    final dayIndex = now.difference(DateTime(now.year)).inDays;
-    final seed = dayIndex + now.hour;
-    final index = seed % variants.length;
-    return variants[index];
-  }
-
-  String get _userName {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return '';
-    final name = user.displayName ?? '';
-    if (name.isEmpty) return '';
-    return name.split(' ').first;
-  }
-
-  String? get _userPhotoUrl {
-    return FirebaseAuth.instance.currentUser?.photoURL;
-  }
-
-  String get _motivationalText {
-    final day = DateTime.now().day;
-    return _motivationalTexts[(day - 1) % _motivationalTexts.length];
-  }
-
-  // Obsolete getters removed. Background and overlay colors are now calculated atomically in build()
 
   @override
   void initState() {
@@ -223,26 +71,84 @@ class _FocusScreenState extends State<FocusScreen> {
   }
 
   Future<void> _loadQuote() async {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('config')
-          .doc('quotes')
-          .get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        if (data['quotes'] is List && (data['quotes'] as List).isNotEmpty) {
-          final quotes = (data['quotes'] as List).map((e) => e.toString()).toList();
-          final dayIndex = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
-          final selectedQuote = quotes[dayIndex % quotes.length];
-          if (mounted) {
-            setState(() {
-              _quote = '"$selectedQuote"';
-            });
+      final prefs = await SharedPreferences.getInstance();
+      final cachedQuote = prefs.getString('daily_quote_text');
+      final cachedAuthor = prefs.getString('daily_quote_author');
+      final cachedDate = prefs.getString('daily_quote_date');
+
+      if (cachedQuote != null && cachedAuthor != null && cachedDate == todayStr) {
+        // Today's quote is already cached. Show it immediately and skip fetching.
+        if (mounted) {
+          setState(() {
+            _quote = '"$cachedQuote" — $cachedAuthor';
+          });
+        }
+        return;
+      }
+
+      // If a cache exists from a previous day, show it immediately before fetching
+      if (cachedQuote != null && cachedAuthor != null) {
+        if (mounted) {
+          setState(() {
+            _quote = '"$cachedQuote" — $cachedAuthor';
+          });
+        }
+      } else {
+        // Otherwise show nothing until fetched
+        if (mounted) {
+          setState(() {
+            _quote = '';
+          });
+        }
+      }
+
+      // Fetch fresh quote from ZenQuotes API
+      final response = await http.get(Uri.parse('https://zenquotes.io/api/today')).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        if (data.isNotEmpty && data[0] is Map) {
+          final q = data[0]['q'] as String?;
+          final a = data[0]['a'] as String?;
+          if (q != null && a != null && q.isNotEmpty && a.isNotEmpty) {
+            // Cache the fresh quote, author, and date
+            await prefs.setString('daily_quote_text', q);
+            await prefs.setString('daily_quote_author', a);
+            await prefs.setString('daily_quote_date', todayStr);
+
+            if (mounted) {
+              setState(() {
+                _quote = '"$q" — $a';
+              });
+            }
+            return;
           }
         }
       }
-    } catch (_) {
-      // Use default quote
+
+      // If API fails and no cache exists at all, show hardcoded fallback
+      if (cachedQuote == null || cachedAuthor == null) {
+        if (mounted) {
+          setState(() {
+            _quote = '"Focus on progress, not perfection." — Unknown';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching/loading daily quote: $e');
+      final prefs = await SharedPreferences.getInstance().catchError((_) => null);
+      final cachedQuote = prefs?.getString('daily_quote_text');
+      final cachedAuthor = prefs?.getString('daily_quote_author');
+      if (cachedQuote == null || cachedAuthor == null) {
+        if (mounted) {
+          setState(() {
+            _quote = '"Focus on progress, not perfection." — Unknown';
+          });
+        }
+      }
     }
   }
 
@@ -289,33 +195,52 @@ class _FocusScreenState extends State<FocusScreen> {
       final activeTasks = tasks.length;
 
       // 1. Get today's habits remaining
-      String dailyNoteInsight = 'Write today';
+      String dailyNoteInsight = 'Track today';
       try {
-        final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-        final note = await _service.getLocalNote(todayStr);
-        final userHabits = await _service.getLocalUserHabits();
+        final today = DateTime.now();
+        final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+        final habits = await _service.getHabits(includeArchived: false);
         
-        final habitsList = userHabits?.habits ?? [];
-        if (habitsList.isEmpty) {
+        if (habits.isEmpty) {
           dailyNoteInsight = 'No habits configured';
         } else {
+          int scheduledCount = 0;
           int doneCount = 0;
-          if (note != null && note.habitsState.isNotEmpty) {
-            for (final h in note.habitsState.keys) {
-              if (note.habitsState[h] == true && habitsList.contains(h)) {
+          
+          for (final h in habits) {
+            bool isScheduled = false;
+            if (h.frequencyType == 'daily') {
+              isScheduled = true;
+            } else if (h.frequencyType == 'days_of_week') {
+              if (h.daysOfWeek != null && h.daysOfWeek!.contains(today.weekday - 1)) {
+                isScheduled = true;
+              }
+            } else {
+              isScheduled = true; // Weekly, monthly, and interval checklists are active
+            }
+            
+            if (isScheduled) {
+              scheduledCount++;
+              final rec = await _service.getRecord(h.id, todayStr);
+              if (rec != null && rec.completed) {
                 doneCount++;
               }
             }
           }
-          final left = habitsList.length - doneCount;
-          if (left <= 0) {
-            dailyNoteInsight = 'All habits completed! 🎉';
+          
+          if (scheduledCount == 0) {
+            dailyNoteInsight = 'No habits today';
           } else {
-            dailyNoteInsight = '$left ${left == 1 ? "habit" : "habits"} remaining';
+            final left = scheduledCount - doneCount;
+            if (left <= 0) {
+              dailyNoteInsight = 'All habits completed! 🎉';
+            } else {
+              dailyNoteInsight = '$left ${left == 1 ? "habit" : "habits"} remaining';
+            }
           }
         }
       } catch (e) {
-        debugPrint('FocusScreen daily note insight load failed: $e');
+        debugPrint('FocusScreen daily habits insight load failed: $e');
       }
 
       // 2. Get next upcoming reminder
@@ -377,12 +302,38 @@ class _FocusScreenState extends State<FocusScreen> {
         debugPrint('FocusScreen reminders insight load failed: $e');
       }
 
+      // 3. Get today's Google Calendar events count
+      String calendarInsight = 'Connect Google Account';
+      try {
+        final connected = await GoogleCalendarService.instance.isConnected();
+        if (connected) {
+          final now = DateTime.now();
+          final startOfDay = DateTime(now.year, now.month, now.day);
+          final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          final events = await CalendarCacheService.instance.getEvents(
+            start: startOfDay,
+            end: endOfDay,
+            includeHidden: false,
+          );
+          if (events.isEmpty) {
+            calendarInsight = 'No events today';
+          } else {
+            calendarInsight = '${events.length} ${events.length == 1 ? "event" : "events"} scheduled today';
+          }
+        } else {
+          calendarInsight = 'Connect Google Account';
+        }
+      } catch (e) {
+        debugPrint('FocusScreen calendar insight load failed: $e');
+      }
+
       if (mounted) {
         setState(() {
           _activeHabits = activeTasks;
           _upcomingReminders = reminderCount;
           _dailyNoteInsight = dailyNoteInsight;
           _remindersInsight = remindersInsight;
+          _calendarInsight = calendarInsight;
         });
       }
     } catch (_) {}
@@ -392,8 +343,6 @@ class _FocusScreenState extends State<FocusScreen> {
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
 
-    final timeSlot = ImageOverlayColors.getTimeSlot();
-    final greetingText = _generateRandomGreeting(timeSlot);
     final isDarkTheme = appThemeNotifier.value.isDark;
 
     SystemChrome.setSystemUIOverlayStyle(
@@ -484,70 +433,61 @@ class _FocusScreenState extends State<FocusScreen> {
                       .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                 ),
 
-                // ── Greeting Section ──
-                const SizedBox(height: 24),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          width: 2,
-                          color: U.border,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _userName.isEmpty ? greetingText : '$greetingText, $_userName.',
-                                style: GoogleFonts.newsreader(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w400,
-                                  fontStyle: FontStyle.italic,
-                                  color: U.text,
-                                  letterSpacing: -0.3,
-                                  height: 1.2,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _quote,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w400,
-                                  color: U.sub,
-                                  height: 1.5,
-                                  letterSpacing: 0.1,
-                                ),
-                              ),
-                            ],
+                // ── Greeting Section (Now containing only the Daily Quote) ──
+                if (_quote.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 2,
+                            color: U.border,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _quote,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w400,
+                                    color: U.sub,
+                                    height: 1.5,
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ).animate()
-                    .fadeIn(delay: 300.ms, duration: 500.ms)
-                    .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
-
-                const SizedBox(height: 28),
+                  ).animate()
+                      .fadeIn(delay: 300.ms, duration: 500.ms)
+                      .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
+                  const SizedBox(height: 28),
+                ] else ...[
+                  const SizedBox(height: 24),
+                ],
 
                 // ── Feature Cards (2+1 Grid) ──
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
-                      // Top row: Daily Note + Reminders
+                      // Top row: Habit Tracker + Reminders
                       Row(
                         children: [
                           Expanded(
                             child: _FeatureCard(
-                              title: 'Daily Note',
-                              description: 'Write thoughts.',
+                              title: 'Habit Tracker',
+                              description: 'Build habits.',
                               icon: Icons.event_repeat_rounded,
                               svgAsset: 'assets/icons/routine_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
                               iconColor: U.blue,
@@ -556,7 +496,7 @@ class _FocusScreenState extends State<FocusScreen> {
                               delay: 400,
                               onTap: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const DailyNoteScreen()),
+                                MaterialPageRoute(builder: (_) => const HabitTrackerScreen()),
                               ).then((_) => _loadData()),
                             ),
                           ),
@@ -579,6 +519,42 @@ class _FocusScreenState extends State<FocusScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _FeatureCard(
+                              title: 'Google Calendar',
+                              description: 'Manage schedule.',
+                              icon: Icons.calendar_today_rounded,
+                              iconColor: U.gold,
+                              statLabel: _calendarInsight,
+                              statColor: U.gold,
+                              delay: 600,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const CalendarScreen()),
+                              ).then((_) => _loadData()),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _FeatureCard(
+                              title: 'Rockets',
+                              description: 'Neural TTS reading.',
+                              icon: Icons.rocket_launch_rounded,
+                              iconColor: U.peach,
+                              statLabel: 'Active sessions',
+                              statColor: U.peach,
+                              delay: 700,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const RocketsScreen()),
+                              ).then((_) => _loadData()),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -589,28 +565,6 @@ class _FocusScreenState extends State<FocusScreen> {
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: NewsBriefDashboardCard(),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Activity (full width)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _FeatureCard(
-                    title: 'Activity',
-                    description: 'Track habits.',
-                    icon: Icons.grid_view_rounded,
-                    svgAsset: 'assets/icons/full_stacked_bar_chart_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                    iconColor: U.peach,
-                    statLabel: '$_activeHabits habits active',
-                    statColor: U.peach,
-                    delay: 600,
-                    isWide: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const HeatmapHomeScreen()),
-                    ).then((_) => _loadData()),
-                  ),
                 ),
 
                 // Bottom padding for nav bar

@@ -1,12 +1,17 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/focus_models.dart';
 import 'focus_database_service.dart';
 import 'notification_service.dart';
+import 'reminder_calendar_bridge.dart';
 
 /// Manages the dedicated Focus Supabase project.
 ///
@@ -57,6 +62,8 @@ class FocusSupabaseService {
   }
 
   bool get isInitialized => _initialized;
+
+  supa.SupabaseClient? get client => _client;
 
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
@@ -426,7 +433,7 @@ class FocusSupabaseService {
     return _db.getReminders(userId);
   }
 
-  Future<void> saveReminder(FocusReminder reminder) async {
+  Future<void> saveReminder(FocusReminder reminder, {bool? syncToCalendar}) async {
     final reminderWithId = reminder.copyWith(
       id: reminder.id ?? _uuid.v4(),
       syncStatus: 'pending',
@@ -451,9 +458,26 @@ class FocusSupabaseService {
         debugPrint('Focus Supabase reminder sync failed: $e');
       }
     }
+
+    // Trigger Google Calendar sync bridge
+    await ReminderCalendarBridge.instance.onReminderSaved(reminderWithId, syncToCalendar: syncToCalendar);
+  }
+
+  Future<void> updateReminderGcalIdOnly(String reminderId, String? gcalEventId) async {
+    await _db.updateReminderGcalId(reminderId, gcalEventId);
+    
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('reminders').update({'gcal_event_id': gcalEventId}).eq('id', reminderId);
+      } catch (e) {
+        debugPrint('Focus Supabase updateReminderGcalIdOnly failed: $e');
+      }
+    }
   }
 
   Future<void> deleteReminder(String reminderId) async {
+    final reminder = await _db.getReminder(reminderId);
+
     await _db.deleteReminder(reminderId);
 
     // Cancel any scheduled local notifications
@@ -465,6 +489,10 @@ class FocusSupabaseService {
       } catch (e) {
         debugPrint('Focus Supabase reminder delete failed: $e');
       }
+    }
+
+    if (reminder != null) {
+      await ReminderCalendarBridge.instance.onReminderDeleted(reminder);
     }
   }
 
@@ -620,5 +648,264 @@ class FocusSupabaseService {
 
   String _dateStr(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  // ──────────────────────────── New Habits Tracker (Loop) ────────────────────────────
+
+  Future<FocusHabit> saveHabit(FocusHabit habit) async {
+    final now = DateTime.now();
+    final habitWithId = habit.copyWith(
+      id: habit.id.isEmpty ? _uuid.v4() : habit.id,
+      syncStatus: 'pending',
+      updatedAt: now,
+      createdAt: habit.createdAt,
+    );
+    await _db.saveHabit(habitWithId);
+    return habitWithId;
+  }
+
+  Future<void> deleteHabit(String id) async {
+    await _db.deleteHabit(id);
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('habits').delete().eq('id', id);
+        await _client!.from('habit_records').delete().eq('habit_id', id);
+      } catch (e) {
+        debugPrint('Supabase delete habit failed: $e');
+      }
+    }
+  }
+
+  Future<HabitRecord> saveRecord(HabitRecord record) async {
+    final recordWithId = record.copyWith(
+      id: record.id.isEmpty ? _uuid.v4() : record.id,
+      syncStatus: 'pending',
+      updatedAt: DateTime.now(),
+    );
+    await _db.saveRecord(recordWithId);
+    return recordWithId;
+  }
+
+  Future<void> deleteRecord(String habitId, String date) async {
+    await _db.deleteRecord(habitId, date);
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('habit_records').delete().match({
+          'habit_id': habitId,
+          'date': date,
+        });
+      } catch (e) {
+        debugPrint('Supabase delete record failed: $e');
+      }
+    }
+  }
+
+  Future<List<FocusHabit>> getHabits({bool includeArchived = false}) async {
+    final userId = _userId;
+    if (userId.isEmpty) return [];
+    return _db.getHabits(userId, includeArchived: includeArchived);
+  }
+
+  Future<FocusHabit?> getHabit(String id) async {
+    return _db.getHabit(id);
+  }
+
+  Future<List<HabitRecord>> getRecordsForHabit(String habitId) async {
+    return _db.getRecordsForHabit(habitId);
+  }
+
+  Future<HabitRecord?> getRecord(String habitId, String date) async {
+    return _db.getRecord(habitId, date);
+  }
+
+  // ──────────────────────────── New Caching & Synchronization ────────────────────────────
+
+  Future<void> performManualSync() async {
+    final userId = _userId;
+    if (userId.isEmpty) return;
+    await initialize();
+    if (!_initialized || _client == null) return;
+
+    try {
+      debugPrint('Focus Supabase Sync: Starting manual sync upload and download...');
+
+      // 1. Upload pending habits
+      final pendingHabits = await _db.getPendingHabits();
+      for (final h in pendingHabits) {
+        try {
+          await _client!.from('habits').upsert(h.toSupabaseMap(), onConflict: 'id');
+          await _db.markHabitSynced(h.id);
+        } catch (e) {
+          debugPrint('Sync upload habit ${h.id} failed: $e');
+        }
+      }
+
+      // 2. Upload pending records
+      final pendingRecords = await _db.getPendingRecords();
+      for (final r in pendingRecords) {
+        try {
+          await _client!.from('habit_records').upsert(r.toSupabaseMap(), onConflict: 'id');
+          await _db.markRecordSynced(r.id);
+        } catch (e) {
+          debugPrint('Sync upload record ${r.id} failed: $e');
+        }
+      }
+
+      // 3. Download habits from cloud
+      final remoteHabitsResponse = await _client!.from('habits').select().eq('user_id', userId);
+      if (remoteHabitsResponse != null) {
+        final List<dynamic> rows = remoteHabitsResponse;
+        for (final row in rows) {
+          final remoteHabit = FocusHabit.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          final localHabit = await _db.getHabit(remoteHabit.id);
+          if (localHabit == null || remoteHabit.updatedAt.isAfter(localHabit.updatedAt)) {
+            await _db.saveHabit(remoteHabit);
+          }
+        }
+      }
+
+      // 4. Download records from cloud
+      final remoteRecordsResponse = await _client!.from('habit_records').select().eq('user_id', userId);
+      if (remoteRecordsResponse != null) {
+        final List<dynamic> rows = remoteRecordsResponse;
+        for (final row in rows) {
+          final remoteRecord = HabitRecord.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          final localRecord = await _db.getRecord(remoteRecord.habitId, remoteRecord.date);
+          if (localRecord == null || remoteRecord.updatedAt.isAfter(localRecord.updatedAt)) {
+            await _db.saveRecord(remoteRecord);
+          }
+        }
+      }
+
+      // Save last sync time in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('focus_last_sync_time', DateTime.now().toIso8601String());
+      debugPrint('Focus Supabase Sync: Finished manual sync successfully!');
+    } catch (e) {
+      debugPrint('Focus Supabase Sync: manual sync failed: $e');
+    }
+  }
+
+  Future<void> checkAndWeeklyAutoSync() async {
+    final userId = _userId;
+    if (userId.isEmpty) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSyncStr = prefs.getString('focus_last_sync_time');
+      bool needsSync = false;
+
+      if (lastSyncStr == null) {
+        needsSync = true;
+      } else {
+        final lastSync = DateTime.parse(lastSyncStr);
+        final difference = DateTime.now().difference(lastSync).inDays;
+        if (difference >= 7) {
+          needsSync = true;
+        }
+      }
+
+      if (needsSync) {
+        debugPrint('Focus Supabase Sync: Weekly auto-sync check triggered a sync!');
+        // Trigger sync asynchronously in background
+        performManualSync();
+      } else {
+        debugPrint('Focus Supabase Sync: Weekly auto-sync checked, not needed yet.');
+      }
+    } catch (e) {
+      debugPrint('Focus Supabase Sync: checkAndWeeklyAutoSync failed: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> exportHabitsBackupData() async {
+    final userId = _userId;
+    if (userId.isEmpty) throw Exception('User not logged in');
+
+    final habits = await _db.getHabits(userId, includeArchived: true);
+    final List<Map<String, dynamic>> recordsList = [];
+    
+    for (final h in habits) {
+      final recs = await _db.getRecordsForHabit(h.id);
+      recordsList.addAll(recs.map((r) => r.toMap()));
+    }
+
+    final backupData = {
+      'backup_version': 1,
+      'exported_at': DateTime.now().toIso8601String(),
+      'habits': habits.map((h) => h.toMap()).toList(),
+      'records': recordsList,
+    };
+
+    final jsonStr = jsonEncode(backupData);
+    final bytes = utf8.encode(jsonStr);
+    
+    bool savedDirectly = false;
+    String savedPath = '';
+
+    try {
+      Directory? downloadsDir;
+      if (Platform.isAndroid) {
+        downloadsDir = Directory('/storage/emulated/0/Download');
+      } else {
+        downloadsDir = await getDownloadsDirectory();
+      }
+
+      if (downloadsDir != null && await downloadsDir.exists()) {
+        final file = File('${downloadsDir.path}/utopia_habits_backup.json');
+        await file.writeAsString(jsonStr);
+        savedPath = file.path;
+        savedDirectly = true;
+        debugPrint('Focus Supabase: Saved backup directly to Downloads: $savedPath');
+      }
+    } catch (e) {
+      debugPrint('Focus Supabase: Direct save to Downloads failed ($e), falling back to temp file...');
+    }
+
+    // If direct save failed or downloads dir didn't exist, write to temporary file
+    if (!savedDirectly) {
+      try {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/utopia_habits_backup.json');
+        await file.writeAsString(jsonStr);
+        savedPath = file.path;
+      } catch (e) {
+        debugPrint('Focus Supabase: Temp file write failed: $e');
+      }
+    }
+
+    return {
+      'path': savedPath,
+      'savedDirectlyToDownloads': savedDirectly,
+      'bytes': bytes,
+    };
+  }
+
+  Future<bool> importHabitsFromJson(String jsonContent) async {
+    final userId = _userId;
+    if (userId.isEmpty) throw Exception('User not logged in');
+
+    final Map<String, dynamic> data = jsonDecode(jsonContent);
+    if (!data.containsKey('habits') || !data.containsKey('records')) {
+      throw Exception('Invalid backup file format');
+    }
+
+    final habitsJson = data['habits'] as List<dynamic>;
+    final recordsJson = data['records'] as List<dynamic>;
+
+    // 1. Import habits
+    for (final hMap in habitsJson) {
+      final habit = FocusHabit.fromMap(hMap as Map<String, dynamic>);
+      final correctedHabit = habit.copyWith(userId: userId, syncStatus: 'pending');
+      await _db.saveHabit(correctedHabit);
+    }
+
+    // 2. Import records
+    for (final rMap in recordsJson) {
+      final record = HabitRecord.fromMap(rMap as Map<String, dynamic>);
+      final correctedRecord = record.copyWith(userId: userId, syncStatus: 'pending');
+      await _db.saveRecord(correctedRecord);
+    }
+
+    return true;
+  }
 
 }

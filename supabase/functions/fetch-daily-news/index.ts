@@ -27,12 +27,15 @@ serve(async (req) => {
   }
 
   try {
-    const hasGroqKey = Deno.env.get("GROQ_API_KEY") ||
-      Deno.env.get("GROQ_API_KEY_2") ||
-      Deno.env.get("GROQ_API_KEY_3") ||
-      Deno.env.get("GROQ_API_KEY_4") ||
-      Deno.env.get("GROQ_API_KEY_5");
-    if (!hasGroqKey || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    const keys = [
+      Deno.env.get("GROQ_API_KEY"),
+      Deno.env.get("GROQ_API_KEY_2"),
+      Deno.env.get("GROQ_API_KEY_3"),
+      Deno.env.get("GROQ_API_KEY_4"),
+      Deno.env.get("GROQ_API_KEY_5"),
+    ].filter((k): k is string => typeof k === "string" && k.trim() !== "");
+
+    if (keys.length === 0 || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Missing system environment variables (At least one GROQ_API_KEY, DB_URL, and DB_SERVICE_KEY is required).");
     }
 
@@ -58,15 +61,38 @@ serve(async (req) => {
     console.log(`Fetched ${rawArticles.length} raw articles to curate.`);
     debugLogs.push(`Fetched ${rawArticles.length} raw articles successfully.`);
 
+    console.log("Screening articles via Groq...");
+    const screenedArticles = await screenTitles(rawArticles, keys, debugLogs);
+    console.log(`Screened articles: ${screenedArticles.length} remaining out of ${rawArticles.length}.`);
+    debugLogs.push(`Screened articles: ${screenedArticles.length} remaining out of ${rawArticles.length}.`);
+
     console.log("Invoking Groq model for AI curation...");
-    const curatedArticles = rawArticles.slice(0, 30);
-    debugLogs.push(`Streamlined input to top ${curatedArticles.length} balanced articles.`);
-    const briefings = await curateWithGroq(curatedArticles, activeCategories, debugLogs);
+    const briefings = await curateWithGroq(screenedArticles, activeCategories, debugLogs);
     console.log(`Groq generated ${briefings.length} curated news briefings.`);
     debugLogs.push(`Groq generated ${briefings.length} briefs.`);
 
+    // Post-curation deduplication step
+    const seenBriefingHeadlines = new Set<string>();
+    const deduplicatedBriefings: CuratedBrief[] = [];
+    let removedCount = 0;
+    for (const b of briefings) {
+      if (!b.headline) {
+        deduplicatedBriefings.push(b);
+        continue;
+      }
+      const normalizedHeadline = b.headline.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (seenBriefingHeadlines.has(normalizedHeadline)) {
+        removedCount++;
+      } else {
+        seenBriefingHeadlines.add(normalizedHeadline);
+        deduplicatedBriefings.push(b);
+      }
+    }
+    console.log(`Deduplication removed ${removedCount} duplicate briefings.`);
+    debugLogs.push(`Deduplication removed ${removedCount} duplicate briefings.`);
+
     // Filter out any brief where headline is empty or null/undefined, or summary is empty or null/undefined. Never insert blank articles.
-    const validBriefings = briefings.filter((b) => {
+    const validBriefings = deduplicatedBriefings.filter((b) => {
       const hasHeadline = b.headline && b.headline.trim() !== "";
       const hasSummary = b.summary && b.summary.trim() !== "";
       return hasHeadline && hasSummary;
@@ -303,7 +329,20 @@ async function fetchRSSLayer(debugLogs: string[]): Promise<any[]> {
     { name: "The Hindu Science", url: "https://www.thehindu.com/sci-tech/science/feeder/default.rss" },
     { name: "NDTV Top Stories", url: "https://feeds.feedburner.com/ndtvnews-top-stories" },
     { name: "Wired", url: "https://www.wired.com/feed/rss" },
-    { name: "MIT Tech Review", url: "https://www.technologyreview.com/feed/" }
+    { name: "MIT Tech Review", url: "https://www.technologyreview.com/feed/" },
+    { name: "Reuters Science", url: "https://feeds.reuters.com/reuters/scienceNews" },
+    { name: "Reuters Entertainment", url: "https://feeds.reuters.com/reuters/entertainment" },
+    { name: "CNN World", url: "https://rss.cnn.com/rss/edition.rss" },
+    { name: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
+    { name: "BBC Health", url: "https://feeds.bbci.co.uk/news/health/rss.xml" },
+    { name: "The Verge", url: "https://www.theverge.com/rss/index.xml" },
+    { name: "Gizmodo", url: "https://gizmodo.com/rss" },
+    { name: "Engadget", url: "https://www.engadget.com/rss.xml" },
+    { name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index" },
+    { name: "Variety", url: "https://variety.com/feed/" },
+    { name: "Space.com", url: "https://www.space.com/feeds/all" },
+    { name: "Economic Times India", url: "https://economictimes.indiatimes.com/rssfeedstopstories.cms" },
+    { name: "Times of India", url: "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms" }
   ];
 
   console.log(`[Layer 1 RSS] Fetching ${rssFeeds.length} feeds directly in parallel...`);
@@ -483,6 +522,146 @@ interface CuratedBrief {
 }
 
 /**
+ * Screens article titles using Groq to filter out articles that are not worth curating
+ */
+async function screenTitles(articles: any[], keys: string[], debugLogs: string[]): Promise<any[]> {
+  if (articles.length === 0) {
+    return [];
+  }
+  if (keys.length === 0) {
+    console.error("No Groq API keys available in environment for screening.");
+    debugLogs.push("No Groq API keys available in environment for screening.");
+    return articles;
+  }
+
+  // Takes up to 96 articles
+  const listToScreen = articles.slice(0, 96);
+  const simplified = listToScreen.map((art, index) => ({
+    index: index,
+    title: art.title || ""
+  }));
+
+  const promptText = `You are UTOPIA's Daily AI News Screening Assistant. Your job is to review a list of article titles and select only those that are newsworthy, factual, and suitable for a high-quality, student-focused news briefing.
+
+Screening Rules:
+- SELECT articles that are: newsworthy, factual reports of events, scientific discoveries, space missions, tech developments, official policy agreements, economic stats, movie/entertainment releases, or sporting events.
+- DO NOT SELECT (FILTER OUT) articles that are:
+  - Opinion pieces, editorials, or columns
+  - Lifestyle articles, tips, self-help, how-to guides, advice, recipes, or lists (e.g., "5 ways to...", "How to stay healthy...")
+  - Social media drama, celebrity gossip, influencer outrage, or platform controversies
+  - Crime, shootings, killings, violence, war tragedies, deaths, or highly depressing events
+  - Speculative rumors, vague claims, or political blame/attacks
+- SKIP words commonly associated with sensationalism or outrage (e.g. blast, outrage, controversy, disgraceful).
+
+Input format: A JSON array of objects with an 'index' and a 'title'.
+Output format: You MUST output the result as a strict, valid JSON object matching the following schema, with no markdown code blocks, backticks, or extra text:
+{
+  "selected_indices": number[]
+}
+
+Here are the articles to screen:
+${JSON.stringify(simplified, null, 2)}`;
+
+  const url = "https://api.groq.com/openai/v1/chat/completions";
+  let currentKeyIndex = 0;
+  let success = false;
+  let selectedIndices: number[] = [];
+
+  for (let offset = 0; offset < keys.length; offset++) {
+    const i = (currentKeyIndex + offset) % keys.length;
+    const currentKey = keys[i];
+    const maskedKey = currentKey.length > 12
+      ? `${currentKey.substring(0, 8)}...${currentKey.substring(currentKey.length - 4)}`
+      : "Invalid Key Length";
+
+    console.log(`[Groq Title Screening] Attempting screening with Key ${i + 1}/${keys.length} (${maskedKey})...`);
+    debugLogs.push(`Attempting Groq Screening with Key ${i + 1}/${keys.length} (${maskedKey})...`);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${currentKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            {
+              role: "user",
+              content: promptText
+            }
+          ],
+          response_format: {
+            type: "json_object"
+          }
+        })
+      });
+
+      console.log(`[Groq Title Screening] HTTP Status: ${response.status} (OK: ${response.ok})`);
+      debugLogs.push(`Groq Screening HTTP Status: ${response.status}`);
+
+      if (response.status === 429) {
+        console.warn(`[Groq Title Screening] Key ${i + 1} is exhausted (Rate Limited - 429). Rotating...`);
+        debugLogs.push(`Screening Key ${i + 1} Rate Limited (429). Rotating...`);
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[Groq Title Screening] Key ${i + 1} failed with status ${response.status}: ${errorText}. Rotating...`);
+        debugLogs.push(`Screening Key ${i + 1} failed with status ${response.status}: ${errorText.substring(0, 150)}`);
+        continue;
+      }
+
+      const result = await response.json();
+      const rawText = result.choices?.[0]?.message?.content;
+      if (!rawText) {
+        console.warn(`[Groq Title Screening] Key ${i + 1} returned empty content. Rotating...`);
+        debugLogs.push(`Screening Key ${i + 1} returned empty content.`);
+        continue;
+      }
+
+      console.log(`[Groq Title Screening] Screening successful using Key ${i + 1}!`);
+      debugLogs.push(`Screening successful using Key ${i + 1}!`);
+
+      let cleanText = rawText.trim();
+      if (cleanText.startsWith("```json")) {
+        cleanText = cleanText.substring(7);
+      } else if (cleanText.startsWith("```")) {
+        cleanText = cleanText.substring(3);
+      }
+      if (cleanText.endsWith("```")) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
+      }
+      cleanText = cleanText.trim();
+
+      const parsed = JSON.parse(cleanText);
+      if (parsed && Array.isArray(parsed.selected_indices)) {
+        selectedIndices = parsed.selected_indices;
+      }
+      success = true;
+      break;
+    } catch (e) {
+      console.error(`[Groq Title Screening] Exception caught with Key ${i + 1}:`, e);
+      debugLogs.push(`Screening Key ${i + 1} caught exception: ${e.message || e}`);
+    }
+  }
+
+  if (!success) {
+    console.error("[Groq Title Screening] All available Groq API keys were exhausted or failed for screening.");
+    debugLogs.push("All available Groq API keys were exhausted or failed for screening. Returning all articles as fallback.");
+    return listToScreen;
+  }
+
+  // Filter the original articles array based on selected indices
+  const filteredArticles = listToScreen.filter((_, index) => selectedIndices.includes(index));
+  console.log(`[Groq Title Screening] Filtered articles from ${listToScreen.length} down to ${filteredArticles.length}`);
+  debugLogs.push(`Screening filtered articles from ${listToScreen.length} down to ${filteredArticles.length}`);
+  return filteredArticles;
+}
+
+/**
  * Curates raw articles into standard structured briefs using Groq Llama-3.3-70b-versatile with automatic key rotation
  */
 /**
@@ -510,18 +689,15 @@ async function curateWithGroq(articles: any[], activeCategories: any[], debugLog
     return [];
   }
 
-  // Maximum of 30 total articles
-  const curatedArticles = articles.slice(0, 30);
-
   // Split into batches of 10 articles each
   const batchSize = 10;
   const batches: any[][] = [];
-  for (let i = 0; i < curatedArticles.length; i += batchSize) {
-    batches.push(curatedArticles.slice(i, i + batchSize));
+  for (let i = 0; i < articles.length; i += batchSize) {
+    batches.push(articles.slice(i, i + batchSize));
   }
 
-  console.log(`[Curation Engine] Curating ${curatedArticles.length} articles in ${batches.length} batches of 10...`);
-  debugLogs.push(`Curating ${curatedArticles.length} articles in ${batches.length} batches of 10...`);
+  console.log(`[Curation Engine] Curating ${articles.length} articles in ${batches.length} batches of 10...`);
+  debugLogs.push(`Curating ${articles.length} articles in ${batches.length} batches of 10...`);
 
   const allBriefs: CuratedBrief[] = [];
   let currentKeyIndex = 0;
@@ -552,18 +728,18 @@ async function curateWithGroq(articles: any[], activeCategories: any[], debugLog
     - INCLUDE politics only for: official policy decisions, signed agreements, diplomatic meetings with concrete outcomes, election results with final numbers
     - INCLUDE india only for: infrastructure, science, economy, space, technology, development projects
     - INCLUDE world only for: international agreements, diplomatic outcomes, global events with clear factual outcomes
-    - SKIP if the headline contains words like: attack, blast, claim, outrage, removed, defeat, controversy, disgraceful, false
+    - SKIP if the headline contains words like: blast, outrage, controversy, disgraceful
     - SKIP: any article containing deaths, shootings, killings, violence, or crime in the headline or description
     - CRITICAL: If you do not have enough real articles for a category, output fewer articles for that category. Never invent placeholder articles. Never output articles with 'None' as source, headline, or summary. Only output real articles from the input. It is acceptable to output 0 articles for a category if no relevant articles exist.
     - Summary: concise and direct, maximum 2 sentences, no fluff
-    - Enforce category diversity: maximum 2 articles per category in the final output
+    - Enforce category diversity: maximum 4 articles per category in the final output
     - Minimum 6 different categories must be represented in the final output
     - Only include articles that clearly match at least one category's keywords
     
     Classify each article into exactly one of these categories based on the keywords:
     ${activeCategories.map((c: any) => `- '${c.slug}' (${c.label}): keywords — ${c.keywords.join(', ')}`).join('\n')}
     
-    Generate EXACTLY 3 briefs per category if possible.
+    Generate 4–5 briefs per category if possible.
     
     For each brief, output:
     1. "category": one of ${activeCategories.map((c: any) => `'${c.slug}'`).join(', ')}.

@@ -12,6 +12,7 @@ import '../widgets/utopia_snackbar.dart';
 import '../services/notification_service.dart';
 import '../widgets/utopia_loader.dart';
 import '../theme/image_overlay_colors.dart';
+import '../services/google_calendar_service.dart';
 
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
@@ -35,7 +36,9 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
 
   bool _reminderAppliesToDay(FocusReminder r, DateTime day) {
     final dateStr = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
-    if (r.type == 'one_time') {
+    if (r.type == 'daily') {
+      return true;
+    } else if (r.type == 'one_time') {
       return r.remindDate == dateStr;
     } else if (r.type == 'weekly') {
       final index = day.weekday - 1;
@@ -104,7 +107,7 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
   }
 
   List<FocusReminder> get _recurring {
-    return _reminders.where((r) => r.type == 'weekly' || r.type == 'monthly_date').toList();
+    return _reminders.where((r) => r.type == 'weekly' || r.type == 'monthly_date' || r.type == 'daily').toList();
   }
 
   List<FocusReminder> get _past {
@@ -158,9 +161,9 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
         fullscreenDialog: true,
         builder: (ctx) => _ReminderForm(
           existing: existing,
-          onSave: (r) async {
+          onSave: (r, syncToCalendar) async {
             Navigator.pop(ctx);
-            await _service.saveReminder(r);
+            await _service.saveReminder(r, syncToCalendar: syncToCalendar);
             if (mounted) {
               showUtopiaSnackBar(context, message: 'Reminder saved successfully!', tone: UtopiaSnackBarTone.success);
             }
@@ -927,7 +930,9 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                         child: Icon(
                           r.type == 'one_time'
                               ? Icons.event_rounded
-                              : (r.type == 'weekly' ? Icons.loop_rounded : Icons.calendar_month_rounded),
+                              : (r.type == 'daily'
+                                  ? Icons.today_rounded
+                                  : (r.type == 'weekly' ? Icons.loop_rounded : Icons.calendar_month_rounded)),
                           color: r.isCompleted ? U.sub.withValues(alpha: 0.6) : U.primary,
                           size: 18,
                         ),
@@ -948,15 +953,23 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
                               ),
                             ),
                             const SizedBox(height: 3),
-                            Text(
-                              r.scheduleSummary,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: U.sub.withValues(alpha: r.isCompleted ? 0.4 : 0.8),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
-                                decoration: r.isCompleted ? TextDecoration.lineThrough : null,
-                                decorationColor: U.sub.withValues(alpha: 0.3),
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  r.scheduleSummary,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: U.sub.withValues(alpha: r.isCompleted ? 0.4 : 0.8),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: r.isCompleted ? TextDecoration.lineThrough : null,
+                                    decorationColor: U.sub.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                if (r.gcalEventId != null) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.calendar_month_rounded, size: 12, color: U.primary.withValues(alpha: 0.8)),
+                                ],
+                              ],
                             ),
                           ],
                         ),
@@ -989,7 +1002,7 @@ class _RemindersScreenState extends State<RemindersScreen> with WidgetsBindingOb
 
 class _ReminderForm extends StatefulWidget {
   final FocusReminder? existing;
-  final Future<void> Function(FocusReminder) onSave;
+  final Future<void> Function(FocusReminder, bool syncToCalendar) onSave;
   final VoidCallback? onDelete;
 
   const _ReminderForm({this.existing, required this.onSave, this.onDelete});
@@ -1009,6 +1022,8 @@ class _ReminderFormState extends State<_ReminderForm> {
   Set<int> _activeMonths = {};
   bool _allMonths = true;
   String? _errorText;
+  bool _syncToCalendar = false;
+  bool _gcalConnected = false;
 
   @override
   void initState() {
@@ -1024,8 +1039,24 @@ class _ReminderFormState extends State<_ReminderForm> {
       _monthDay = e.monthDay ?? 1;
       _activeMonths = Set.from(e.activeMonths ?? []);
       _allMonths = e.activeMonths == null || e.activeMonths!.isEmpty;
+      _syncToCalendar = e.gcalEventId != null;
     }
     _monthDayController = TextEditingController(text: '$_monthDay');
+    _checkGcalConnection();
+  }
+
+  Future<void> _checkGcalConnection() async {
+    final connected = await GoogleCalendarService.instance.isConnected();
+    if (mounted) {
+      setState(() {
+        _gcalConnected = connected;
+        if (widget.existing != null) {
+          _syncToCalendar = widget.existing!.gcalEventId != null;
+        } else {
+          _syncToCalendar = connected;
+        }
+      });
+    }
   }
 
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -1061,8 +1092,9 @@ class _ReminderFormState extends State<_ReminderForm> {
       monthDay: _type == 'monthly_date' ? _monthDay : null,
       activeMonths: sortedMonths,
       isActive: true,
+      gcalEventId: widget.existing?.gcalEventId,
     );
-    widget.onSave(reminder);
+    widget.onSave(reminder, _syncToCalendar);
   }
 
   @override
@@ -1153,14 +1185,20 @@ class _ReminderFormState extends State<_ReminderForm> {
                   const SizedBox(height: 10),
                   
                   // Type pills
-                  Row(
-                    children: [
-                      _typePill('One-time', 'one_time'),
-                      const SizedBox(width: 8),
-                      _typePill('Weekly', 'weekly'),
-                      const SizedBox(width: 8),
-                      _typePill('Monthly', 'monthly_date'),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        _typePill('One-time', 'one_time'),
+                        const SizedBox(width: 8),
+                        _typePill('Daily', 'daily'),
+                        const SizedBox(width: 8),
+                        _typePill('Weekly', 'weekly'),
+                        const SizedBox(width: 8),
+                        _typePill('Monthly', 'monthly_date'),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   
@@ -1221,6 +1259,51 @@ class _ReminderFormState extends State<_ReminderForm> {
                   _buildTimePicker(),
                   const SizedBox(height: 28),
                   
+                  // Sync to Google Calendar switch
+                  if (_gcalConnected) ...[
+                    Container(
+                      decoration: BoxDecoration(
+                        color: U.surface.withValues(alpha: isDarkTheme ? 0.4 : 0.55),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65)),
+                      ),
+                      child: SwitchListTile(
+                        title: Text(
+                          'Sync to Google Calendar',
+                          style: GoogleFonts.outfit(color: U.text, fontSize: 14.5, fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Mirror this reminder on your Google Calendar',
+                          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                        ),
+                        value: _syncToCalendar,
+                        activeColor: U.primary,
+                        onChanged: (val) {
+                          setState(() {
+                            _syncToCalendar = val;
+                          });
+                        },
+                      ),
+                    ),
+                    if (widget.existing?.gcalEventId != null) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.link_rounded, color: U.green, size: 14),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Linked to Google Calendar',
+                              style: GoogleFonts.outfit(color: U.green, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                  ],
+
                   // Summary in card
                   Container(
                     width: double.infinity,
@@ -1306,32 +1389,30 @@ class _ReminderFormState extends State<_ReminderForm> {
   Widget _typePill(String label, String value) {
     final selected = _type == value;
     final isDarkTheme = appThemeNotifier.value.isDark;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _type = value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
+    return GestureDetector(
+      onTap: () => setState(() => _type = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? U.primary.withValues(alpha: 0.16)
+              : U.surface.withValues(alpha: isDarkTheme ? 0.35 : 0.5),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
             color: selected
-                ? U.primary.withValues(alpha: 0.16)
-                : U.surface.withValues(alpha: isDarkTheme ? 0.35 : 0.5),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? U.primary
-                  : U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65),
-              width: 1.0,
-            ),
+                ? U.primary
+                : U.border.withValues(alpha: isDarkTheme ? 0.35 : 0.65),
+            width: 1.0,
           ),
-          child: Text(
-            label,
-            style: GoogleFonts.outfit(
-              color: selected ? U.primary : U.sub,
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-            ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: selected ? U.primary : U.sub,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
           ),
         ),
       ),
@@ -1568,6 +1649,8 @@ class _ReminderFormState extends State<_ReminderForm> {
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     switch (_type) {
+      case 'daily':
+        return 'Every day at $timeStr';
       case 'one_time':
         return '${_date.day} ${months[_date.month]} ${_date.year} at $timeStr';
       case 'weekly':

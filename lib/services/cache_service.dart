@@ -19,7 +19,7 @@ class CacheService {
     final path = join(dbPath, 'utopia_cache.db');
     return openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE folders (
@@ -60,6 +60,42 @@ class CacheService {
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
             updated_at INTEGER NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE google_calendars (
+            id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            description TEXT,
+            background_color TEXT,
+            foreground_color TEXT,
+            selected INTEGER NOT NULL DEFAULT 1,
+            access_role TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE google_calendar_events (
+            id TEXT PRIMARY KEY,
+            calendar_id TEXT NOT NULL,
+            summary TEXT,
+            description TEXT,
+            location TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            is_all_day INTEGER NOT NULL DEFAULT 0,
+            timezone TEXT,
+            rrule TEXT,
+            color_id TEXT,
+            hangout_link TEXT,
+            creator_email TEXT,
+            organizer_email TEXT,
+            visibility TEXT,
+            attendees TEXT,
+            reminders TEXT,
+            attachments TEXT,
+            updated_at INTEGER NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            is_dirty INTEGER NOT NULL DEFAULT 0
           )
         ''');
       },
@@ -110,6 +146,44 @@ class CacheService {
           await db.execute(
             'ALTER TABLE github_cache RENAME TO supabase_cache',
           ).catchError((_) {});
+        }
+        if (oldVersion < 8) {
+          await db.execute('''
+            CREATE TABLE google_calendars (
+              id TEXT PRIMARY KEY,
+              summary TEXT NOT NULL,
+              description TEXT,
+              background_color TEXT,
+              foreground_color TEXT,
+              selected INTEGER NOT NULL DEFAULT 1,
+              access_role TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE google_calendar_events (
+              id TEXT PRIMARY KEY,
+              calendar_id TEXT NOT NULL,
+              summary TEXT,
+              description TEXT,
+              location TEXT,
+              start_time TEXT,
+              end_time TEXT,
+              is_all_day INTEGER NOT NULL DEFAULT 0,
+              timezone TEXT,
+              rrule TEXT,
+              color_id TEXT,
+              hangout_link TEXT,
+              creator_email TEXT,
+              organizer_email TEXT,
+              visibility TEXT,
+              attendees TEXT,
+              reminders TEXT,
+              attachments TEXT,
+              updated_at INTEGER NOT NULL,
+              is_deleted INTEGER NOT NULL DEFAULT 0,
+              is_dirty INTEGER NOT NULL DEFAULT 0
+            )
+          ''');
         }
       },
     );

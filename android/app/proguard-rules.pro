@@ -46,3 +46,17 @@
 -keepclassmembers,allowobfuscation class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
+# ── just_audio, audio_session, & ExoPlayer/Media3 ──
+# Keep ExoPlayer/Media3 classes to prevent R8 from stripping them in release builds
+-keep class com.google.android.exoplayer2.** { *; }
+-keep class androidx.media3.** { *; }
+
+# Keep just_audio and audio_session native bindings
+-keep class com.ryanheise.just_audio.** { *; }
+-keepclassmembers class com.ryanheise.just_audio.** { *; }
+-keep class com.ryanheise.audio_session.** { *; }
+-keepclassmembers class com.ryanheise.audio_session.** { *; }
+-dontwarn com.ryanheise.just_audio.**
+-dontwarn com.ryanheise.audio_session.**
+

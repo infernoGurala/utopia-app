@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+import 'dart:convert';
 import '../models/focus_models.dart';
 
 /// Local SQLite cache for Focus feature data.
@@ -28,7 +30,7 @@ class FocusDatabaseService {
     final path = p.join(dir.path, 'focus_data.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 6,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('DROP TABLE IF EXISTS daily_notes');
@@ -59,6 +61,129 @@ class FocusDatabaseService {
           try {
             await db.execute("ALTER TABLE daily_notes ADD COLUMN journal TEXT NOT NULL DEFAULT ''");
           } catch (_) {}
+        }
+        if (oldVersion < 4) {
+          await db.execute('''
+            CREATE TABLE habits (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              name TEXT NOT NULL,
+              description TEXT,
+              type TEXT NOT NULL,
+              target_value REAL NOT NULL DEFAULT 1.0,
+              unit TEXT,
+              frequency_type TEXT NOT NULL,
+              frequency_value INTEGER NOT NULL DEFAULT 1,
+              days_of_week TEXT,
+              reminder_time TEXT,
+              color TEXT NOT NULL DEFAULT '#08BB68',
+              is_archived INTEGER NOT NULL DEFAULT 0,
+              sync_status TEXT NOT NULL DEFAULT 'pending',
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE habit_records (
+              id TEXT PRIMARY KEY,
+              habit_id TEXT NOT NULL,
+              user_id TEXT NOT NULL,
+              date TEXT NOT NULL,
+              value REAL NOT NULL DEFAULT 0.0,
+              target_value REAL NOT NULL DEFAULT 1.0,
+              completed INTEGER NOT NULL DEFAULT 0,
+              note TEXT,
+              sync_status TEXT NOT NULL DEFAULT 'pending',
+              updated_at TEXT NOT NULL,
+              UNIQUE(habit_id, date)
+            )
+          ''');
+          await db.execute('CREATE INDEX idx_habit_records_date ON habit_records(user_id, date)');
+          await db.execute('CREATE INDEX idx_habit_records_habit_date ON habit_records(habit_id, date)');
+
+          // Data migration from focus_user_habits and habit_completions
+          const uuid = Uuid();
+          try {
+            final userHabitsRows = await db.query('focus_user_habits');
+            for (final row in userHabitsRows) {
+              final userId = row['user_id'] as String;
+              final habitsJson = row['habits'] as String? ?? '[]';
+              List<dynamic> habitsList = [];
+              try {
+                habitsList = jsonDecode(habitsJson) as List;
+              } catch (_) {}
+
+              for (final habitNameDyn in habitsList) {
+                final habitName = habitNameDyn.toString().trim();
+                if (habitName.isEmpty) continue;
+
+                final habitId = uuid.v4();
+                final nowIso = DateTime.now().toIso8601String();
+
+                // Insert into new habits table
+                await db.insert('habits', {
+                  'id': habitId,
+                  'user_id': userId,
+                  'name': habitName,
+                  'description': 'Daily habit',
+                  'type': 'binary',
+                  'target_value': 1.0,
+                  'unit': null,
+                  'frequency_type': 'daily',
+                  'frequency_value': 1,
+                  'days_of_week': null,
+                  'reminder_time': null,
+                  'color': '#08BB68',
+                  'is_archived': 0,
+                  'sync_status': 'pending',
+                  'created_at': nowIso,
+                  'updated_at': nowIso,
+                });
+
+                // Retrieve historical checks for this task_name and user_id
+                final completions = await db.query(
+                  'habit_completions',
+                  where: 'user_id = ? AND task_name = ?',
+                  whereArgs: [userId, habitName.toLowerCase().trim()],
+                );
+
+                for (final comp in completions) {
+                  final date = comp['date'] as String;
+                  final completed = comp['completed'] as int? ?? 0;
+                  
+                  await db.insert('habit_records', {
+                    'id': uuid.v4(),
+                    'habit_id': habitId,
+                    'user_id': userId,
+                    'date': date,
+                    'value': completed == 1 ? 1.0 : 0.0,
+                    'target_value': 1.0,
+                    'completed': completed,
+                    'note': null,
+                    'sync_status': 'pending',
+                    'updated_at': nowIso,
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            print('Migration to version 4 error/warning: $e');
+          }
+        }
+        if (oldVersion < 5) {
+          try {
+            await db.execute('ALTER TABLE reminders ADD COLUMN gcal_event_id TEXT');
+          } catch (e) {
+            print('Migration to version 5 error/warning: $e');
+          }
+        }
+        if (oldVersion < 6) {
+          try {
+            await db.execute('ALTER TABLE reminders ADD COLUMN description TEXT');
+            await db.execute('ALTER TABLE reminders ADD COLUMN habit_id TEXT');
+          } catch (e) {
+            print('Migration to version 6 error/warning: $e');
+          }
         }
       },
       onCreate: (db, version) async {
@@ -112,6 +237,8 @@ class FocusDatabaseService {
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             label TEXT NOT NULL,
+            description TEXT,
+            habit_id TEXT,
             type TEXT NOT NULL,
             reminder_time TEXT NOT NULL,
             remind_date TEXT,
@@ -121,7 +248,8 @@ class FocusDatabaseService {
             is_active INTEGER NOT NULL DEFAULT 1,
             sync_status TEXT NOT NULL DEFAULT 'pending',
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
+            updated_at TEXT NOT NULL,
+            gcal_event_id TEXT
           )
         ''');
         await db.execute('''
@@ -136,6 +264,45 @@ class FocusDatabaseService {
             updated_at TEXT NOT NULL
           )
         ''');
+
+        // Create habits and habit_records tables directly for version 4 fresh installations
+        await db.execute('''
+          CREATE TABLE habits (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            type TEXT NOT NULL,
+            target_value REAL NOT NULL DEFAULT 1.0,
+            unit TEXT,
+            frequency_type TEXT NOT NULL,
+            frequency_value INTEGER NOT NULL DEFAULT 1,
+            days_of_week TEXT,
+            reminder_time TEXT,
+            color TEXT NOT NULL DEFAULT '#08BB68',
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            sync_status TEXT NOT NULL DEFAULT 'pending',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE habit_records (
+            id TEXT PRIMARY KEY,
+            habit_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            value REAL NOT NULL DEFAULT 0.0,
+            target_value REAL NOT NULL DEFAULT 1.0,
+            completed INTEGER NOT NULL DEFAULT 0,
+            note TEXT,
+            sync_status TEXT NOT NULL DEFAULT 'pending',
+            updated_at TEXT NOT NULL,
+            UNIQUE(habit_id, date)
+          )
+        ''');
+        await db.execute('CREATE INDEX idx_habit_records_date ON habit_records(user_id, date)');
+        await db.execute('CREATE INDEX idx_habit_records_habit_date ON habit_records(habit_id, date)');
       },
     );
   }
@@ -403,6 +570,28 @@ class FocusDatabaseService {
     await db.delete('reminders', where: 'id = ?', whereArgs: [reminderId]);
   }
 
+  Future<FocusReminder?> getReminder(String id) async {
+    final db = await database;
+    final results = await db.query(
+      'reminders',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return FocusReminder.fromMap(results.first);
+  }
+
+  Future<void> updateReminderGcalId(String reminderId, String? gcalEventId) async {
+    final db = await database;
+    await db.update(
+      'reminders',
+      {'gcal_event_id': gcalEventId},
+      where: 'id = ?',
+      whereArgs: [reminderId],
+    );
+  }
+
   // ──────────────────────────── Templates ────────────────────────────
 
   Future<String?> getUserTemplate(String userId) async {
@@ -499,6 +688,141 @@ class FocusDatabaseService {
       {'sync_status': 'synced'},
       where: 'id = ?',
       whereArgs: [reminderId],
+    );
+  }
+
+  // ──────────────────────────── New Habits Tracker (Loop) ────────────────────────────
+
+  Future<List<FocusHabit>> getHabits(String userId, {bool includeArchived = false}) async {
+    final db = await database;
+    final results = await db.query(
+      'habits',
+      where: includeArchived ? 'user_id = ?' : 'user_id = ? AND is_archived = 0',
+      whereArgs: [userId],
+      orderBy: 'created_at ASC',
+    );
+    return results.map(FocusHabit.fromMap).toList();
+  }
+
+  Future<FocusHabit?> getHabit(String id) async {
+    final db = await database;
+    final results = await db.query(
+      'habits',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return FocusHabit.fromMap(results.first);
+  }
+
+  Future<void> saveHabit(FocusHabit habit) async {
+    final db = await database;
+    await db.insert(
+      'habits',
+      habit.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteHabit(String id) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('habits', where: 'id = ?', whereArgs: [id]);
+      await txn.delete('habit_records', where: 'habit_id = ?', whereArgs: [id]);
+    });
+  }
+
+  Future<List<HabitRecord>> getRecordsForHabit(String habitId) async {
+    final db = await database;
+    final results = await db.query(
+      'habit_records',
+      where: 'habit_id = ?',
+      whereArgs: [habitId],
+      orderBy: 'date ASC',
+    );
+    return results.map(HabitRecord.fromMap).toList();
+  }
+
+  Future<List<HabitRecord>> getRecordsForUser(String userId, String date) async {
+    final db = await database;
+    final results = await db.query(
+      'habit_records',
+      where: 'user_id = ? AND date = ?',
+      whereArgs: [userId, date],
+    );
+    return results.map(HabitRecord.fromMap).toList();
+  }
+
+  Future<HabitRecord?> getRecord(String habitId, String date) async {
+    final db = await database;
+    final results = await db.query(
+      'habit_records',
+      where: 'habit_id = ? AND date = ?',
+      whereArgs: [habitId, date],
+      limit: 1,
+    );
+    if (results.isEmpty) return null;
+    return HabitRecord.fromMap(results.first);
+  }
+
+  Future<void> saveRecord(HabitRecord record) async {
+    final db = await database;
+    await db.insert(
+      'habit_records',
+      record.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteRecord(String habitId, String date) async {
+    final db = await database;
+    await db.delete(
+      'habit_records',
+      where: 'habit_id = ? AND date = ?',
+      whereArgs: [habitId, date],
+    );
+  }
+
+  // ──────────────────────────── New Pending Sync (Loop) ────────────────────────────
+
+  Future<List<FocusHabit>> getPendingHabits() async {
+    final db = await database;
+    final results = await db.query(
+      'habits',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+    return results.map(FocusHabit.fromMap).toList();
+  }
+
+  Future<List<HabitRecord>> getPendingRecords() async {
+    final db = await database;
+    final results = await db.query(
+      'habit_records',
+      where: 'sync_status = ?',
+      whereArgs: ['pending'],
+    );
+    return results.map(HabitRecord.fromMap).toList();
+  }
+
+  Future<void> markHabitSynced(String id) async {
+    final db = await database;
+    await db.update(
+      'habits',
+      {'sync_status': 'synced'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> markRecordSynced(String id) async {
+    final db = await database;
+    await db.update(
+      'habit_records',
+      {'sync_status': 'synced'},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 }
