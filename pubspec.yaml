@@ -1,7 +1,7 @@
 name: utopia_app
 description: UTOPIA student notes app.
 publish_to: 'none'
-version: 3.4.1+24
+version: 3.5.0+28
 
 environment:
   sdk: ^3.11.3
@@ -73,10 +73,15 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - assets/welcome_bg/one_light/
+    - assets/daily/
+    - assets/university/
+    - assets/semesters/
     - assets/focus screen/
     - assets/apps_icons/
     - assets/icon_cropped.png
     - assets/icons/
+    - assets/voices/
   fonts:
     - family: OrangeAvenue
       fonts:

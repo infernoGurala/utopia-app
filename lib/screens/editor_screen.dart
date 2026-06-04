@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +9,7 @@ import '../services/file_upload_service.dart';
 import '../services/supabase_notes_service.dart';
 import '../services/supabase_global_service.dart';
 import '../widgets/genz_loading_overlay.dart';
+import '../services/ai_service.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  Block data model
@@ -136,7 +136,6 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
   int i = 0;
 
   // Track grouped sections
-  bool inQaSection = false;
   bool inFilesSection = false;
 
   while (i < lines.length) {
@@ -151,20 +150,17 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
 
     // Detect section headings for Q&A and Files
     if (t == '# Questions' || t == '## Questions') {
-      inQaSection = true;
       inFilesSection = false;
       i++;
       continue;
     }
     if (t == '# Files' || t == '## Files') {
       inFilesSection = true;
-      inQaSection = false;
       i++;
       continue;
     }
     // New heading resets section context
     if (t.startsWith('#') && !t.startsWith('##')) {
-      inQaSection = false;
       inFilesSection = false;
     }
 
@@ -174,7 +170,9 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
       String answer = '';
       i++;
       // Skip blanks
-      while (i < lines.length && lines[i].trim().isEmpty) i++;
+      while (i < lines.length && lines[i].trim().isEmpty) {
+        i++;
+      }
       if (i < lines.length && lines[i].trim().startsWith('**A:**')) {
         answer = lines[i].trim().replaceFirst('**A:**', '').trim();
         i++;
@@ -185,27 +183,60 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
 
     // ── Q&A new inline block: Question [^Answer^](qa://encoded_answer)
     if (t.contains('[^Answer^](qa://')) {
-      final match = RegExp(r'^(.*?)\s*\[\^Answer\^\]\(qa:\/\/(.+?)\)$').firstMatch(t);
-      if (match != null) {
-        final q = match.group(1) ?? '';
-        final a = Uri.decodeComponent(match.group(2) ?? '');
-        blocks.add(EditorBlock(type: BlockType.qa, question: q, answer: a));
-        i++;
-        continue;
+      final qaIndex = t.indexOf('[^Answer^](qa://');
+      if (qaIndex != -1) {
+        var q = t.substring(0, qaIndex).trim();
+        final rest = t.substring(qaIndex + '[^Answer^](qa://'.length);
+        final closingParen = rest.indexOf(')');
+        if (closingParen != -1) {
+          final encodedVal = rest.substring(0, closingParen).trim();
+          final a = Uri.decodeComponent(encodedVal);
+          
+          // NON-DESTRUCTIVE COMBINATION:
+          // If the preceding block is a plain text block without a title,
+          // we merge its body into this question to keep the full multi-line question!
+          if (blocks.isNotEmpty && blocks.last.type == BlockType.text && blocks.last.title.isEmpty) {
+            final prevBody = blocks.last.body.trim();
+            if (prevBody.isNotEmpty) {
+              q = '$prevBody\n$q';
+              blocks.removeLast(); // remove the merged text block
+            }
+          }
+          
+          blocks.add(EditorBlock(type: BlockType.qa, question: q, answer: a));
+          i++;
+          continue;
+        }
       }
     }
 
-    // ── File link: [name](url) inside Files section
-    if (inFilesSection && t.startsWith('[')) {
-      final match = RegExp(r'\[(.+?)\]\((.+?)\)').firstMatch(t);
+    // ── File link: [name](url) inside Files section or standalone file URL
+    if (t.startsWith('[')) {
+      final match = RegExp(r'^\[(.+?)\]\((.+?)\)$').firstMatch(t);
       if (match != null) {
-        blocks.add(EditorBlock(
-          type: BlockType.file,
-          fileDisplayName: match.group(1) ?? '',
-          fileUrl: match.group(2) ?? '',
-        ));
-        i++;
-        continue;
+        final url = match.group(2) ?? '';
+        final isFile = inFilesSection ||
+            url.toLowerCase().contains('.pdf') ||
+            url.toLowerCase().contains('.docx') ||
+            url.toLowerCase().contains('.doc') ||
+            url.toLowerCase().contains('.xls') ||
+            url.toLowerCase().contains('.xlsx') ||
+            url.toLowerCase().contains('.zip') ||
+            url.toLowerCase().contains('.png') ||
+            url.toLowerCase().contains('.jpg') ||
+            url.toLowerCase().contains('.jpeg') ||
+            url.toLowerCase().contains('.gif') ||
+            url.contains('/uploads/') ||
+            url.contains('cloudinary');
+        if (isFile) {
+          blocks.add(EditorBlock(
+            type: BlockType.file,
+            fileDisplayName: match.group(1) ?? '',
+            fileUrl: url,
+          ));
+          i++;
+          continue;
+        }
       }
     }
 
@@ -335,6 +366,7 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
             next == r'$$' ||
             (next.startsWith(r'$$') && next.endsWith(r'$$') && next.length > 4) ||
             next.startsWith('**Q:**') ||
+            next.contains('[^Answer^](qa://') ||
             (next.startsWith('|') && next.endsWith('|'))) {
           break;
         }
@@ -363,6 +395,7 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
             next == r'$$' ||
             (next.startsWith(r'$$') && next.endsWith(r'$$') && next.length > 4) ||
             next.startsWith('**Q:**') ||
+            next.contains('[^Answer^](qa://') ||
             (next.startsWith('[') && RegExp(r'^\[.+?\]\(.+?\)$').hasMatch(next) && inFilesSection) ||
             (next.startsWith('|') && next.endsWith('|'))) {
           break;
@@ -387,38 +420,16 @@ List<EditorBlock> parseMarkdownToBlocks(String markdown) {
 
 /// Serialize a list of blocks back to markdown.
 String serializeBlocksToMarkdown(List<EditorBlock> blocks) {
-  // Group files and Q&A under their headings
-  final fileBlocks = blocks.where((b) => b.type == BlockType.file).toList();
-  final qaBlocks = blocks.where((b) => b.type == BlockType.qa).toList();
-  final otherBlocks = blocks.where((b) => b.type != BlockType.file && b.type != BlockType.qa).toList();
-
   final parts = <String>[];
 
-  // Render other blocks in order
-  for (final block in otherBlocks) {
+  for (final block in blocks) {
     final md = block.toMarkdown();
-    if (md.isNotEmpty) parts.add(md);
-  }
-
-  // Q&A section
-  if (qaBlocks.isNotEmpty) {
-    parts.add('## Questions');
-    for (final block in qaBlocks) {
-      final md = block.toMarkdown();
-      if (md.isNotEmpty) parts.add(md);
+    if (md.isNotEmpty) {
+      parts.add(md);
     }
   }
 
-  // Files section
-  if (fileBlocks.isNotEmpty) {
-    parts.add('## Files');
-    for (final block in fileBlocks) {
-      final md = block.toMarkdown();
-      if (md.isNotEmpty) parts.add(md);
-    }
-  }
-
-  return parts.join('\n\n') + '\n';
+  return '${parts.join('\n\n')}\n';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -847,7 +858,7 @@ class _EditorScreenState extends State<EditorScreen> {
                 Icon(_iconForType(block.type), color: U.primary, size: 16),
                 const SizedBox(width: 6),
                 Text(
-                  _labelForType(block.type),
+                  _labelForBlock(index, block),
                   style: GoogleFonts.outfit(color: U.sub, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                 ),
                 const Spacer(),
@@ -893,6 +904,19 @@ class _EditorScreenState extends State<EditorScreen> {
       case BlockType.mermaid: return 'FLOW CHART';
       case BlockType.file: return 'FILE';
     }
+  }
+
+  String _labelForBlock(int index, EditorBlock block) {
+    if (block.type == BlockType.qa) {
+      int qaCount = 1;
+      for (int i = 0; i < index; i++) {
+        if (_blocks[i].type == BlockType.qa) {
+          qaCount++;
+        }
+      }
+      return 'QUESTION #$qaCount';
+    }
+    return _labelForType(block.type);
   }
 
   Widget _buildBlockBody(EditorBlock block) {
@@ -1183,9 +1207,13 @@ class MarkdownTextEditingController extends TextEditingController {
         final String content = matchText.substring(hashCount + 1);
         
         double fontSize = defaultStyle.fontSize ?? 14;
-        if (hashCount == 2) fontSize *= 1.4; // H2 (Shown as H1)
-        else if (hashCount == 3) fontSize *= 1.2; // H3 (Shown as H2)
-        else if (hashCount == 4) fontSize *= 1.1; // H4 (Shown as H3)
+        if (hashCount == 2) {
+          fontSize *= 1.4; // H2 (Shown as H1)
+        } else if (hashCount == 3) {
+          fontSize *= 1.2; // H3 (Shown as H2)
+        } else if (hashCount == 4) {
+          fontSize *= 1.1; // H4 (Shown as H3)
+        }
 
         spans.add(TextSpan(children: [
           TextSpan(text: hashTags, style: tagStyle.copyWith(fontSize: fontSize)),
@@ -1312,6 +1340,7 @@ class _QABlockBodyState extends State<_QABlockBody> {
   late UndoHistoryController _aUndoController;
   late FocusNode _qFocus;
   late FocusNode _aFocus;
+  bool _isGenerating = false;
 
   @override
   void initState() {
@@ -1340,9 +1369,55 @@ class _QABlockBodyState extends State<_QABlockBody> {
     super.dispose();
   }
 
+  Future<void> _letLunaAnswer() async {
+    final question = _qController.text.trim();
+    if (question.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please type a question first, bro! 🧠',
+            style: GoogleFonts.outfit(color: Colors.white),
+          ),
+          backgroundColor: U.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isGenerating = true);
+
+    try {
+      final prompt = 'Answer this academic question in neat, simple language (8M style direct answer, no fluff, concise ELIF5-style explanation, clear formatting): $question';
+      final response = await AIService.sendMessage(userMessage: prompt);
+
+      if (mounted) {
+        setState(() {
+          _aController.text = response;
+          widget.block.answer = response;
+          _isGenerating = false;
+        });
+        widget.onChanged();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isGenerating = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch answer from Luna: $e',
+              style: GoogleFonts.outfit(color: Colors.white),
+            ),
+            backgroundColor: U.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
           controller: _qController,
@@ -1354,15 +1429,109 @@ class _QABlockBodyState extends State<_QABlockBody> {
           decoration: _blockInputDecor('Question'),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: _aController,
-          undoController: _aUndoController,
-          focusNode: _aFocus,
-          onChanged: (v) { widget.block.answer = v; widget.onChanged(); },
-          maxLines: null,
-          minLines: 2,
-          style: GoogleFonts.outfit(color: U.text, fontSize: 14, height: 1.5),
-          decoration: _blockInputDecor('Answer'),
+        Stack(
+          alignment: Alignment.center,
+          children: [
+            TextField(
+              controller: _aController,
+              undoController: _aUndoController,
+              focusNode: _aFocus,
+              onChanged: (v) { widget.block.answer = v; widget.onChanged(); },
+              maxLines: null,
+              minLines: 3,
+              style: GoogleFonts.outfit(
+                color: _isGenerating ? U.text.withValues(alpha: 0.4) : U.text,
+                fontSize: 14,
+                height: 1.5,
+              ),
+              decoration: _blockInputDecor(
+                _isGenerating ? 'Luna is thinking... 🔮' : 'Answer',
+              ),
+              enabled: !_isGenerating,
+            ),
+            if (_isGenerating)
+              Positioned(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: U.surface.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: U.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Luna is answering...',
+                        style: GoogleFonts.outfit(
+                          color: U.primary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _isGenerating ? 0.6 : 1.0,
+            child: InkWell(
+              onTap: _isGenerating ? null : _letLunaAnswer,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      U.primary,
+                      U.primary.withValues(alpha: 0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: U.primary.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Let Luna Answer',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );

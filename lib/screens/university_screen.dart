@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../main.dart';
+import '../theme/image_overlay_colors.dart';
 import 'iaa_screen.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
@@ -58,41 +59,120 @@ class _UniversityScreenState extends State<UniversityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+    final currentThemeKey = appThemeNotifier.value.key;
+
+    final titleColor = isDark
+        ? (currentThemeKey == 'gruvbox'
+            ? const Color(0xFFFB4934)
+            : currentThemeKey == 'everforest'
+                ? const Color(0xFFA7C080)
+                : currentThemeKey == 'github-dark'
+                    ? const Color(0xFF58A6FF)
+                    : currentThemeKey == 'orchid'
+                        ? const Color(0xFFCBA6F7)
+                        : Colors.white)
+        : ImageOverlayColors.titleColor(currentThemeKey, 'morning');
+
+    final subtitleColor = isDark
+        ? U.sub
+        : ImageOverlayColors.subtitleColor(currentThemeKey, 'morning');
+
     return Scaffold(
       backgroundColor: U.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'University',
-                    style: GoogleFonts.newsreader(
-                      color: U.text,
-                      fontSize: 38,
-                      fontWeight: FontWeight.w400,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Explore your campus network',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: U.dim,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
+      body: Stack(
+        children: [
+          // Background Image (Extended for smooth transition)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.6,
+            child: Opacity(
+              opacity: isDark ? 0.35 : 0.6,
+              child: Image.asset(
+                'assets/university/background.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                color: isDark ? U.bg : null,
+                colorBlendMode: isDark ? BlendMode.multiply : null,
               ),
             ),
-            const SizedBox(height: 16),
+          ),
+          // Gradient overlay: top half clear, bottom half smooth fade
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.6,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [
+                          U.bg.withValues(alpha: 0.45),
+                          U.bg.withValues(alpha: 0.15),
+                          U.bg.withValues(alpha: 1.0),
+                        ]
+                      : [
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg,
+                        ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'University',
+                        style: GoogleFonts.newsreader(
+                          color: titleColor,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w400,
+                          fontStyle: FontStyle.italic,
+                          letterSpacing: -0.5,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
+                              offset: const Offset(0, 1),
+                              blurRadius: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Explore your campus network',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: subtitleColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          letterSpacing: 0.2,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
+                              offset: const Offset(0, 1),
+                              blurRadius: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
             if (_isLoading)
               const Expanded(
                 child: Center(
@@ -221,6 +301,8 @@ class _UniversityScreenState extends State<UniversityScreen> {
               ),
           ],
         ),
+      ),
+        ],
       ),
     );
   }

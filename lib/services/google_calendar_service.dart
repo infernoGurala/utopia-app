@@ -113,29 +113,23 @@ class GoogleCalendarService {
             calendar.CalendarApi.calendarScope,
           ]);
           
-          String? newAccessToken = authz?.accessToken;
-          
-          if (newAccessToken == null) {
-            final freshAuthz = await account.authorizationClient.authorizeScopes([
-              calendar.CalendarApi.calendarScope,
-            ]);
-            newAccessToken = freshAuthz.accessToken;
+          final newAccessToken = authz?.accessToken;
+          if (newAccessToken != null) {
+            final newExpiry = DateTime.now().add(const Duration(minutes: 55));
+            await SecureStorageService.saveGoogleTokens(
+              accessToken: newAccessToken,
+              expiry: newExpiry,
+            );
+            debugPrint("GOOGLE_CAL: Silent token refresh success");
+            return newAccessToken;
           }
-          
-          final newExpiry = DateTime.now().add(const Duration(minutes: 55));
-          await SecureStorageService.saveGoogleTokens(
-            accessToken: newAccessToken,
-            expiry: newExpiry,
-          );
-          debugPrint("GOOGLE_CAL: Silent token refresh success");
-          return newAccessToken;
         }
       } catch (e) {
         debugPrint("GOOGLE_CAL: Silent refresh failed: $e");
       }
       
-      // If silent refresh failed, we clear tokens and force re-auth in UI
-      await disconnect();
+      // If silent refresh failed, we return null to let sync fail gracefully.
+      // We do not disconnect/wipe tokens here to avoid logging the user out during network dropouts.
       return null;
     }
 

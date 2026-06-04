@@ -190,48 +190,122 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = appThemeNotifier.value.isDark;
+    final currentThemeKey = appThemeNotifier.value.key;
 
-    final titleColor = ImageOverlayColors.titleColor(appThemeNotifier.value.key, 'morning');
-    final subtitleColor = ImageOverlayColors.subtitleColor(appThemeNotifier.value.key, 'morning');
+    final titleColor = isDark
+        ? (currentThemeKey == 'gruvbox'
+            ? const Color(0xFFFB4934)
+            : currentThemeKey == 'everforest'
+                ? const Color(0xFFA7C080)
+                : currentThemeKey == 'github-dark'
+                    ? const Color(0xFF58A6FF)
+                    : currentThemeKey == 'orchid'
+                        ? const Color(0xFFCBA6F7)
+                        : Colors.white)
+        : ImageOverlayColors.titleColor(currentThemeKey, 'morning');
+
+    final subtitleColor = isDark
+        ? U.sub
+        : ImageOverlayColors.subtitleColor(currentThemeKey, 'morning');
 
     return Scaffold(
       backgroundColor: U.bg,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Semesters',
-                          style: GoogleFonts.newsreader(
-                            color: U.text,
-                            fontSize: 38,
-                            fontWeight: FontWeight.w400,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -0.5,
-                          ),
+      body: Stack(
+        children: [
+          // Background Image with dark mode blending
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.45,
+            child: Opacity(
+              opacity: isDark ? 0.35 : 0.6,
+              child: Image.asset(
+                'assets/semesters/background.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                color: isDark ? U.bg : null,
+                colorBlendMode: isDark ? BlendMode.multiply : null,
+              ),
+            ),
+          ),
+          // Gradient fade — top fully clear/shaded, bottom solid to blend with background
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.sizeOf(context).height * 0.45,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: isDark
+                      ? [
+                          U.bg.withValues(alpha: 0.45),
+                          U.bg.withValues(alpha: 0.15),
+                          U.bg.withValues(alpha: 1.0),
+                        ]
+                      : [
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg.withValues(alpha: 0.0),
+                          U.bg,
+                        ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Semesters',
+                              style: GoogleFonts.newsreader(
+                                color: titleColor,
+                                fontSize: 38,
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: -0.5,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
+                                    offset: const Offset(0, 1),
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Access academic resources.',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: subtitleColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
+                                    offset: const Offset(0, 1),
+                                    blurRadius: 3,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Access academic resources.',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: U.sub,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -324,6 +398,8 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
             ),
           ],
         ),
+      ),
+        ],
       ),
     );
   }

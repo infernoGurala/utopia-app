@@ -1,14 +1,14 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
+import '../theme/image_overlay_colors.dart';
 import 'habit_tracker_screen.dart';
 import 'reminders_screen.dart';
 import 'calendar_screen.dart';
@@ -29,6 +29,7 @@ class FocusScreen extends StatefulWidget {
 class _FocusScreenState extends State<FocusScreen> {
   final _service = FocusSupabaseService();
   String _quote = '';
+  String _greetingText = '';
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
@@ -36,10 +37,120 @@ class _FocusScreenState extends State<FocusScreen> {
   String _remindersInsight = 'No upcoming';
   String _calendarInsight = 'Connect Google Account';
 
+  String get _userName {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return '';
+    final name = user.displayName;
+    if (name == null || name.isEmpty) return '';
+    return name.split(' ')[0];
+  }
+
+  String _generateRandomGreeting(String slot) {
+    final List<String> variants;
+    if (slot == 'morning') {
+      variants = const [
+        'Rise and shine',
+        'Good morning',
+        'Top of the morning',
+        'Have a beautiful morning',
+        'Wishing you a bright morning',
+        'Wake up and conquer',
+        'Hello, early bird',
+        'A fresh start today',
+        'Time to shine',
+        'Good morning, champion',
+        'Hope your day starts great',
+        'Good morning, legend',
+        'Start with a smile',
+        'Embrace the fresh day',
+        'Morning, superstar',
+        'Ready for a great day?',
+        'A beautiful morning to you',
+        'Make today count',
+        'Rise up and thrive',
+        'Hello there, sunshine',
+      ];
+    } else if (slot == 'afternoon') {
+      variants = const [
+        'Good afternoon',
+        'Hope your afternoon is great',
+        'Good afternoon, legend',
+        'Happy midday',
+        'Keep going strong',
+        'Crushing your day?',
+        'Stay focused this afternoon',
+        'A wonderful afternoon to you',
+        'Enjoy this beautiful afternoon',
+        'Afternoon, superstar',
+        'Halfway to your goals',
+        'Keep up the great momentum',
+        'Midday motivation is here',
+        'Hope your day is productive',
+        'Taking a breath?',
+        'Good afternoon, champion',
+        'Stay energized',
+        'Make the rest of the day count',
+        'Afternoon, early achiever',
+        'Doing amazing things today',
+      ];
+    } else if (slot == 'evening') {
+      variants = const [
+        'Good evening',
+        'Hope you had a great day',
+        'Good evening, legend',
+        'Unwind and relax',
+        'Time to ease into the evening',
+        'A peaceful evening to you',
+        'Evening, superstar',
+        'Reflect on today\'s wins',
+        'Hope your evening is cozy',
+        'Good evening, champion',
+        'Time to recharge',
+        'Evening, achiever',
+        'You did great today',
+        'Relax and reflect',
+        'Cozy evening vibes',
+        'Enjoy your evening rest',
+        'A calm evening to you',
+        'Great work today',
+        'Sunset vibes are here',
+      ];
+    } else {
+      variants = const [
+        'Good night',
+        'Rest well tonight',
+        'Time to wind down',
+        'Quiet night, sharp mind',
+        'Good night, champion',
+        'Sleep tight, legend',
+        'Sweet dreams',
+        'Late night grind?',
+        'Midnight focus',
+        'Working late, superstar?',
+        'Time to wrap up your day',
+        'Rest your eyes, legend',
+        'Sleep is the best meditation',
+        'Peaceful dreams ahead',
+        'Unwind and recharge',
+        'Still awake, champion?',
+        'Stars are shining, rest well',
+        'Cozy night vibes',
+      ];
+    }
+    final now = DateTime.now();
+    final dayIndex = now.difference(DateTime(now.year)).inDays;
+    final seed = dayIndex + now.hour;
+    final index = seed % variants.length;
+    return variants[index];
+  }
 
   @override
   void initState() {
     super.initState();
+    final timeSlot = ImageOverlayColors.getTimeSlot();
+    final greetingText = _generateRandomGreeting(timeSlot);
+    final userNameStr = _userName;
+    _greetingText = userNameStr.isEmpty ? greetingText : '$greetingText, $userNameStr';
     _loadData();
     _loadQuote();
     _loadStats();
@@ -139,10 +250,18 @@ class _FocusScreenState extends State<FocusScreen> {
       }
     } catch (e) {
       debugPrint('Error fetching/loading daily quote: $e');
-      final prefs = await SharedPreferences.getInstance().catchError((_) => null);
-      final cachedQuote = prefs?.getString('daily_quote_text');
-      final cachedAuthor = prefs?.getString('daily_quote_author');
-      if (cachedQuote == null || cachedAuthor == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedQuote = prefs.getString('daily_quote_text');
+        final cachedAuthor = prefs.getString('daily_quote_author');
+        if (cachedQuote == null || cachedAuthor == null) {
+          if (mounted) {
+            setState(() {
+              _quote = '"Focus on progress, not perfection." — Unknown';
+            });
+          }
+        }
+      } catch (_) {
         if (mounted) {
           setState(() {
             _quote = '"Focus on progress, not perfection." — Unknown';
@@ -341,140 +460,232 @@ class _FocusScreenState extends State<FocusScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final topPadding = MediaQuery.paddingOf(context).top;
 
+    final timeSlot = ImageOverlayColors.getTimeSlot();
+    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
+    final themeKey = appThemeNotifier.value.key;
     final isDarkTheme = appThemeNotifier.value.isDark;
 
-    SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: U.surface,
-        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-        systemNavigationBarDividerColor: Colors.transparent,
-      ),
-    );
+    final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
+    final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
+    final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
+    final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-        statusBarBrightness: isDarkTheme ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: U.surface,
-        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-        systemNavigationBarDividerColor: Colors.transparent,
-      ),
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: U.bg,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
+        body: Stack(
+          children: [
+            // ── Background Image ──
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: screenHeight * 0.80,
+              child: Image.asset(
+                bgImagePath,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+            ),
 
-                // ── Header: Utopia title ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
+            // ── Gradient Overlay ──
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: screenHeight * 0.80,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      U.bg.withValues(alpha: 0.0),
+                      U.bg.withValues(alpha: 0.0),
+                      U.bg,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Main Content ──
+            Positioned.fill(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: topPadding + 16),
+
+                    // ── Header: Utopia title ──
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              'Utopia',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontFamily: 'OrangeAvenue',
-                                fontSize: 38,
-                                fontWeight: FontWeight.w700,
-                                color: U.text,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Transform.rotate(
-                              angle: 30 * 3.1415926535 / 180,
-                              child: Transform.scale(
-                                scaleX: -1,
-                                child: Image.asset(
-                                  'assets/focus screen/leaves.png',
-                                  width: 22,
-                                  height: 22,
-                                  fit: BoxFit.contain,
-                                  color: U.primary,
-                                  colorBlendMode: BlendMode.srcIn,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Utopia',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontFamily: 'OrangeAvenue',
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w700,
+                                    color: onImageTitleColor,
+                                    letterSpacing: -0.5,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.15),
+                                        offset: const Offset(0, 1),
+                                        blurRadius: 3,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Stay productive.',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: U.dim,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ).animate()
-                      .fadeIn(duration: 500.ms, curve: Curves.easeOut)
-                      .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
-                ),
-
-                // ── Greeting Section (Now containing only the Daily Quote) ──
-                if (_quote.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(
-                            width: 2,
-                            color: U.border,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _quote,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w400,
-                                    color: U.sub,
-                                    height: 1.5,
-                                    letterSpacing: 0.1,
+                              const SizedBox(width: 2),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Transform.rotate(
+                                  angle: 30 * 3.1415926535 / 180,
+                                  child: Transform.scale(
+                                    scaleX: -1,
+                                    child: Image.asset(
+                                      'assets/focus screen/leaves.png',
+                                      width: 22,
+                                      height: 22,
+                                      fit: BoxFit.contain,
+                                      color: onImageTitleColor,
+                                      colorBlendMode: BlendMode.srcIn,
+                                    ),
                                   ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                margin: const EdgeInsets.only(top: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: onImageTitleColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: onImageTitleColor.withValues(alpha: 0.2),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Beta',
+                                  style: GoogleFonts.caveat(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: onImageTitleColor,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Stay productive.',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: onImageSubtitleColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              letterSpacing: 0.2,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.15),
+                                  offset: const Offset(0, 1),
+                                  blurRadius: 3,
                                 ),
                               ],
                             ),
                           ),
                         ],
-                      ),
+                      ).animate()
+                          .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+                          .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
                     ),
-                  ).animate()
-                      .fadeIn(delay: 300.ms, duration: 500.ms)
-                      .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
-                  const SizedBox(height: 28),
-                ] else ...[
-                  const SizedBox(height: 24),
-                ],
+
+                    // ── Greeting Section ──
+                    if (_greetingText.isNotEmpty) ...[
+                      SizedBox(height: screenHeight * 0.14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(
+                                width: 3,
+                                decoration: BoxDecoration(
+                                  color: greetingColor.withValues(alpha: 0.45),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _greetingText,
+                                      style: GoogleFonts.tiroGurmukhi(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w500,
+                                        color: greetingColor,
+                                        height: 1.2,
+                                        shadows: [
+                                          Shadow(
+                                            color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.10),
+                                            offset: const Offset(0, 1),
+                                            blurRadius: 3,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (_quote.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        _quote,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w400,
+                                          color: motivationalColor,
+                                          height: 1.5,
+                                          letterSpacing: 0.1,
+                                          shadows: [
+                                            Shadow(
+                                              color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.10),
+                                              offset: const Offset(0, 1),
+                                              blurRadius: 2.5,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ).animate()
+                          .fadeIn(delay: 300.ms, duration: 500.ms)
+                          .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
+                      const SizedBox(height: 28),
+                    ] else ...[
+                      const SizedBox(height: 24),
+                    ],
 
                 // ── Feature Cards (2+1 Grid) ──
                 Padding(
@@ -573,9 +784,10 @@ class _FocusScreenState extends State<FocusScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
+      ],
+    ),
+  );
+}
 }
 
 class _FeatureCard extends StatelessWidget {

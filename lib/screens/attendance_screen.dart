@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -2414,103 +2413,60 @@ class _TodayPulseButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = appThemeNotifier.value.isDark;
     
-    // Glassmorphic styling:
-    // Background is semi-transparent surface/card color to let underlying widgets blur through.
-    final glassBgColor = isDark 
-        ? U.card.withValues(alpha: 0.65) 
-        : Colors.white.withValues(alpha: 0.75);
-        
-    // Glowing text/icon color: using the theme's gorgeous U.gold (royal purple in dark, warm gold in light).
-    final glowColor = U.gold;
-
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, child) {
-        // Smooth breathing scale effect: 1.0 to 1.05
-        final scale = 1.0 + (animation.value * 0.05);
-        // Pulsing glowing border alpha
-        final borderAlpha = 0.4 + (animation.value * 0.25);
-        // Pulsing shadow blur and spread
-        final blurRadius = 12.0 + (animation.value * 10.0);
-        final spreadRadius = 1.0 + (animation.value * 2.0);
-
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: glowColor.withValues(alpha: 0.25 + (animation.value * 0.15)),
-                  blurRadius: blurRadius,
-                  spreadRadius: spreadRadius,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(100),
+        child: Container(
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(
+              color: U.border,
+              width: 0.8,
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: glassBgColor,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(
-                      color: glowColor.withValues(alpha: borderAlpha),
-                      width: 1.5,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(100),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.today_rounded,
+                      color: U.primary,
+                      size: 16,
                     ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(30),
-                      onTap: onTap,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Beautiful glowing sun icon
-                            Icon(
-                              Icons.wb_sunny_rounded,
-                              color: glowColor,
-                              size: 22,
-                              shadows: [
-                                Shadow(
-                                  color: glowColor.withValues(alpha: 0.6),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 10),
-                            // Beautiful glowing text
-                            Text(
-                              'Today',
-                              style: GoogleFonts.outfit(
-                                color: glowColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                                shadows: [
-                                  Shadow(
-                                    color: glowColor.withValues(alpha: 0.6),
-                                    blurRadius: 8,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Today',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.text,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

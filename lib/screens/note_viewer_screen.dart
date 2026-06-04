@@ -8,7 +8,6 @@ import '../widgets/utopia_loader.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:open_filex/open_filex.dart';
@@ -24,6 +23,7 @@ import '../services/supabase_global_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
 import 'editor_screen.dart';
+import 'answer_viewer_screen.dart';
 
 class NoteViewerScreen extends StatefulWidget {
   final String title;
@@ -56,9 +56,6 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   final _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
   String _rawContent = '';
-  List<Map<String, dynamic>> _noteFiles = [];
-  List<Map<String, dynamic>> _assignmentFiles = [];
-  List<Map<String, dynamic>> _uploadedFiles = [];
   List<_Segment> _segments = const [];
   final Map<String, GlobalKey> _segmentKeys = {};
   bool _loading = true;
@@ -142,9 +139,6 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 
   void _parse(String raw) {
-    final noteFiles = <Map<String, dynamic>>[];
-    final assignmentFiles = <Map<String, dynamic>>[];
-    final uploadedFiles = <Map<String, dynamic>>[];
     final segments = <_Segment>[];
     final lines = raw.split('\n');
     final sectionHeadingRegex = RegExp(r'^#{2,3}\s+(.+)$');
@@ -206,48 +200,56 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       if (sectionHeading == 'NOTES' || sectionHeading == 'RESOURCES') {
         flushContentLines();
         section = 'NOTES';
-        segments.add(_Segment.fileHeading('NOTES', id: 'heading_notes_${i}'));
+        segments.add(_Segment.fileHeading('NOTES', id: 'heading_notes_$i'));
         continue;
       }
       if (sectionHeading == 'ASSIGNMENTS') {
         flushContentLines();
         section = 'ASSIGNMENTS';
-        segments.add(_Segment.fileHeading('ASSIGNMENTS', id: 'heading_assignments_${i}'));
+        segments.add(_Segment.fileHeading('ASSIGNMENTS', id: 'heading_assignments_$i'));
         continue;
       }
       if (sectionHeading == 'FILES') {
         flushContentLines();
         section = 'FILES';
-        segments.add(_Segment.fileHeading('FILES', id: 'heading_files_${i}'));
+        segments.add(_Segment.fileHeading('FILES', id: 'heading_files_$i'));
         continue;
       }
       if (sectionHeading != null && section != null) {
         section = null;
       }
 
-      if (section != null) {
-        final m = sectionLinkRegex.firstMatch(t);
-        if (m != null) {
+      final m = sectionLinkRegex.firstMatch(t);
+      if (m != null) {
+        final url = m.group(2) ?? '';
+        final isFile = section != null ||
+            url.toLowerCase().contains('.pdf') ||
+            url.toLowerCase().contains('.docx') ||
+            url.toLowerCase().contains('.doc') ||
+            url.toLowerCase().contains('.xls') ||
+            url.toLowerCase().contains('.xlsx') ||
+            url.toLowerCase().contains('.zip') ||
+            url.toLowerCase().contains('.png') ||
+            url.toLowerCase().contains('.jpg') ||
+            url.toLowerCase().contains('.jpeg') ||
+            url.toLowerCase().contains('.gif') ||
+            url.contains('/uploads/') ||
+            url.contains('cloudinary');
+        if (isFile) {
+          flushContentLines();
           final entry = {
             'name': m.group(1) ?? '',
-            'url': m.group(2) ?? '',
+            'url': url,
             'type': 'pdf',
           };
-          if (section == 'NOTES') {
-            noteFiles.add(entry);
-          } else if (section == 'ASSIGNMENTS') {
-            assignmentFiles.add(entry);
-          } else if (section == 'FILES') {
-            uploadedFiles.add(entry);
-          }
-          segments.add(_Segment.fileBar(entry, id: 'file_${entry['name']}_${i}'));
+          segments.add(_Segment.fileBar(entry, id: 'file_${entry['name']}_$i'));
           continue;
         }
       }
 
       if (t == '---') {
         if (section != null) {
-          segments.add(_Segment.spacing(4, id: 'space_${i}'));
+          segments.add(_Segment.spacing(4, id: 'space_$i'));
           section = null;
         }
       }
@@ -257,9 +259,6 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     flushContentLines();
 
     setState(() {
-      _noteFiles = noteFiles;
-      _assignmentFiles = assignmentFiles;
-      _uploadedFiles = uploadedFiles;
       _segments = segments;
       _loading = false;
     });
@@ -512,6 +511,26 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
     while (i < lines.length) {
       final line = lines[i];
       final t = line.trim();
+
+      if (t.contains('[^Answer^](qa://')) {
+        if (buffer.isNotEmpty) {
+          segments.add(_segmentMarkdown(buffer.toString().trimRight()));
+          buffer.clear();
+        }
+        final qaIndex = t.indexOf('[^Answer^](qa://');
+        if (qaIndex != -1) {
+          final q = t.substring(0, qaIndex).trim();
+          final rest = t.substring(qaIndex + '[^Answer^](qa://'.length);
+          final closingParen = rest.indexOf(')');
+          if (closingParen != -1) {
+            final encodedVal = rest.substring(0, closingParen).trim();
+            final a = Uri.decodeComponent(encodedVal);
+            segments.add(_Segment.qa(q, a, id: _segmentIdFor(_SegType.qa, '$q|$a')));
+            i++;
+            continue;
+          }
+        }
+      }
 
       if (t == r'$$') {
         if (buffer.isNotEmpty) {
@@ -788,11 +807,39 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
         );
       case _SegType.markdown:
         return _buildMarkdown(seg.content);
+      case _SegType.qa:
+        int qaNumber = 1;
+        for (int j = 0; j < _segments.indexOf(seg); j++) {
+          if (_segments[j].type == _SegType.qa) {
+            qaNumber++;
+          }
+        }
+        return _QABlockWidget(
+          questionNumber: qaNumber,
+          question: seg.title!,
+          answer: seg.content,
+          onTapAnswer: () => _openAnswerViewer(qaNumber, seg.title!, seg.content),
+        );
       case _SegType.fileHeading:
       case _SegType.fileBar:
       case _SegType.spacing:
         return const SizedBox.shrink();
     }
+  }
+
+  void _openAnswerViewer(int questionNumber, String question, String answer) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AnswerViewerScreen(
+          questionNumber: questionNumber,
+          question: question,
+          answer: answer,
+          filePath: widget.filePath,
+          useGlobalRepo: widget.useGlobalRepo,
+        ),
+      ),
+    );
   }
 
   Future<void> _handleLink(String href) async {
@@ -802,10 +849,10 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => NoteViewerScreen(
-            title: 'Answer',
-            filePath: widget.filePath + '/answer',
-            overrideContent: answer,
+          builder: (_) => AnswerViewerScreen(
+            question: "Question",
+            answer: answer,
+            filePath: widget.filePath,
             useGlobalRepo: widget.useGlobalRepo,
           ),
         ),
@@ -987,7 +1034,7 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
   }
 }
 
-enum _SegType { markdown, latex, mermaid, callout, code, fileHeading, fileBar, spacing }
+enum _SegType { markdown, latex, mermaid, callout, code, fileHeading, fileBar, spacing, qa }
 
 class _Segment {
   final _SegType type;
@@ -1063,6 +1110,18 @@ class _Segment {
     double height, {
     required String id,
   }) => _Segment._(_SegType.spacing, height.toString(), id: id, preview: 'spacing');
+
+  factory _Segment.qa(
+    String question,
+    String answer, {
+    required String id,
+  }) => _Segment._(
+    _SegType.qa,
+    answer,
+    title: question,
+    id: id,
+    preview: question,
+  );
 }
 
 class _ShareNoteSheet extends StatefulWidget {
@@ -1424,20 +1483,6 @@ class _InlineMathMarkdown extends StatelessWidget {
       }).toList(),
     );
   }
-
-  bool _hasStructuredMarkdown(String value) {
-    if (value.contains(r'$$')) return true;
-    for (final rawLine in value.split('\n')) {
-      final line = rawLine.trimLeft();
-      if (line.isEmpty) continue;
-      if (line.startsWith('```')) return true;
-      if (line.startsWith('> ')) return true;
-      if (line.startsWith('|')) return true;
-      if (RegExp(r'^#{1,6}\s').hasMatch(line)) return true;
-      if (RegExp(r'^\d+\.\s').hasMatch(line)) return true;
-    }
-    return false;
-  }
 }
 
 class _MarkdownChunk extends StatelessWidget {
@@ -1603,6 +1648,123 @@ class _LatexBlock extends StatelessWidget {
   }
 }
 
+class _QABlockWidget extends StatelessWidget {
+  final String question;
+  final String answer;
+  final VoidCallback onTapAnswer;
+  final int? questionNumber;
+
+  const _QABlockWidget({
+    required this.question,
+    required this.answer,
+    required this.onTapAnswer,
+    this.questionNumber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: U.primary.withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: U.primary.withValues(alpha: isDark ? 0.05 : 0.02),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: U.primary.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.help_outline_rounded, color: U.primary, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (questionNumber != null) ...[
+                      Text(
+                        'QUESTION #$questionNumber',
+                        style: GoogleFonts.outfit(
+                          color: U.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    Text(
+                      question,
+                      style: GoogleFonts.outfit(
+                        color: U.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerRight,
+            child: InkWell(
+              onTap: onTapAnswer,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: U.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.question_answer_outlined, color: U.primary, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'View Answer',
+                      style: GoogleFonts.outfit(
+                        color: U.primary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MermaidBlock extends StatefulWidget {
   final String code;
   const _MermaidBlock({required this.code});
@@ -1648,7 +1810,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #${bgHex};
+    background: #$bgHex;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -1670,18 +1832,18 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     startOnLoad: true,
     theme: 'dark',
     themeVariables: {
-      primaryColor: '#${primaryHex}',
+      primaryColor: '#$primaryHex',
       primaryTextColor: '#CDD6F4',
       primaryBorderColor: '#45475A',
-      lineColor: '#${lineHex}',
-      secondaryColor: '#${bgHex}',
-      tertiaryColor: '#${bgHex}',
-      background: '#${bgHex}',
-      mainBkg: '#${primaryHex}',
-      nodeBorder: '#${lineHex}',
-      clusterBkg: '#${bgHex}',
+      lineColor: '#$lineHex',
+      secondaryColor: '#$bgHex',
+      tertiaryColor: '#$bgHex',
+      background: '#$bgHex',
+      mainBkg: '#$primaryHex',
+      nodeBorder: '#$lineHex',
+      clusterBkg: '#$bgHex',
       titleColor: '#CDD6F4',
-      edgeLabelBackground: '#${bgHex}',
+      edgeLabelBackground: '#$bgHex',
       fontFamily: 'sans-serif',
     }
   });
@@ -3341,7 +3503,6 @@ class _RawMarkdownEditor extends StatefulWidget {
 class _RawMarkdownEditorState extends State<_RawMarkdownEditor> {
   late TextEditingController _controller;
   bool _hasChanges = false;
-  bool _saving = false;
 
   @override
   void initState() {
@@ -3429,19 +3590,10 @@ class _RawMarkdownEditorState extends State<_RawMarkdownEditor> {
         ),
         actions: [
           if (_hasChanges)
-            _saving
-                ? Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: U.green)),
-                  )
-                : IconButton(
-                    icon: Icon(Icons.check_rounded, color: U.green),
-                    onPressed: _save,
-                  ),
+            IconButton(
+              icon: Icon(Icons.check_rounded, color: U.green),
+              onPressed: _save,
+            ),
         ],
       ),
       body: Padding(

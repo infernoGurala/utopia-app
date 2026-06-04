@@ -245,17 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .collection('users')
               .doc(user.uid)
               .snapshots();
-    final isDark = appThemeNotifier.value.isDark;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        systemNavigationBarColor: U.surface,
-        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-        systemNavigationBarDividerColor: Colors.transparent,
-      ),
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: U.bg,
         body: SafeArea(
           child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -536,6 +526,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                
+                // Play Store Coming Soon Banner
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: U.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: U.primary.withValues(alpha: 0.15), width: 0.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: U.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.android_rounded, color: U.primary, size: 18),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Coming to Play Store soon',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Native mobile application is currently in active development.',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.sub,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
                 
                 // Minimal Logout Button
@@ -568,8 +606,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         ),
       ),
-    ),
-  );
+    );
 }
 
   Widget _groupedTile({
@@ -625,9 +662,9 @@ class _ThemeStyleSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.45,
-      minChildSize: 0.30,
-      maxChildSize: 0.50,
+      initialChildSize: 0.75,
+      minChildSize: 0.45,
+      maxChildSize: 0.90,
       expand: false,
       builder: (context, scrollController) {
         return Container(

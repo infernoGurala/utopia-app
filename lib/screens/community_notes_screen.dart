@@ -11,7 +11,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'note_viewer_screen.dart';
-import '../widgets/genz_loading_overlay.dart';
 import '../services/trash_service.dart';
 import 'trash_screen.dart';
 
@@ -451,16 +450,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   void _fetchLastModifiedDates() {
     for (final item in _items) {
       final path = item['path'] as String? ?? '';
-      if (path.isEmpty) continue;
-      // Fire and forget — each call is independent
-      _github
-          .getLastModified(path)
-          .then((dt) {
-            if (dt != null && mounted) {
-              setState(() => _lastModifiedDates[path] = dt);
-            }
-          })
-          .catchError((_) {});
+      final updatedAtStr = item['updated_at'] as String?;
+      if (path.isEmpty || updatedAtStr == null) continue;
+      try {
+        _lastModifiedDates[path] = DateTime.parse(updatedAtStr).toLocal();
+      } catch (_) {}
     }
   }
 
@@ -556,10 +550,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       }
     }
   }
-
-  /// Path to the shared icon metadata file on GitHub.
-  String get _iconsJsonPath =>
-      '${widget.universityFolderName}/Community/.icons.json';
 
   /// Load icon overrides from GitHub .icons.json for this university.
   Future<void> _loadFolderIcons() async {
@@ -929,7 +919,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     final requestedPath = _fullPath;
 
     try {
-      final itemsFuture = _github.getDirectoryContents(requestedPath);
+      final itemsFuture = _github.getDirectoryContents(requestedPath, forceRefresh: forceRefresh);
       final trashFuture = _trashService.getTrashedPaths().catchError((e) {
         debugPrint("COMMUNITY: Trash fetch failed: $e");
         return <String>{};
@@ -953,11 +943,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
             .toList();
         _trashedPaths = fetchedTrash;
         _sortItems();
+        _fetchLastModifiedDates();
         _syncing = false;
         _loading = false;
       });
-      // Fetch last-modified dates in the background after items are available
-      _fetchLastModifiedDates();
       if (_depth >= 1) {
         _prefetchSubfolders();
       }
@@ -3100,8 +3089,8 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
 
-                    // ── Last updated (always visible on root cards) ──
-                    if (lastModified != null) ...[
+                    // ── Last updated (only visible in edit mode) ──
+                    if (isEditMode && lastModified != null) ...[
                       const SizedBox(height: 6),
                       Row(
                         mainAxisSize: MainAxisSize.min,

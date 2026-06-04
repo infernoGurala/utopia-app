@@ -1,11 +1,24 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
 
 class SupabaseGlobalService {
   static final SupabaseGlobalService instance = SupabaseGlobalService._();
   SupabaseGlobalService._();
 
   SupabaseClient get _supabase => Supabase.instance.client;
+
+  // Caches for directory contents, notes, and icons
+  final Map<String, List<Map<String, dynamic>>> _dirCache = {};
+  final Map<String, String> _noteCache = {};
+  final Map<String, Map<String, String>> _iconCache = {};
+
+  void clearCache() {
+    _dirCache.clear();
+    _noteCache.clear();
+    _iconCache.clear();
+    debugPrint("SUPABASE_GLOBAL: Caches cleared.");
+  }
 
   String _formatName(String name) {
     return name.replaceAll(' ', '-');
@@ -26,11 +39,18 @@ class SupabaseGlobalService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getDirectoryContents(String path) async {
+  Future<List<Map<String, dynamic>>> getDirectoryContents(String path, {bool forceRefresh = false}) async {
     try {
       final cleanPath = path.endsWith('/')
           ? path.substring(0, path.length - 1)
           : path;
+
+      if (!forceRefresh && _dirCache.containsKey(cleanPath)) {
+        debugPrint("SUPABASE_GLOBAL: Cache hit for directory: $cleanPath");
+        return _dirCache[cleanPath]!;
+      }
+
+      debugPrint("SUPABASE_GLOBAL: Cache miss/forceRefresh for directory: $cleanPath, fetching from DB...");
 
       var folderQuery = _supabase
           .from('folders')
@@ -60,14 +80,23 @@ class SupabaseGlobalService {
         notesResponse,
       ).map((n) => {...n, 'type': 'file'}).toList();
 
-      return [...folders, ...notes];
+      final result = [...folders, ...notes];
+      _dirCache[cleanPath] = result;
+      return result;
     } catch (e) {
       throw Exception('Failed to get directory contents for $path: $e');
     }
   }
 
-  Future<String> getNoteContent(String notePath) async {
+  Future<String> getNoteContent(String notePath, {bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _noteCache.containsKey(notePath)) {
+        debugPrint("SUPABASE_GLOBAL: Cache hit for note: $notePath");
+        return _noteCache[notePath]!;
+      }
+
+      debugPrint("SUPABASE_GLOBAL: Cache miss for note: $notePath, fetching from DB...");
+
       final response = await _supabase
           .from('notes')
           .select('content')
@@ -75,7 +104,9 @@ class SupabaseGlobalService {
           .maybeSingle();
 
       if (response == null) return '';
-      return (response['content'] as String?) ?? '';
+      final content = (response['content'] as String?) ?? '';
+      _noteCache[notePath] = content;
+      return content;
     } catch (e) {
       throw Exception('Failed to get note content for $notePath: $e');
     }
@@ -105,6 +136,7 @@ class SupabaseGlobalService {
         'is_hidden': false,
         'created_by': createdByUid,
       });
+      clearCache();
     } catch (e) {
       throw Exception('Failed to create folder $name: $e');
     }
@@ -133,6 +165,7 @@ class SupabaseGlobalService {
         'class_id': classId,
         'created_by': createdByUid,
       });
+      clearCache();
     } catch (e) {
       throw Exception('Failed to create note $name: $e');
     }
@@ -187,6 +220,7 @@ class SupabaseGlobalService {
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('path', notePath);
+      clearCache();
     } catch (e) {
       throw Exception('Failed to update note $notePath: $e');
     }
@@ -195,6 +229,7 @@ class SupabaseGlobalService {
   Future<void> deleteNote(String notePath) async {
     try {
       await _supabase.from('notes').delete().eq('path', notePath);
+      clearCache();
     } catch (e) {
       throw Exception('Failed to delete note $notePath: $e');
     }
@@ -208,6 +243,7 @@ class SupabaseGlobalService {
       await _supabase.from('folders').delete().like('path', '$folderPath/%');
       // delete the target folder itself
       await _supabase.from('folders').delete().eq('path', folderPath);
+      clearCache();
     } catch (e) {
       throw Exception('Failed to delete folder $folderPath: $e');
     }
@@ -275,6 +311,7 @@ class SupabaseGlobalService {
             .update({'path': updatedPath, 'folder_path': updatedFolder})
             .eq('path', currentPath);
       }
+      clearCache();
     } catch (e) {
       throw Exception('Failed to rename folder $oldPath: $e');
     }
@@ -294,13 +331,21 @@ class SupabaseGlobalService {
           .from('notes')
           .update({'path': newPath, 'name': newName})
           .eq('path', oldPath);
+      clearCache();
     } catch (e) {
       throw Exception('Failed to rename note $oldPath: $e');
     }
   }
 
-  Future<Map<String, String>> getFolderIcons(String basePath) async {
+  Future<Map<String, String>> getFolderIcons(String basePath, {bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _iconCache.containsKey(basePath)) {
+        debugPrint("SUPABASE_GLOBAL: Cache hit for folder icons: $basePath");
+        return _iconCache[basePath]!;
+      }
+
+      debugPrint("SUPABASE_GLOBAL: Cache miss for folder icons: $basePath, fetching from DB...");
+
       final response = await _supabase
           .from('folder_icons')
           .select('folder_path, icon_key')
@@ -311,6 +356,7 @@ class SupabaseGlobalService {
       for (var row in icons) {
         map[row['folder_path'] as String] = row['icon_key'] as String;
       }
+      _iconCache[basePath] = map;
       return map;
     } catch (e) {
       throw Exception('Failed to get folder icons for $basePath: $e');
@@ -323,6 +369,7 @@ class SupabaseGlobalService {
         'folder_path': folderPath,
         'icon_key': iconKey,
       });
+      clearCache();
     } catch (e) {
       throw Exception('Failed to set folder icon for $folderPath: $e');
     }
@@ -355,6 +402,7 @@ class SupabaseGlobalService {
 
         await _supabase.from(table).update({'sort_index': i}).eq('path', path);
       }
+      clearCache();
     } catch (e) {
       throw Exception('Failed to update sort order: $e');
     }
@@ -379,6 +427,7 @@ class SupabaseGlobalService {
           .from('folders')
           .update({'is_hidden': true})
           .like('path', '$folderPath/%');
+      clearCache();
     } catch (e) {
       throw Exception('Failed to hide folder $folderPath: $e');
     }
@@ -402,6 +451,7 @@ class SupabaseGlobalService {
           .from('folders')
           .update({'is_hidden': false})
           .like('path', '$folderPath/%');
+      clearCache();
     } catch (e) {
       throw Exception('Failed to unhide folder $folderPath: $e');
     }

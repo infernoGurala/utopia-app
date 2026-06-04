@@ -281,74 +281,43 @@ class _AppShellState extends State<AppShell> {
     return ValueListenableBuilder<AppTheme>(
       valueListenable: appThemeNotifier,
       builder: (context, theme, _) {
-        if (_index != 0) {
-          SystemChrome.setSystemUIOverlayStyle(
-            SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
-              statusBarBrightness: theme.isDark ? Brightness.dark : Brightness.light,
-              systemNavigationBarColor: theme.surface,
-              systemNavigationBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
-              systemNavigationBarDividerColor: Colors.transparent,
-              systemNavigationBarContrastEnforced: false,
-            ),
-          );
-        } else {
-          final timeSlot = ImageOverlayColors.getTimeSlot();
-          final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
-          final isDarkTheme = theme.isDark;
-          final useLightStatusBarIcons = isDarkSky || isDarkTheme;
-          SystemChrome.setSystemUIOverlayStyle(
-            SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-              statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
-              systemNavigationBarColor: theme.surface,
-              systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-              systemNavigationBarDividerColor: Colors.transparent,
-            ),
-          );
-        }
+        final timeSlot = ImageOverlayColors.getTimeSlot();
+        final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
+        final isDarkTheme = theme.isDark;
+        final useLightStatusBarIcons = isDarkSky || isDarkTheme;
 
-        return Scaffold(
-          backgroundColor: U.bg,
-          extendBody: true,
-          body: Stack(
-            children: [
-              PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() => _index = index);
-                  if (index != 0) {
-                    SystemChrome.setSystemUIOverlayStyle(
-                      SystemUiOverlayStyle(
-                        statusBarColor: Colors.transparent,
-                        statusBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
-                        statusBarBrightness: theme.isDark ? Brightness.dark : Brightness.light,
-                        systemNavigationBarColor: theme.surface,
-                        systemNavigationBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
-                        systemNavigationBarDividerColor: Colors.transparent,
-                        systemNavigationBarContrastEnforced: false,
-                      ),
-                    );
-                  } else {
-                    final timeSlot = ImageOverlayColors.getTimeSlot();
-                    final isDarkSky = timeSlot == 'evening' || timeSlot == 'night';
-                    final isDarkTheme = theme.isDark;
-                    final useLightStatusBarIcons = isDarkSky || isDarkTheme;
-                    SystemChrome.setSystemUIOverlayStyle(
-                      SystemUiOverlayStyle(
-                        statusBarColor: Colors.transparent,
-                        statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
-                        statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
-                        systemNavigationBarColor: theme.surface,
-                        systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-                        systemNavigationBarDividerColor: Colors.transparent,
-                      ),
-                    );
-                  }
-                },
-                physics: const ClampingScrollPhysics(),
+        final systemUiStyle = _index != 0
+            ? SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+                statusBarBrightness: theme.isDark ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor: theme.surface,
+                systemNavigationBarIconBrightness: theme.isDark ? Brightness.light : Brightness.dark,
+                systemNavigationBarDividerColor: Colors.transparent,
+                systemNavigationBarContrastEnforced: false,
+              )
+            : SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: useLightStatusBarIcons ? Brightness.light : Brightness.dark,
+                statusBarBrightness: useLightStatusBarIcons ? Brightness.dark : Brightness.light,
+                systemNavigationBarColor: theme.surface,
+                systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                systemNavigationBarDividerColor: Colors.transparent,
+              );
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: systemUiStyle,
+          child: Scaffold(
+            backgroundColor: U.bg,
+            extendBody: true,
+            body: Stack(
+              children: [
+                PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() => _index = index);
+                  },
+                  physics: const ClampingScrollPhysics(),
                 children: [
                   _KeepAliveWrapper(child: _getScreen(0)),
                   _KeepAliveWrapper(child: _getScreen(1)),
@@ -477,10 +446,11 @@ class _AppShellState extends State<AppShell> {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }
 
 class _NavItem extends StatelessWidget {
