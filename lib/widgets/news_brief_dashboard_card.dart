@@ -180,11 +180,19 @@ class _NewsBriefDashboardCardState extends State<NewsBriefDashboardCard> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: U.card,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: U.border,
-              width: 0.5,
+              color: U.border.withValues(alpha: 0.8),
+              width: 1.0,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+                spreadRadius: -2,
+              ),
+            ],
           ),
           child: cardContent,
         ),

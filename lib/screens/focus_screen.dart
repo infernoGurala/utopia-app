@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -33,6 +35,8 @@ class _FocusScreenState extends State<FocusScreen> {
   int _streakDays = 0;
   int _activeHabits = 0;
   int _upcomingReminders = 0;
+  int _scheduledHabitsCount = 0;
+  int _completedHabitsCount = 0;
   String _dailyNoteInsight = 'Write today';
   String _remindersInsight = 'No upcoming';
   String _calendarInsight = 'Connect Google Account';
@@ -313,6 +317,9 @@ class _FocusScreenState extends State<FocusScreen> {
       final tasks = await _service.getAllTrackedTasks();
       final activeTasks = tasks.length;
 
+      int totalHabits = 0;
+      int completedHabits = 0;
+
       // 1. Get today's habits remaining
       String dailyNoteInsight = 'Track today';
       try {
@@ -347,6 +354,9 @@ class _FocusScreenState extends State<FocusScreen> {
             }
           }
           
+          totalHabits = scheduledCount;
+          completedHabits = doneCount;
+
           if (scheduledCount == 0) {
             dailyNoteInsight = 'No habits today';
           } else {
@@ -450,6 +460,8 @@ class _FocusScreenState extends State<FocusScreen> {
         setState(() {
           _activeHabits = activeTasks;
           _upcomingReminders = reminderCount;
+          _scheduledHabitsCount = totalHabits;
+          _completedHabitsCount = completedHabits;
           _dailyNoteInsight = dailyNoteInsight;
           _remindersInsight = remindersInsight;
           _calendarInsight = calendarInsight;
@@ -458,536 +470,887 @@ class _FocusScreenState extends State<FocusScreen> {
     } catch (_) {}
   }
 
+  Widget _buildQuickPill({required String label, required Color color}) {
+    final isDark = appThemeNotifier.value.isDark;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? color.withValues(alpha: 0.06)
+                : color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark
+                  ? color.withValues(alpha: 0.2)
+                  : color.withValues(alpha: 0.25),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: isDark ? color.withValues(alpha: 0.95) : color.withValues(alpha: 0.85),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    final timeSlot = ImageOverlayColors.getTimeSlot();
-    final bgImagePath = 'assets/welcome_bg/one_light/$timeSlot.png';
-    final themeKey = appThemeNotifier.value.key;
     final isDarkTheme = appThemeNotifier.value.isDark;
-
-    final onImageTitleColor = ImageOverlayColors.titleColor(themeKey, timeSlot);
-    final onImageSubtitleColor = ImageOverlayColors.subtitleColor(themeKey, timeSlot);
-    final motivationalColor = ImageOverlayColors.quoteColor(themeKey, timeSlot) ?? U.sub;
-    final greetingColor = ImageOverlayColors.greetingColor(themeKey, timeSlot) ?? U.text;
+    final now = DateTime.now();
+    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final months = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    final dateStr = '${weekdays[now.weekday - 1].toUpperCase()}, ${months[now.month].toUpperCase()} ${now.day}';
 
     return Scaffold(
-        backgroundColor: U.bg,
-        body: Stack(
-          children: [
-            // ── Background Image ──
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.80,
-              child: Image.asset(
-                bgImagePath,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            ),
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 20),
 
-            // ── Gradient Overlay ──
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: screenHeight * 0.80,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      U.bg.withValues(alpha: 0.0),
-                      U.bg.withValues(alpha: 0.0),
-                      U.bg,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Main Content ──
-            Positioned.fill(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
+              // ── Header: Utopia brand identity & Date ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: topPadding + 16),
-
-                    // ── Header: Utopia title ──
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Utopia',
+                              style: TextStyle(
+                                fontFamily: 'OrangeAvenue',
+                                fontSize: 38,
+                                fontWeight: FontWeight.w700,
+                                color: U.text,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Transform.rotate(
+                                angle: 30 * 3.1415926535 / 180,
+                                child: Transform.scale(
+                                  scaleX: -1,
+                                  child: Image.asset(
+                                    'assets/focus screen/leaves.png',
+                                    width: 22,
+                                    height: 22,
+                                    fit: BoxFit.contain,
+                                    color: U.primary,
+                                    colorBlendMode: BlendMode.srcIn,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: U.primary.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: U.primary.withValues(alpha: 0.15),
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            dateStr,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.0,
+                              color: U.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Greeting text
+                    (() {
+                      final commaIndex = _greetingText.indexOf(',');
+                      if (commaIndex != -1) {
+                        final greetingPart = _greetingText.substring(0, commaIndex);
+                        final namePart = _greetingText.substring(commaIndex + 1).trim();
+                        return RichText(
+                          text: TextSpan(
                             children: [
-                              Flexible(
-                                child: Text(
-                                  'Utopia',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontFamily: 'OrangeAvenue',
-                                    fontSize: 38,
-                                    fontWeight: FontWeight.w700,
-                                    color: onImageTitleColor,
-                                    letterSpacing: -0.5,
-                                    shadows: [
-                                      Shadow(
-                                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.15),
-                                        offset: const Offset(0, 1),
-                                        blurRadius: 3,
-                                      ),
-                                    ],
-                                  ),
+                              TextSpan(
+                                text: '$greetingPart, ',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w300,
+                                  color: U.text,
+                                  letterSpacing: -0.4,
                                 ),
                               ),
-                              const SizedBox(width: 2),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Transform.rotate(
-                                  angle: 30 * 3.1415926535 / 180,
-                                  child: Transform.scale(
-                                    scaleX: -1,
-                                    child: Image.asset(
-                                      'assets/focus screen/leaves.png',
-                                      width: 22,
-                                      height: 22,
-                                      fit: BoxFit.contain,
-                                      color: onImageTitleColor,
-                                      colorBlendMode: BlendMode.srcIn,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                margin: const EdgeInsets.only(top: 6),
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: onImageTitleColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: onImageTitleColor.withValues(alpha: 0.2),
-                                    width: 0.8,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Beta',
-                                  style: GoogleFonts.caveat(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: onImageTitleColor,
-                                    height: 1.0,
-                                  ),
+                              TextSpan(
+                                text: namePart,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 23,
+                                  fontWeight: FontWeight.w800,
+                                  color: U.text,
+                                  letterSpacing: -0.6,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Stay productive.',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: onImageSubtitleColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
-                              letterSpacing: 0.2,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.15),
-                                  offset: const Offset(0, 1),
-                                  blurRadius: 3,
-                                ),
-                              ],
+                        );
+                      } else {
+                        return Text(
+                          _greetingText,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w400,
+                            color: U.text,
+                            letterSpacing: -0.4,
+                          ),
+                        );
+                      }
+                    })(),
+                    if (_quote.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.only(left: 12),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: U.primary.withValues(alpha: 0.25),
+                              width: 1.5,
                             ),
                           ),
-                        ],
-                      ).animate()
-                          .fadeIn(duration: 500.ms, curve: Curves.easeOut)
-                          .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
-                    ),
+                        ),
+                        child: Text(
+                          _quote,
+                          style: GoogleFonts.newsreader(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w400,
+                            fontStyle: FontStyle.italic,
+                            color: U.sub,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ).animate()
+                  .fadeIn(duration: 500.ms, curve: Curves.easeOutCubic)
+                  .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOutCubic),
 
-                    // ── Greeting Section ──
-                    if (_greetingText.isNotEmpty) ...[
-                      SizedBox(height: screenHeight * 0.14),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+              const SizedBox(height: 18),
+
+              // ── Inline Metric Quick Bar ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildQuickPill(
+                        label: '🔥 $_streakDays Day Streak',
+                        color: U.peach,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickPill(
+                        label: '✓ $_completedHabitsCount/$_scheduledHabitsCount Habits',
+                        color: U.green,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickPill(
+                        label: '🔔 $_upcomingReminders Tasks',
+                        color: U.lavender,
+                      ),
+                    ],
+                  ),
+                ),
+              ).animate()
+                  .fadeIn(delay: 150.ms, duration: 400.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 150.ms, duration: 400.ms, curve: Curves.easeOutCubic),
+
+              const SizedBox(height: 20),
+
+              // ── Habit Progress Hero Card (Wide) ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: PressableCard(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HabitTrackerScreen()),
+                  ).then((_) => _loadData()),
+                  child: Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: U.card,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.8),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                          spreadRadius: -2,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 3,
-                                decoration: BoxDecoration(
-                                  color: greetingColor.withValues(alpha: 0.45),
-                                  borderRadius: BorderRadius.circular(2),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: U.green.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.event_repeat_rounded,
+                                      color: U.green,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'DAILY ROUTINES',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.5,
+                                      color: U.green.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Habit Tracker',
+                                style: GoogleFonts.newsreader(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: U.text,
+                                  letterSpacing: -0.4,
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _greetingText,
-                                      style: GoogleFonts.tiroGurmukhi(
-                                        fontSize: 26,
-                                        fontWeight: FontWeight.w500,
-                                        color: greetingColor,
-                                        height: 1.2,
-                                        shadows: [
-                                          Shadow(
-                                            color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.10),
-                                            offset: const Offset(0, 1),
-                                            blurRadius: 3,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_quote.isNotEmpty) ...[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        _quote,
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 14.5,
-                                          fontWeight: FontWeight.w400,
-                                          color: motivationalColor,
-                                          height: 1.5,
-                                          letterSpacing: 0.1,
-                                          shadows: [
-                                            Shadow(
-                                              color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.10),
-                                              offset: const Offset(0, 1),
-                                              blurRadius: 2.5,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                              const SizedBox(height: 6),
+                              Text(
+                                _dailyNoteInsight,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: U.sub,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: _scheduledHabitsCount > 0
+                                      ? _completedHabitsCount / _scheduledHabitsCount
+                                      : 0.0,
+                                  backgroundColor: U.surface,
+                                  valueColor: AlwaysStoppedAnimation<Color>(U.green),
+                                  minHeight: 6,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ).animate()
-                          .fadeIn(delay: 300.ms, duration: 500.ms)
-                          .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOut),
-                      const SizedBox(height: 28),
-                    ] else ...[
-                      const SizedBox(height: 24),
-                    ],
-
-                // ── Feature Cards (2+1 Grid) ──
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      // Top row: Habit Tracker + Reminders
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _FeatureCard(
-                              title: 'Habit Tracker',
-                              description: 'Build habits.',
-                              icon: Icons.event_repeat_rounded,
-                              svgAsset: 'assets/icons/routine_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                              iconColor: U.blue,
-                              statLabel: _dailyNoteInsight,
-                              statColor: U.blue,
-                              delay: 400,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const HabitTrackerScreen()),
-                              ).then((_) => _loadData()),
+                        const SizedBox(width: 24),
+                        (() {
+                          final pct = _scheduledHabitsCount > 0
+                              ? _completedHabitsCount / _scheduledHabitsCount
+                              : 0.0;
+                          return Container(
+                            width: 76,
+                            height: 76,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 76,
+                                  height: 76,
+                                  child: CircularProgressIndicator(
+                                    value: pct,
+                                    backgroundColor: U.surface,
+                                    color: U.green,
+                                    strokeWidth: 7,
+                                    strokeCap: StrokeCap.round,
+                                  ),
+                                ),
+                                Container(
+                                  width: 58,
+                                  height: 58,
+                                  decoration: BoxDecoration(
+                                    color: U.green.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '${(pct * 100).toInt()}%',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: U.text,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _FeatureCard(
-                              title: 'Reminders',
-                              description: 'Manage tasks.',
-                              icon: Icons.alarm_on_rounded,
-                              svgAsset: 'assets/icons/alarm_smart_wake_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.svg',
-                              iconColor: U.lavender,
-                              statLabel: _remindersInsight,
-                              statColor: U.lavender,
-                              delay: 500,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const RemindersScreen()),
-                              ).then((_) => _loadData()),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _FeatureCard(
-                              title: 'Google Calendar',
-                              description: 'Manage schedule.',
-                              icon: Icons.calendar_today_rounded,
-                              iconColor: U.gold,
-                              statLabel: _calendarInsight,
-                              statColor: U.gold,
-                              delay: 600,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const CalendarScreen()),
-                              ).then((_) => _loadData()),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _FeatureCard(
-                              title: 'Rockets',
-                              description: 'Neural TTS reading.',
-                              icon: Icons.rocket_launch_rounded,
-                              iconColor: U.peach,
-                              statLabel: 'Active sessions',
-                              statColor: U.peach,
-                              delay: 700,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const RocketsScreen()),
-                              ).then((_) => _loadData()),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          );
+                        })(),
+                      ],
+                    ),
                   ),
                 ),
+              ).animate()
+                  .fadeIn(delay: 250.ms, duration: 500.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 250.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-                const SizedBox(height: 12),
+              const SizedBox(height: 16),
 
-                // ── Today's Brief Card ──
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: NewsBriefDashboardCard(),
+              // ── Middle Row: Reminders & Calendar ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Reminders Card
+                    Expanded(
+                      child: PressableCard(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                        ).then((_) => _loadData()),
+                        child: Container(
+                          height: 190,
+                          decoration: BoxDecoration(
+                            color: U.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: U.border.withValues(alpha: 0.8),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                blurRadius: 16,
+                                offset: const Offset(0, 8),
+                                spreadRadius: -2,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Stack(
+                              children: [
+                                // Left accent line
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: 4,
+                                  child: Container(color: U.lavender),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: U.lavender.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.alarm_on_rounded,
+                                              color: U.lavender,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'TASKS',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.5,
+                                              color: U.lavender.withValues(alpha: 0.85),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        'Reminders',
+                                        style: GoogleFonts.newsreader(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle: FontStyle.italic,
+                                          color: U.text,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      (() {
+                                        final parts = _remindersInsight.split(': ');
+                                        if (parts.length >= 2) {
+                                          final time = parts[0];
+                                          final label = parts.sublist(1).join(': ');
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                label,
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: U.text,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: U.lavender.withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color: U.lavender.withValues(alpha: 0.25),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.access_time_rounded, color: U.lavender, size: 10),
+                                                    const SizedBox(width: 4),
+                                                    Flexible(
+                                                      child: Text(
+                                                        time,
+                                                        style: GoogleFonts.plusJakartaSans(
+                                                          fontSize: 9.5,
+                                                          fontWeight: FontWeight.w800,
+                                                          color: U.lavender.withValues(alpha: 0.9),
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        } else {
+                                          return Text(
+                                            _remindersInsight,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              color: U.sub,
+                                              height: 1.35,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          );
+                                        }
+                                      })(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Calendar Card
+                    Expanded(
+                      child: PressableCard(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CalendarScreen()),
+                        ).then((_) => _loadData()),
+                        child: Container(
+                          height: 190,
+                          decoration: BoxDecoration(
+                            color: U.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: U.border.withValues(alpha: 0.8),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                blurRadius: 16,
+                                offset: const Offset(0, 8),
+                                spreadRadius: -2,
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Stack(
+                              children: [
+                                // Left accent line
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: 4,
+                                  child: Container(color: U.gold),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: U.gold.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.calendar_today_rounded,
+                                              color: U.gold,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'SCHEDULE',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.5,
+                                              color: U.gold.withValues(alpha: 0.85),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const Spacer(),
+                                      Text(
+                                        'Calendar',
+                                        style: GoogleFonts.newsreader(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle: FontStyle.italic,
+                                          color: U.text,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      (() {
+                                        if (_calendarInsight == 'Connect Google Account') {
+                                          return Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(vertical: 5),
+                                            decoration: BoxDecoration(
+                                              color: U.gold.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: U.gold.withValues(alpha: 0.25),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Connect',
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: U.gold.withValues(alpha: 0.95),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          return Text(
+                                            _calendarInsight,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              color: U.sub,
+                                              height: 1.35,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          );
+                                        }
+                                      })(),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+              ).animate()
+                  .fadeIn(delay: 350.ms, duration: 500.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 350.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-                // Bottom padding for nav bar
-                const SizedBox(height: 120),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-}
+              const SizedBox(height: 16),
 
-class _FeatureCard extends StatelessWidget {
-  final String title;
-  final String description;
-  final IconData icon;
-  final String? svgAsset;
-  final Color iconColor;
-  final String statLabel;
-  final Color statColor;
-  final VoidCallback onTap;
-  final int delay;
-  final bool isWide;
-
-  const _FeatureCard({
-    required this.title,
-    required this.description,
-    required this.icon,
-    this.svgAsset,
-    required this.iconColor,
-    required this.statLabel,
-    required this.statColor,
-    required this.onTap,
-    required this.delay,
-    this.isWide = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cardContent = isWide ? _buildWideLayout() : _buildSquareLayout();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: U.card,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: U.border,
-            width: 0.5,
-          ),
-        ),
-        child: cardContent,
-      ),
-    ).animate()
-        .fadeIn(delay: delay.ms, duration: 500.ms)
-        .slideY(begin: 0.12, end: 0, delay: delay.ms, duration: 500.ms, curve: Curves.easeOutCubic);
-  }
-
-  /// Square card layout (for Daily Note, Activity)
-  Widget _buildSquareLayout() {
-    return SizedBox(
-      height: 170,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Icon + Arrow row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: U.surface,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: U.border,
-                    width: 0.5,
+              // ── Rockets Visualizer Card (Wide) ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: PressableCard(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RocketsScreen()),
+                  ).then((_) => _loadData()),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: U.card,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.8),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                          spreadRadius: -2,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: U.peach.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.rocket_launch_rounded,
+                                      color: U.peach,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'READ ALOUD',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.5,
+                                      color: U.peach.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Rockets Reader',
+                                style: GoogleFonts.newsreader(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: U.text,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Listen to your notes via neural AI TTS.',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: U.sub,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        Column(
+                          children: [
+                            AnimatedWaveform(color: U.peach),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: U.peach,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                'Listen',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: svgAsset != null
-                    ? SvgPicture.asset(
-                        svgAsset!,
-                        width: 20,
-                        height: 20,
-                        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                      )
-                    : Icon(icon, color: iconColor, size: 20),
+              ).animate()
+                  .fadeIn(delay: 400.ms, duration: 500.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 400.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+
+              const SizedBox(height: 20),
+
+              // ── Today's Brief Card ──
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: NewsBriefDashboardCard(),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: U.dim,
-                size: 16,
-              ),
+
+              const SizedBox(height: 140),
             ],
           ),
-          const Spacer(),
-
-          // Title
-          Text(
-            title,
-            style: GoogleFonts.newsreader(
-              fontSize: 22,
-              fontWeight: FontWeight.w400,
-              fontStyle: FontStyle.italic,
-              color: U.text,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const SizedBox(height: 4),
-
-          // Description
-          Text(
-            description,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: U.sub,
-              height: 1.4,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 8),
-
-          // Stat line
-          Text(
-            statLabel,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: U.dim,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  /// Wide card layout (for Reminders – full width)
-  Widget _buildWideLayout() {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: U.surface,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: U.border,
-              width: 0.5,
-            ),
-          ),
-          child: svgAsset != null
-              ? SvgPicture.asset(
-                  svgAsset!,
-                  width: 22,
-                  height: 22,
-                  colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
-                )
-              : Icon(icon, color: iconColor, size: 22),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.newsreader(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w400,
-                  fontStyle: FontStyle.italic,
-                  color: U.text,
-                  letterSpacing: -0.3,
-                ),
+class PressableCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final double scaleFactor;
+
+  const PressableCard({
+    super.key,
+    required this.child,
+    required this.onTap,
+    this.scaleFactor = 0.97,
+  });
+
+  @override
+  State<PressableCard> createState() => _PressableCardState();
+}
+
+class _PressableCardState extends State<PressableCard> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) => setState(() => _isPressed = false),
+      onTapCancel: () => setState(() => _isPressed = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _isPressed ? widget.scaleFactor : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOutCubic,
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+class AnimatedWaveform extends StatefulWidget {
+  final Color color;
+  const AnimatedWaveform({super.key, required this.color});
+
+  @override
+  State<AnimatedWaveform> createState() => _AnimatedWaveformState();
+}
+
+class _AnimatedWaveformState extends State<AnimatedWaveform> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final heights = [0.35, 0.75, 0.5, 0.95, 0.65, 0.45, 0.25];
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: List.generate(7, (index) {
+            final animatedVal = _controller.value;
+            final shift = sin((animatedVal * 2 * pi) + (index * 0.8));
+            final currentHeight = 10.0 + 18.0 * heights[index] * (shift + 1.2);
+            return Container(
+              width: 3.5,
+              height: currentHeight.clamp(4.0, 32.0),
+              margin: const EdgeInsets.symmetric(horizontal: 1.8),
+              decoration: BoxDecoration(
+                color: widget.color.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(height: 4),
-              Text(
-                description.replaceAll('\n', ' '),
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  color: U.sub,
-                  height: 1.4,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                statLabel,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: U.dim,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-        Icon(
-          Icons.chevron_right_rounded,
-          color: U.dim,
-          size: 16,
-        ),
-      ],
+            );
+          }),
+        );
+      },
     );
   }
 }

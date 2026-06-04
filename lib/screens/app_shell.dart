@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../main.dart';
@@ -19,9 +20,10 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
   int _index = 0;
   late final PageController _pageController;
+  late final AnimationController _gradientController;
 
   final List<Widget?> _screens = [
     const FocusScreen(),
@@ -51,6 +53,10 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _index);
+    _gradientController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 15),
+    )..repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPopupEvent();
     });
@@ -260,6 +266,7 @@ class _AppShellState extends State<AppShell> {
   @override
   void dispose() {
     _pageController.dispose();
+    _gradientController.dispose();
     super.dispose();
   }
 
@@ -312,6 +319,9 @@ class _AppShellState extends State<AppShell> {
             extendBody: true,
             body: Stack(
               children: [
+                Positioned.fill(
+                  child: _buildMeshGradient(theme),
+                ),
                 PageView(
                   controller: _pageController,
                   onPageChanged: (index) {
@@ -451,6 +461,98 @@ class _AppShellState extends State<AppShell> {
     },
   );
 }
+
+  Widget _buildMeshGradient(AppTheme theme) {
+    final isDark = theme.isDark;
+    return AnimatedBuilder(
+      animation: _gradientController,
+      builder: (context, _) {
+        final value = _gradientController.value;
+        final dx1 = cos(value * 2 * pi);
+        final dy1 = sin(value * 2 * pi);
+        final dx2 = sin(value * 2 * pi);
+        final dy2 = cos(value * 2 * pi);
+
+        final alpha1 = isDark
+            ? (0.16 + 0.05 * sin(value * 2 * pi)).clamp(0.0, 1.0)
+            : (0.15 + 0.03 * sin(value * 2 * pi)).clamp(0.0, 1.0);
+            
+        final alpha2 = isDark
+            ? (0.14 + 0.04 * cos(value * 2 * pi)).clamp(0.0, 1.0)
+            : (0.12 + 0.02 * cos(value * 2 * pi)).clamp(0.0, 1.0);
+            
+        final alpha3 = isDark
+            ? (0.08 + 0.03 * sin(value * 2 * pi + pi)).clamp(0.0, 1.0)
+            : (0.09 + 0.02 * sin(value * 2 * pi + pi)).clamp(0.0, 1.0);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.bg,
+          ),
+          child: Stack(
+            children: [
+              // Top Left moving glow
+              Positioned(
+                top: -200 + dy1 * 150,
+                left: -200 + dx1 * 150,
+                width: 600,
+                height: 600,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        theme.primary.withValues(alpha: alpha1),
+                        theme.primary.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Bottom Right moving glow
+              Positioned(
+                bottom: -200 + dy2 * 130,
+                right: -200 + dx2 * 130,
+                width: 600,
+                height: 600,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        (theme.key == 'gruvbox' 
+                            ? theme.peach 
+                            : theme.teal).withValues(alpha: alpha2),
+                        theme.teal.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Center subtle moving ambient light
+              Positioned(
+                top: 250 - dy1 * 80,
+                right: 0 - dx2 * 80,
+                width: 400,
+                height: 400,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        theme.blue.withValues(alpha: alpha3),
+                        theme.blue.withValues(alpha: 0.0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _NavItem extends StatelessWidget {

@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../main.dart';
-import '../theme/image_overlay_colors.dart';
+import 'university_selection_screen.dart';
 import 'iaa_screen.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
@@ -26,6 +26,7 @@ class UniversityScreen extends StatefulWidget {
 
 class _UniversityScreenState extends State<UniversityScreen> {
   String _universityId = '';
+  String _universityName = '';
   bool _isLoading = true;
 
   @override
@@ -43,9 +44,22 @@ class _UniversityScreenState extends State<UniversityScreen> {
             .doc(user.uid)
             .get();
         final uniId = userDoc.data()?['selectedUniversityId'] as String?;
+        
+        String uniName = '';
+        if (uniId != null && uniId.isNotEmpty) {
+          final uniDoc = await FirebaseFirestore.instance
+              .collection('universities')
+              .doc(uniId)
+              .get();
+          if (uniDoc.exists && uniDoc.data() != null) {
+            uniName = uniDoc.data()?['name'] as String? ?? '';
+          }
+        }
+
         if (mounted) {
           setState(() {
             _universityId = uniId ?? '';
+            _universityName = uniName;
             _isLoading = false;
           });
         }
@@ -57,252 +71,359 @@ class _UniversityScreenState extends State<UniversityScreen> {
     }
   }
 
+  String get _displayUniversityName {
+    if (_universityName.isNotEmpty) return _universityName;
+    if (_universityId.isNotEmpty) {
+      return _universityId
+          .split('-')
+          .map((word) => word.isNotEmpty
+              ? '${word[0].toUpperCase()}${word.substring(1)}'
+              : '')
+          .join(' ');
+    }
+    return 'Utopia Campus';
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
-    final isDark = appThemeNotifier.value.isDark;
-    final currentThemeKey = appThemeNotifier.value.key;
+    final theme = appThemeNotifier.value;
 
-    final titleColor = isDark
-        ? (currentThemeKey == 'gruvbox'
-            ? const Color(0xFFFB4934)
-            : currentThemeKey == 'everforest'
-                ? const Color(0xFFA7C080)
-                : currentThemeKey == 'github-dark'
-                    ? const Color(0xFF58A6FF)
-                    : currentThemeKey == 'orchid'
-                        ? const Color(0xFFCBA6F7)
-                        : Colors.white)
-        : ImageOverlayColors.titleColor(currentThemeKey, 'morning');
-
-    final subtitleColor = isDark
-        ? U.sub
-        : ImageOverlayColors.subtitleColor(currentThemeKey, 'morning');
+    final cards = [
+      _CardItem(
+        title: 'Attendance',
+        subtitle: 'Track presence.',
+        icon: Icons.fact_check_rounded,
+        color: theme.primary,
+        badgeText: '98%',
+        delay: 50,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AttendanceScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'People',
+        subtitle: 'Campus directory.',
+        icon: Icons.people_alt_rounded,
+        color: theme.blue,
+        badgeText: 'Find',
+        delay: 100,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PeopleScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'Friends',
+        subtitle: 'Connections.',
+        icon: Icons.groups_rounded,
+        color: theme.peach,
+        badgeText: 'Chat',
+        delay: 150,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FriendsScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'Events',
+        subtitle: 'Happenings.',
+        icon: Icons.local_activity_rounded,
+        color: theme.green,
+        badgeText: 'Live',
+        delay: 200,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EventsScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'Uni Chat',
+        subtitle: 'Group discussion.',
+        icon: Icons.chat_bubble_rounded,
+        color: theme.teal,
+        badgeText: 'Room',
+        delay: 250,
+        onTap: () async {
+          if (_universityId.isNotEmpty) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UniChatScreen(universityId: _universityId),
+              ),
+            );
+          }
+        },
+      ),
+      _CardItem(
+        title: 'Docs',
+        subtitle: 'Study resources.',
+        icon: Icons.folder_copy_rounded,
+        color: theme.lavender,
+        badgeText: 'PDFs',
+        delay: 300,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const DocsScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'IAA',
+        subtitle: 'AI Assistant.',
+        icon: Icons.auto_awesome_rounded,
+        color: theme.primary,
+        badgeText: 'GPT',
+        delay: 350,
+        onTap: () => Navigator.push(
+          context,
+          IAAScreen.route(),
+        ),
+      ),
+      _CardItem(
+        title: 'Map',
+        subtitle: 'Campus locator.',
+        icon: Icons.explore_rounded,
+        color: (theme.key == 'primary-light' || theme.key == 'primary-dark')
+            ? theme.primary
+            : theme.red,
+        badgeText: '3D',
+        delay: 400,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        ),
+      ),
+      _CardItem(
+        title: 'Timetable',
+        subtitle: 'Class schedule.',
+        icon: Icons.calendar_month_rounded,
+        color: theme.sky,
+        badgeText: 'Today',
+        delay: 450,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TimetableScreen()),
+        ),
+      ),
+    ];
 
     return Scaffold(
-      backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // Background Image (Extended for smooth transition)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Opacity(
-              opacity: isDark ? 0.35 : 0.6,
-              child: Image.asset(
-                'assets/university/background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                color: isDark ? U.bg : null,
-                colorBlendMode: isDark ? BlendMode.multiply : null,
-              ),
-            ),
-          ),
-          // Gradient overlay: top half clear, bottom half smooth fade
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.6,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark
-                      ? [
-                          U.bg.withValues(alpha: 0.45),
-                          U.bg.withValues(alpha: 0.15),
-                          U.bg.withValues(alpha: 1.0),
-                        ]
-                      : [
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg,
-                        ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Premium Modern Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Circular University Change Button (Left)
+                      _HeaderButton(
+                        icon: Icons.swap_horiz_rounded,
+                        tooltip: 'Change University',
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const UniversitySelectionScreen(),
+                            ),
+                          );
+                          _loadData(); // Reload selected university details on back
+                        },
+                      ),
+                      // Circular Notification Bell Button (Right)
+                      _HeaderButton(
+                        icon: Icons.notifications_none_rounded,
+                        tooltip: 'Notifications',
+                        showBadge: true,
+                        badgeText: '1',
+                        onTap: () {
+                          U.showSnackBar(
+                            context,
+                            'Welcome to UTOPIA! Explore your campus network.',
+                            icon: Icons.notifications_active_rounded,
+                            iconColor: theme.primary,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'University',
-                        style: GoogleFonts.newsreader(
-                          color: titleColor,
-                          fontSize: 38,
-                          fontWeight: FontWeight.w400,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: -0.5,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
-                              offset: const Offset(0, 1),
-                              blurRadius: 3,
-                            ),
-                          ],
+                        'MY CAMPUS',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2.0,
+                          color: theme.primary.withValues(alpha: 0.9),
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 6),
                       Text(
-                        'Explore your campus network',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: subtitleColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.2,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
-                              offset: const Offset(0, 1),
-                              blurRadius: 3,
-                            ),
-                          ],
+                        _displayUniversityName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                          color: theme.text,
+                          letterSpacing: -0.6,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
-            if (_isLoading)
-              const Expanded(
-                child: Center(
-                  child: UtopiaLoader(scale: 0.7),
-                ),
-              )
-            else
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.9,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _UniversityCard(
-                      title: 'Attendance',
-                      subtitle: 'Track presence.',
-                      icon: Icons.fact_check_outlined,
-                      color: U.primary,
-                      delay: 100,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-                      ),
+                if (_isLoading)
+                  const Expanded(
+                    child: Center(
+                      child: UtopiaLoader(scale: 0.7),
                     ),
-                    _UniversityCard(
-                      title: 'People',
-                      subtitle: 'Campus network.',
-                      icon: Icons.public_outlined,
-                      color: U.blue,
-                      delay: 150,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PeopleScreen(),
-                        ),
+                  )
+                else
+                  Expanded(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 140),
+                      physics: const BouncingScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 20,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.88,
                       ),
-                    ),
-                    _UniversityCard(
-                      title: 'Friends',
-                      subtitle: 'Your connections.',
-                      icon: Icons.groups_outlined,
-                      color: U.peach,
-                      delay: 200,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const FriendsScreen()),
-                      ),
-                    ),
-                    _UniversityCard(
-                      title: 'Events',
-                      subtitle: 'Happenings.',
-                      icon: Icons.event_available_outlined,
-                      color: const Color(0xFF10B981), // green
-                      delay: 250,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const EventsScreen()),
-                      ),
-                    ),
-                    _UniversityCard(
-                      title: 'Uni Chat',
-                      subtitle: 'Group chat.',
-                      icon: Icons.forum_outlined,
-                      color: U.teal,
-                      delay: 300,
-                      onTap: () async {
-                        if (_universityId.isNotEmpty) {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => UniChatScreen(universityId: _universityId),
-                            ),
-                          );
-                        }
+                      itemCount: cards.length,
+                      itemBuilder: (context, index) {
+                        final card = cards[index];
+                        return _UniversityCard(
+                          title: card.title,
+                          subtitle: card.subtitle,
+                          icon: card.icon,
+                          color: card.color,
+                          badgeText: card.badgeText,
+                          delay: card.delay,
+                          onTap: card.onTap,
+                        );
                       },
                     ),
-                    _UniversityCard(
-                      title: 'Docs',
-                      subtitle: 'Resources.',
-                      icon: Icons.description_outlined,
-                      color: const Color(0xFF7C6AF7),
-                      delay: 350,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const DocsScreen()),
-                      ),
+                  ),
+              ],
+            ),
+          ),
+    );
+  }
+}
+
+class _CardItem {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final String badgeText;
+  final int delay;
+  final VoidCallback onTap;
+
+  _CardItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.badgeText,
+    required this.delay,
+    required this.onTap,
+  });
+}
+
+class _HeaderButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+  final bool showBadge;
+  final String? badgeText;
+
+  const _HeaderButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    this.showBadge = false,
+    this.badgeText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isDark 
+                    ? Colors.white.withValues(alpha: 0.08) 
+                    : Colors.black.withValues(alpha: 0.05),
+                border: Border.all(
+                  color: isDark 
+                      ? Colors.white.withValues(alpha: 0.1) 
+                      : Colors.black.withValues(alpha: 0.05),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                icon,
+                color: U.text,
+                size: 20,
+              ),
+            ),
+            if (showBadge)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: U.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: U.bg,
+                      width: 1.5,
                     ),
-                    _UniversityCard(
-                      title: 'IAA',
-                      subtitle: 'AI Assistant.',
-                      icon: Icons.auto_awesome_rounded,
-                      color: const Color(0xFF7F77DD),
-                      delay: 400,
-                      onTap: () => Navigator.push(
-                        context,
-                        IAAScreen.route(),
-                      ),
-                    ),
-                    _UniversityCard(
-                      title: 'Map',
-                      subtitle: 'Campus map.',
-                      icon: Icons.map_outlined,
-                      color: U.red,
-                      delay: 450,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const MapScreen()),
-                      ),
-                    ),
-                    _UniversityCard(
-                      title: 'Timetable',
-                      subtitle: 'Schedule.',
-                      icon: Icons.calendar_month_rounded,
-                      color: const Color(0xFFF43F5E),
-                      delay: 500,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                      ),
-                    ),
-                  ],
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: badgeText != null
+                      ? Text(
+                          badgeText!,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: isDark ? Colors.black : Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        )
+                      : null,
                 ),
               ),
           ],
         ),
-      ),
-        ],
       ),
     );
   }
@@ -313,76 +434,113 @@ class _UniversityCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
+  final String badgeText;
   final VoidCallback onTap;
   final int delay;
-  final bool isComingSoon;
 
   const _UniversityCard({
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.color,
+    required this.badgeText,
     required this.onTap,
     required this.delay,
-    this.isComingSoon = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = appThemeNotifier.value;
+    final isDark = theme.isDark;
+
     return GestureDetector(
-      onTap: isComingSoon ? null : onTap,
+      onTap: onTap,
       child: Container(
+        width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
           color: U.card,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: U.border,
-            width: 0.5,
+            color: U.border.withValues(alpha: 0.7),
+            width: 0.8,
           ),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, color: U.primary, size: 20),
-                Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              title,
-              style: GoogleFonts.newsreader(
-                fontSize: 22,
-                fontWeight: FontWeight.w400,
-                fontStyle: FontStyle.italic,
-                color: U.text,
-                letterSpacing: -0.3,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle.replaceAll('\n', ' '),
-              style: GoogleFonts.plusJakartaSans(
-                color: U.sub,
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                height: 1.3,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          boxShadow: [
+            BoxShadow(
+              color: (isDark ? Colors.black : theme.primary)
+                  .withValues(alpha: isDark ? 0.25 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              spreadRadius: -2,
             ),
           ],
         ),
-      ).animate().fadeIn(delay: delay.ms, duration: 400.ms).slideY(
-            begin: 0.1,
-            end: 0,
-            delay: delay.ms,
-            duration: 400.ms,
-            curve: Curves.easeOutCubic,
-          ),
-    );
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 8),
+            // Stylized Centered Icon (Squircle shape with subtle gradient)
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withValues(alpha: 0.18),
+                    color.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: U.text,
+                letterSpacing: -0.2,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                subtitle,
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  height: 1.25,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: delay.ms, duration: 450.ms).slideY(
+          begin: 0.12,
+          end: 0,
+          delay: delay.ms,
+          duration: 450.ms,
+          curve: Curves.easeOutCubic,
+        );
   }
 }

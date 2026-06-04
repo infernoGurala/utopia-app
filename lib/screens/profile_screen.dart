@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,7 +15,6 @@ import '../services/cache_service.dart';
 import '../services/platform_support.dart';
 import '../services/role_service.dart';
 import 'university_selection_screen.dart';
-import 'user_profile_screen.dart';
 import 'utopia_section_screen.dart';
 
 
@@ -24,9 +24,10 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   bool _isSuperUser = false;
   bool _updatingTheme = false;
+  late AnimationController _gradientController;
 
   Future<void> _signOut() async {
     RoleService().clearCache();
@@ -196,6 +197,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+
+
   void _showChangePhotoDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -238,6 +246,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = appThemeNotifier.value;
+    final isDark = theme.isDark;
     final user = FirebaseAuth.instance.currentUser;
     final userDocStream = user == null
         ? null
@@ -246,368 +256,418 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .doc(user.uid)
               .snapshots();
     return Scaffold(
-        backgroundColor: U.bg,
-        body: SafeArea(
-          child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: userDocStream,
-            builder: (context, snapshot) {
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 120),
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: userDocStream,
+              builder: (context, snapshot) {
+                return ListView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 140),
                   children: [
+                    // Header Row
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        if (Navigator.canPop(context)) ...[
-                          GestureDetector(
+                        // Back Button (Left)
+                        if (Navigator.canPop(context))
+                          _HeaderButton(
+                            icon: Icons.arrow_back_rounded,
+                            tooltip: 'Back',
                             onTap: () => Navigator.pop(context),
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 12),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: U.card,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: U.border),
-                              ),
-                              child: Icon(
-                                Icons.arrow_back_rounded,
-                                color: U.text,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
-                        Expanded(
-                          child: Text(
-                            'Profile',
-                            style: GoogleFonts.newsreader(
-                              fontSize: 38,
-                              fontWeight: FontWeight.w400,
-                              fontStyle: FontStyle.italic,
-                              color: U.text,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
+                          )
+                        else
+                          const SizedBox(width: 44),
+                        // Share Button (Right)
+                        _HeaderButton(
+                          icon: Icons.share_outlined,
+                          tooltip: 'Share App',
                           onTap: () {
                             Share.share('Join me on UTOPIA! 🚀 The productivity platform.\n\nhttps://inferalis.space/download-utopia');
                           },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: U.card,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: U.border),
-                            ),
-                            child: Icon(
-                              Icons.share_outlined,
-                              color: U.text,
-                              size: 20,
-                            ),
-                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Manage your academic identity',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: U.dim,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                )
-                    .animate()
-                    .fadeIn(duration: 500.ms, curve: Curves.easeOut)
-                    .slideY(begin: 0.1, end: 0, duration: 500.ms, curve: Curves.easeOut),
-                const SizedBox(height: 32),
-
-                // Clean Minimal Profile Header
-                Builder(
-                  builder: (context) {
-                    final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
-                    return Column(
+                    const SizedBox(height: 16),
+                    // Header Typography
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Center(
-                          child: Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              GestureDetector(
-                                onTap: () => _showChangePhotoDialog(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(3),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: U.primary.withValues(alpha: 0.2), width: 2),
-                                  ),
-                                  child: CircleAvatar(
-                                    radius: 44,
-                                    backgroundColor: U.primary.withValues(alpha: 0.1),
-                                    backgroundImage: user?.photoURL != null
-                                        ? CachedNetworkImageProvider(user!.photoURL!)
-                                        : null,
-                                    child: user?.photoURL == null
-                                        ? Text(
-                                            (user?.displayName ?? 'U')[0].toUpperCase(),
-                                            style: GoogleFonts.plusJakartaSans(
-                                              color: U.primary,
-                                              fontSize: 32,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                              GestureDetector(
-                                onTap: () => _showChangePhotoDialog(context),
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: U.card,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: U.border),
-                                  ),
-                                  child: Icon(Icons.camera_alt_outlined, size: 14, color: U.primary),
-                                ),
-                              ),
-                            ],
+                        Text(
+                          'MY ACCOUNT',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.0,
+                            color: theme.primary.withValues(alpha: 0.9),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                user?.displayName ?? 'Student',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: U.text,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (_isSuperUser) ...[
-                              const SizedBox(width: 6),
-                              const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 16),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 6),
                         Text(
-                          user?.email ?? '',
+                          'Profile',
+                          style: GoogleFonts.outfit(
+                            fontSize: 34,
+                            fontWeight: FontWeight.w800,
+                            color: theme.text,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Manage your academic identity',
                           style: GoogleFonts.plusJakartaSans(
                             color: U.sub,
-                            fontSize: 13,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                        if (bio.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32),
-                            child: Text(
-                              bio,
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: U.text.withValues(alpha: 0.8),
-                                fontSize: 13,
-                                height: 1.4,
+                      ],
+                    ).animate().fadeIn(duration: 450.ms, curve: Curves.easeOutCubic).slideY(
+                          begin: 0.1,
+                          end: 0,
+                          duration: 450.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+                    const SizedBox(height: 32),
+
+                    // Premium Profile Header Card
+                    Builder(
+                      builder: (context) {
+                        final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: U.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: U.border.withValues(alpha: 0.7),
+                              width: 0.8,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isDark ? Colors.black : theme.primary)
+                                    .withValues(alpha: isDark ? 0.25 : 0.04),
+                                blurRadius: 16,
+                                offset: const Offset(0, 8),
+                                spreadRadius: -2,
                               ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // Avatar stack
+                              Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _showChangePhotoDialog(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: theme.primary.withValues(alpha: 0.3),
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 44,
+                                        backgroundColor: theme.primary.withValues(alpha: 0.1),
+                                        backgroundImage: user?.photoURL != null
+                                            ? CachedNetworkImageProvider(user!.photoURL!)
+                                            : null,
+                                        child: user?.photoURL == null
+                                            ? Text(
+                                                (user?.displayName ?? 'U')[0].toUpperCase(),
+                                                style: GoogleFonts.plusJakartaSans(
+                                                  color: theme.primary,
+                                                  fontSize: 32,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => _showChangePhotoDialog(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: U.card,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: U.border),
+                                      ),
+                                      child: Icon(Icons.camera_alt_outlined, size: 14, color: theme.primary),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      user?.displayName ?? 'Student',
+                                      style: GoogleFonts.outfit(
+                                        color: U.text,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.5,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (_isSuperUser) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 18),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                user?.email ?? '',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: U.sub,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (bio.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                Divider(color: U.border.withValues(alpha: 0.5), thickness: 0.5),
+                                const SizedBox(height: 16),
+                                Text(
+                                  bio,
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: U.text.withValues(alpha: 0.85),
+                                    fontSize: 13,
+                                    height: 1.45,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                              const SizedBox(height: 20),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  final updated = await showModalBottomSheet<bool>(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (context) => _EditProfileSheet(
+                                      initialName: user?.displayName ?? 'Student',
+                                      initialBio: bio,
+                                    ),
+                                  );
+                                  if (updated == true && mounted) {
+                                    setState(() {});
+                                  }
+                                },
+                                icon: Icon(Icons.edit_outlined, size: 14, color: theme.primary),
+                                label: Text(
+                                  'Edit Profile',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.primary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: theme.primary.withValues(alpha: 0.5), width: 0.8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  backgroundColor: theme.primary.withValues(alpha: 0.05),
+                                  minimumSize: Size.zero,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ).animate().fadeIn(delay: 100.ms, duration: 450.ms).slideY(
+                          begin: 0.1,
+                          end: 0,
+                          delay: 100.ms,
+                          duration: 450.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+                    const SizedBox(height: 24),
+
+                    // Grouped Settings List
+                    Container(
+                      decoration: BoxDecoration(
+                        color: U.card,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: U.border.withValues(alpha: 0.7),
+                          width: 0.8,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isDark ? Colors.black : theme.primary)
+                                .withValues(alpha: isDark ? 0.25 : 0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                            spreadRadius: -2,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _groupedTile(
+                            icon: Icons.palette_rounded,
+                            label: 'Switch Theme',
+                            sub: _updatingTheme ? 'Updating theme...' : '${U.themeForKey(U.currentThemeKey).label} theme',
+                            color: theme.peach,
+                            onTap: _selectThemeStyle,
+                          ),
+                          Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color: U.border.withValues(alpha: 0.5),
+                          ),
+                          _groupedTile(
+                            icon: Icons.school_rounded,
+                            label: 'Change University',
+                            sub: 'Switch to a different university',
+                            color: theme.blue,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const UniversitySelectionScreen(),
+                              ),
+                            ),
+                          ),
+                          Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color: U.border.withValues(alpha: 0.5),
+                          ),
+                          _groupedTile(
+                            icon: Icons.rocket_launch_rounded,
+                            label: 'UTOPIA',
+                            sub: 'About and development',
+                            color: theme.lavender,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UtopiaSectionScreen(
+                                  initialIsSuperUser: _isSuperUser,
+                                ),
+                              ),
                             ),
                           ),
                         ],
-                        const SizedBox(height: 16),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final updated = await showModalBottomSheet<bool>(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => _EditProfileSheet(
-                                initialName: user?.displayName ?? 'Student',
-                                initialBio: bio,
-                              ),
-                            );
-                            if (updated == true && mounted) {
-                              setState(() {});
-                            }
-                          },
-                          icon: Icon(Icons.edit_outlined, size: 14, color: U.sub),
-                          label: Text(
-                            'Edit Profile',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: U.sub,
+                      ),
+                    ).animate().fadeIn(delay: 200.ms, duration: 450.ms).slideY(
+                          begin: 0.1,
+                          end: 0,
+                          delay: 200.ms,
+                          duration: 450.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+                    const SizedBox(height: 24),
+
+                    // Play Store Banner Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: theme.primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: theme.primary.withValues(alpha: 0.2),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: theme.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.android_rounded, color: theme.primary, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Coming to Play Store soon',
+                                  style: GoogleFonts.outfit(
+                                    color: U.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Native mobile application is currently in active development.',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: U.sub,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: U.border, width: 0.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            backgroundColor: U.card,
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 300.ms, duration: 450.ms).slideY(
+                          begin: 0.1,
+                          end: 0,
+                          delay: 300.ms,
+                          duration: 450.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
+                    const SizedBox(height: 24),
+
+                    // Sign Out Button
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _showSignOutConfirmDialog,
+                        icon: Icon(Icons.logout_rounded, size: 16, color: U.red.withValues(alpha: 0.8)),
+                        label: Text(
+                          'Sign Out',
+                          style: GoogleFonts.outfit(
+                            color: U.red.withValues(alpha: 0.8),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-
-                // Settings & Info List
-                Container(
-                  decoration: BoxDecoration(
-                    color: U.card.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: U.border, width: 0.5),
-                  ),
-                  child: Column(
-                    children: [
-
-                      // Switch Theme
-                      _groupedTile(
-                        icon: Icons.palette_outlined,
-                        label: 'Switch Theme',
-                        sub: _updatingTheme ? 'Updating theme...' : '${U.themeForKey(U.currentThemeKey).label} theme',
-                        color: U.primary,
-                        onTap: _selectThemeStyle,
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
-                      // Change University
-                      _groupedTile(
-                        icon: Icons.school_outlined,
-                        label: 'Change University',
-                        sub: 'Switch to a different university',
-                        color: U.primary,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const UniversitySelectionScreen(),
-                          ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                         ),
-                      ),
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: U.border.withValues(alpha: 0.5),
-                      ),
-
-
-                      // UTOPIA Section
-                      _groupedTile(
-                        icon: Icons.rocket_launch_outlined,
-                        label: 'UTOPIA',
-                        sub: 'About and development',
-                        color: U.primary,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => UtopiaSectionScreen(
-                              initialIsSuperUser: _isSuperUser,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                
-                // Play Store Coming Soon Banner
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: U.primary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: U.primary.withValues(alpha: 0.15), width: 0.5),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: U.primary.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.android_rounded, color: U.primary, size: 18),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Coming to Play Store soon',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: U.text,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: -0.1,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Native mobile application is currently in active development.',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: U.sub,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Minimal Logout Button
-                Center(
-                  child: TextButton.icon(
-                    onPressed: _showSignOutConfirmDialog,
-                    icon: Icon(Icons.logout_rounded, size: 16, color: U.red.withValues(alpha: 0.7)),
-                    label: Text(
-                      'Sign Out',
-                      style: GoogleFonts.plusJakartaSans(
-                        color: U.red.withValues(alpha: 0.7),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: Text(
+                        'Designed by Humans, Powered by AI',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.dim,
+                          fontSize: 11,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Text(
-                    'Designed by Humans, Powered by AI',
-                    style: GoogleFonts.plusJakartaSans(color: U.dim, fontSize: 11),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+                  ],
+                );
+              },
+            ),
+          ),
     );
-}
+  }
 
   Widget _groupedTile({
     required IconData icon,
@@ -620,10 +680,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: color.withValues(alpha: 0.8), size: 20),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    color.withValues(alpha: 0.18),
+                    color.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 20,
+                ),
+              ),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -631,7 +712,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Text(
                     label,
-                    style: GoogleFonts.plusJakartaSans(
+                    style: GoogleFonts.outfit(
                       color: U.text,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -640,13 +721,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 2),
                   Text(
                     sub,
-                    style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 12),
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.sub,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ],
               ),
             ),
             Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  const _HeaderButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark 
+                ? Colors.white.withValues(alpha: 0.08) 
+                : Colors.black.withValues(alpha: 0.05),
+            border: Border.all(
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.1) 
+                  : Colors.black.withValues(alpha: 0.05),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: U.text,
+            size: 20,
+          ),
         ),
       ),
     );

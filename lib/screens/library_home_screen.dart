@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,7 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../models/class_model.dart';
-import '../theme/image_overlay_colors.dart';
 import '../widgets/utopia_loader.dart';
 import '../services/class_service.dart';
 import '../services/supabase_global_service.dart';
@@ -190,161 +188,68 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = appThemeNotifier.value.isDark;
-    final currentThemeKey = appThemeNotifier.value.key;
-
-    final titleColor = isDark
-        ? (currentThemeKey == 'gruvbox'
-            ? const Color(0xFFFB4934)
-            : currentThemeKey == 'everforest'
-                ? const Color(0xFFA7C080)
-                : currentThemeKey == 'github-dark'
-                    ? const Color(0xFF58A6FF)
-                    : currentThemeKey == 'orchid'
-                        ? const Color(0xFFCBA6F7)
-                        : Colors.white)
-        : ImageOverlayColors.titleColor(currentThemeKey, 'morning');
-
-    final subtitleColor = isDark
-        ? U.sub
-        : ImageOverlayColors.subtitleColor(currentThemeKey, 'morning');
-
     return Scaffold(
-      backgroundColor: U.bg,
-      body: Stack(
-        children: [
-          // Background Image with dark mode blending
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: Opacity(
-              opacity: isDark ? 0.35 : 0.6,
-              child: Image.asset(
-                'assets/semesters/background.png',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                color: isDark ? U.bg : null,
-                colorBlendMode: isDark ? BlendMode.multiply : null,
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Premium Modern Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(width: 44),
+                  const SizedBox(width: 18),
+                  _HeaderButton(
+                    icon: Icons.calendar_month_rounded,
+                    tooltip: 'Timetable',
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
-          // Gradient fade — top fully clear/shaded, bottom solid to blend with background
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.sizeOf(context).height * 0.45,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: isDark
-                      ? [
-                          U.bg.withValues(alpha: 0.45),
-                          U.bg.withValues(alpha: 0.15),
-                          U.bg.withValues(alpha: 1.0),
-                        ]
-                      : [
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg.withValues(alpha: 0.0),
-                          U.bg,
-                        ],
-                  stops: const [0.0, 0.5, 1.0],
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Semesters',
-                              style: GoogleFonts.newsreader(
-                                color: titleColor,
-                                fontSize: 38,
-                                fontWeight: FontWeight.w400,
-                                fontStyle: FontStyle.italic,
-                                letterSpacing: -0.5,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
-                                    offset: const Offset(0, 1),
-                                    blurRadius: 3,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Access academic resources.',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: subtitleColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w400,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.1),
-                                    offset: const Offset(0, 1),
-                                    blurRadius: 3,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedOpacity(
-                        opacity: (_isLoading || _isSyncing) ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 400),
-                        child: SizedBox(
-                          width: 30,
-                          child: LinearProgressIndicator(
-                            backgroundColor: U.border,
-                            valueColor: AlwaysStoppedAnimation<Color>(U.primary),
-                            minHeight: 2,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: U.card,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: U.border, width: 0.5),
-                        ),
-                        child: IconButton(
-                          icon: Icon(Icons.calendar_month_rounded, color: U.primary, size: 18),
-                          tooltip: 'Timetable',
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                            );
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ),
-                    ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'MY ACADEMICS',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.0,
+                      color: U.primary.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Semesters',
+                    style: GoogleFonts.outfit(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w800,
+                      color: U.text,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Access academic resources',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.sub,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.2,
+                    ),
                   ),
                 ],
               ),
@@ -360,9 +265,9 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                       child: GridView.count(
                         crossAxisCount: 2,
                         crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
-                        childAspectRatio: 0.75,
+                        mainAxisSpacing: 20,
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 140),
+                        childAspectRatio: 0.85,
                         children: <Widget>[
                           // ── Community Notes ──
                           _buildCommunityTile(context),
@@ -385,7 +290,7 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                           // ── New Class ──
                           _buildActionTile(
                             label: 'New Class',
-                            icon: Icons.add_circle_outline,
+                            icon: Icons.add_rounded,
                             onTap: _showNewClassMenu,
                           ),
                         ].asMap().entries.map((e) {
@@ -398,8 +303,6 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
             ),
           ],
         ),
-      ),
-        ],
       ),
     );
   }
@@ -735,77 +638,103 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
     bool showPin = false,
     bool showTriangle = false,
   }) {
-    return InkWell(
+    final theme = appThemeNotifier.value;
+    final isDark = theme.isDark;
+
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
-          color: U.card,
-          border: Border.all(
-            color: U.border,
-            width: 0.5,
-          ),
-        ),
-        child: Stack(
-          children: [
-            if (showPin)
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Icon(Icons.push_pin_rounded, size: 14, color: U.primary),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: U.card,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: U.border.withValues(alpha: 0.7),
+                width: 0.8,
               ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, color: U.primary, size: 20),
-                  const Spacer(),
-                  Text(
-                    title,
-                    style: GoogleFonts.newsreader(
-                      color: U.text,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w400,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: -0.3,
+              boxShadow: [
+                BoxShadow(
+                  color: (isDark ? Colors.black : theme.primary)
+                      .withValues(alpha: isDark ? 0.25 : 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -2,
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 8),
+                // Stylized Centered Icon (Squircle shape with subtle gradient)
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        color.withValues(alpha: 0.18),
+                        color.withValues(alpha: 0.05),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
+                  child: Center(
+                    child: Icon(
+                      icon,
+                      color: color,
+                      size: 26,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: U.text,
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
                     description,
                     style: GoogleFonts.plusJakartaSans(
                       color: U.sub,
                       fontSize: 11,
-                      height: 1.3,
+                      fontWeight: FontWeight.w400,
+                      height: 1.25,
                     ),
+                    textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Text(
-                        'EXPLORE',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: U.primary,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.arrow_forward_rounded, color: U.primary, size: 12),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 12),
+              ],
             ),
-          ],
-        ),
+          ),
+          if (showPin)
+            Positioned(
+              top: 14,
+              right: 14,
+              child: Icon(Icons.push_pin_rounded, size: 14, color: U.primary),
+            ),
+        ],
       ),
     );
   }
@@ -1138,40 +1067,47 @@ class UpperCaseTextFormatter extends TextInputFormatter {
 
 
 
-class _SolidTrianglePainter extends CustomPainter {
-  final Color color;
-  final bool topRight;
 
-  _SolidTrianglePainter({required this.color, required this.topRight});
+class _HeaderButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = LinearGradient(
-        colors: [color, color.withValues(alpha: 0.5)],
-        begin: topRight ? Alignment.topRight : Alignment.topLeft,
-        end: topRight ? Alignment.bottomLeft : Alignment.bottomRight,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    if (topRight) {
-      path.moveTo(0, 0);
-      path.lineTo(size.width, 0);
-      path.lineTo(size.width, size.height);
-      path.close();
-    } else {
-      path.moveTo(0, 0);
-      path.lineTo(size.width, 0);
-      path.lineTo(0, size.height);
-      path.close();
-    }
-
-    canvas.drawPath(path, paint);
-  }
+  const _HeaderButton({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
 
   @override
-  bool shouldRepaint(covariant _SolidTrianglePainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.topRight != topRight;
+  Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark 
+                ? Colors.white.withValues(alpha: 0.08) 
+                : Colors.black.withValues(alpha: 0.05),
+            border: Border.all(
+              color: isDark 
+                  ? Colors.white.withValues(alpha: 0.1) 
+                  : Colors.black.withValues(alpha: 0.05),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: U.text,
+            size: 20,
+          ),
+        ),
+      ),
+    );
   }
 }
