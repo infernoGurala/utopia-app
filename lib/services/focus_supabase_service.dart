@@ -21,7 +21,7 @@ class FocusSupabaseService {
   static FocusSupabaseService? _instance;
   supa.SupabaseClient? _client;
   bool _initialized = false;
-  bool _initializing = false;
+  Future<bool>? _initFuture;
   final _db = FocusDatabaseService();
   static const _uuid = Uuid();
 
@@ -35,6 +35,7 @@ class FocusSupabaseService {
       if (user != null) {
         debugPrint('Focus Supabase: Auth state change detected (User logged in). Re-initializing and syncing...');
         _initialized = false;
+        _initFuture = null;
         initialize().then((success) {
           _syncPendingData().then((_) => syncDownAllData());
         });
@@ -68,11 +69,14 @@ class FocusSupabaseService {
   String get _userId => FirebaseAuth.instance.currentUser?.uid ?? '';
 
   /// Initialize the Focus Supabase client from Firestore config
+  /// Initialize the Focus Supabase client from Firestore config
   Future<bool> initialize() async {
     if (_initialized) return true;
-    if (_initializing) return false;
-    _initializing = true;
+    _initFuture ??= _doInitialize();
+    return _initFuture!;
+  }
 
+  Future<bool> _doInitialize() async {
     try {
       final doc = await FirebaseFirestore.instance
           .collection('config')
@@ -84,14 +88,12 @@ class FocusSupabaseService {
         try {
           _client = supa.Supabase.instance.client;
           _initialized = true;
-          _initializing = false;
           debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
           _syncPendingData().then((_) => syncDownAllData());
           return true;
         } catch (fallbackError) {
           debugPrint('Primary Supabase fallback failed: $fallbackError');
         }
-        _initializing = false;
         return false;
       }
 
@@ -104,20 +106,17 @@ class FocusSupabaseService {
         try {
           _client = supa.Supabase.instance.client;
           _initialized = true;
-          _initializing = false;
           debugPrint('Focus Supabase: Initialized successfully using Primary Fallback client!');
           _syncPendingData().then((_) => syncDownAllData());
           return true;
         } catch (fallbackError) {
           debugPrint('Primary Supabase fallback failed: $fallbackError');
         }
-        _initializing = false;
         return false;
       }
 
       _client = supa.SupabaseClient(url, anonKey);
       _initialized = true;
-      _initializing = false;
       debugPrint('Focus Supabase: Initialized successfully with dedicated project URL: $url');
 
       // Background sync of pending data
@@ -129,14 +128,14 @@ class FocusSupabaseService {
       try {
         _client = supa.Supabase.instance.client;
         _initialized = true;
-        _initializing = false;
         _syncPendingData().then((_) => syncDownAllData());
         return true;
       } catch (fallbackError) {
         debugPrint('Primary Supabase fallback failed: $fallbackError');
       }
-      _initializing = false;
       return false;
+    } finally {
+      _initFuture = null;
     }
   }
 
@@ -708,6 +707,15 @@ class FocusSupabaseService {
       createdAt: habit.createdAt,
     );
     await _db.saveHabit(habitWithId);
+
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('habits').upsert(habitWithId.toSupabaseMap(), onConflict: 'id');
+        await _db.markHabitSynced(habitWithId.id);
+      } catch (e) {
+        debugPrint('Focus Supabase: Save habit ${habitWithId.id} online failed: $e');
+      }
+    }
     return habitWithId;
   }
 
@@ -730,6 +738,15 @@ class FocusSupabaseService {
       updatedAt: DateTime.now(),
     );
     await _db.saveRecord(recordWithId);
+
+    if (_initialized && _client != null) {
+      try {
+        await _client!.from('habit_records').upsert(recordWithId.toSupabaseMap(), onConflict: 'id');
+        await _db.markRecordSynced(recordWithId.id);
+      } catch (e) {
+        debugPrint('Focus Supabase: Save record ${recordWithId.id} online failed: $e');
+      }
+    }
     return recordWithId;
   }
 

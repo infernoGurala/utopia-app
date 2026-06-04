@@ -645,7 +645,7 @@ class FocusHabit {
       'days_of_week': daysOfWeek?.join(','), // Represent as a string for safety in supabase too or array depending on setup
       'reminder_time': reminderTime,
       'color': color,
-      'is_archived': isArchived,
+      'is_archived': isArchived ? 1 : 0,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -745,7 +745,7 @@ class HabitRecord {
       'date': date,
       'value': value,
       'target_value': targetValue,
-      'completed': completed,
+      'completed': completed ? 1 : 0,
       'note': note,
       'updated_at': updatedAt.toIso8601String(),
     };
