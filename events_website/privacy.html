@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - UTOPIA</title>
+    <meta name="description" content="Privacy Policy for UTOPIA student platform. Learn how we collect, use, and protect your personal information.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #0f0f11;
+            --surface: #151518;
+            --surface-card: #1c1c21;
+            --border: #282830;
+            --text: #f3f4f6;
+            --sub: #9ca3af;
+            --dim: #6b7280;
+            --primary: #ff5733;
+            --primary-glow: rgba(255, 87, 51, 0.15);
+            --primary-hover: #ff6d4d;
+            --font: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --max-width: 1100px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .background-dots {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: radial-gradient(var(--border) 1px, transparent 1px);
+            background-size: 28px 28px;
+            opacity: 0.3;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            background-color: rgba(15, 15, 17, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            width: 100%;
+        }
+
+        .nav-container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 700;
+            font-size: 20px;
+            letter-spacing: -0.5px;
+            gap: 10px;
+            transition: opacity 0.2s ease;
+        }
+
+        .brand-link:hover {
+            opacity: 0.9;
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--primary), #ff7e5f);
+            box-shadow: 0 4px 12px var(--primary-glow);
+            font-weight: 800;
+            font-size: 14px;
+            color: #fff;
+            letter-spacing: -0.5px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 12px;
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 13.5px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .back-btn:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+            border-color: var(--sub);
+            transform: translateY(-1px);
+        }
+
+        .hero {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 24px 30px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #ffffff, #d1d5db);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            font-size: 14px;
+            color: var(--sub);
+        }
+
+        .update-badge {
+            background-color: rgba(255, 87, 51, 0.1);
+            border: 1px solid rgba(255, 87, 51, 0.2);
+            color: var(--primary);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .main-layout {
+            position: relative;
+            z-index: 2;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 20px 24px 80px;
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 40px;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 100px;
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px 12px 16px;
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-family: var(--font);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .toc-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--dim);
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+
+        .toc-list {
+            list-style-type: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .toc-link {
+            display: block;
+            padding: 8px 12px;
+            color: var(--sub);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .toc-link:hover {
+            color: var(--text);
+            background-color: rgba(255, 255, 255, 0.03);
+            padding-left: 16px;
+        }
+
+        .toc-link.active {
+            color: var(--primary);
+            background-color: rgba(255, 87, 51, 0.08);
+            font-weight: 600;
+            padding-left: 16px;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        .policy-section {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 32px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .policy-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary), #ff7e5f);
+            opacity: 0.8;
+        }
+
+        .policy-section:hover {
+            border-color: rgba(255, 87, 51, 0.3);
+        }
+
+        .policy-section h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .policy-section p {
+            color: var(--sub);
+            font-size: 15.5px;
+            line-height: 1.7;
+            margin-bottom: 16px;
+        }
+
+        .policy-section p:last-child {
+            margin-bottom: 0;
+        }
+
+        .policy-list {
+            list-style-type: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .policy-list li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 400;
+        }
+
+        .policy-list li::before {
+            content: "-";
+            position: absolute;
+            left: 4px;
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 14px;
+        }
+
+        .highlight-box {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            margin-top: 16px;
+        }
+
+        .highlight-box p {
+            margin: 0;
+            font-size: 14.5px;
+        }
+
+        .email-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+            border-bottom: 1px dashed var(--primary);
+            padding-bottom: 1px;
+        }
+
+        .email-link:hover {
+            color: var(--primary-hover);
+            border-bottom-style: solid;
+        }
+
+        footer {
+            background-color: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 40px 24px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .footer-content {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .footer-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text);
+            font-weight: 700;
+            font-size: 16px;
+            text-decoration: none;
+        }
+
+        .footer-logo-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--primary), #ff7e5f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 800;
+            color: white;
+            letter-spacing: -0.5px;
+        }
+
+        .footer-text {
+            font-size: 13px;
+            color: var(--dim);
+        }
+
+        .back-to-top {
+            margin-top: 10px;
+            color: var(--primary);
+            background: none;
+            border: none;
+            font-family: var(--font);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+
+        .back-to-top:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        @media (max-width: 900px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .sidebar {
+                position: relative;
+                top: 0;
+                width: 100%;
+            }
+
+            .toc-list {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 8px;
+            }
+
+            .hero h1 {
+                font-size: 32px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .hero {
+                padding: 40px 16px 20px;
+            }
+
+            .hero h1 {
+                font-size: 26px;
+            }
+
+            .policy-section {
+                padding: 24px 20px;
+            }
+
+            .toc-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-dots"></div>
+
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="brand-link">
+                <div class="brand-logo">UT</div>
+                <span>UTOPIA</span>
+            </a>
+            <a href="index.html" class="back-btn">Back to App</a>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>Privacy Policy for UTOPIA</h1>
+            <div class="hero-meta">
+                <span class="update-badge">Active</span>
+                <span>Last updated: June 4, 2026</span>
+            </div>
+        </section>
+
+        <div class="main-layout">
+            <!-- Table of Contents -->
+            <aside class="sidebar">
+                <div class="search-box">
+                    <input type="text" id="search" class="search-input" placeholder="Search policy...">
+                </div>
+
+                <div>
+                    <h3 class="toc-title">Table of Contents</h3>
+                    <ul class="toc-list">
+                        <li><a href="#introduction" class="toc-link active">1. Introduction</a></li>
+                        <li><a href="#data-collected" class="toc-link">2. Data We Collect</a></li>
+                        <li><a href="#data-storage" class="toc-link">3. How We Store Your Data</a></li>
+                        <li><a href="#third-party" class="toc-link">4. Third-Party Services</a></li>
+                        <li><a href="#advertising" class="toc-link">5. Advertising</a></li>
+                        <li><a href="#user-rights" class="toc-link">6. Your Rights</a></li>
+                        <li><a href="#contact" class="toc-link">7. Contact</a></li>
+                        <li><a href="#policy-changes" class="toc-link">8. Changes to This Policy</a></li>
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <article class="content" id="policy-content">
+                
+                <section id="introduction" class="policy-section">
+                    <h2>1. Introduction</h2>
+                    <p>UTOPIA ("the App") is developed by John Moses ("we", "our", "us"), based in India. This policy explains how we collect, use, and protect your personal information.</p>
+                </section>
+
+                <section id="data-collected" class="policy-section">
+                    <h2>2. Data We Collect</h2>
+                    <p>We collect the following when you use the App:</p>
+                    <ul class="policy-list">
+                        <li>Name and email address (via Google Sign-In)</li>
+                        <li>University name and academic details</li>
+                        <li>Attendance records, timetables, and schedules</li>
+                        <li>User-uploaded files, notes, documents, and voice recordings</li>
+                        <li>Focus session times and habit tracking records</li>
+                        <li>Device location data (for campus mapping and geofencing features)</li>
+                    </ul>
+                </section>
+
+                <section id="data-storage" class="policy-section">
+                    <h2>3. How We Store Your Data</h2>
+                    <p>Your data is synced to secure cloud infrastructure provided by Firebase and Supabase. No data is shared with unauthorized or unofficial third-party servers.</p>
+                </section>
+
+                <section id="third-party" class="policy-section">
+                    <h2>4. Third-Party Services</h2>
+                    <p>The App uses the following third-party services, each governed by their own privacy policies:</p>
+                    <ul class="policy-list">
+                        <li>Google Firebase (authentication, database, storage)</li>
+                        <li>Supabase (database and backend services)</li>
+                    </ul>
+                </section>
+
+                <section id="advertising" class="policy-section">
+                    <h2>5. Advertising</h2>
+                    <p>The App is currently free with no advertisements. We plan to introduce ads approximately one month after the initial Play Store release. This policy will be updated before ads go live.</p>
+                </section>
+
+                <section id="user-rights" class="policy-section">
+                    <h2>6. Your Rights</h2>
+                    <p>You may request deletion of your data at any time by contacting us at the email below.</p>
+                </section>
+
+                <section id="contact" class="policy-section">
+                    <h2>7. Contact</h2>
+                    <p>For any privacy-related questions:</p>
+                    <div class="highlight-box">
+                        <p>Email: <a href="mailto:johnmosesg150@gmail.com" class="email-link">johnmosesg150@gmail.com</a></p>
+                    </div>
+                </section>
+
+                <section id="policy-changes" class="policy-section">
+                    <h2>8. Changes to This Policy</h2>
+                    <p>We may update this policy periodically. Continued use of the App after changes constitutes acceptance of the updated policy.</p>
+                </section>
+
+            </article>
+        </div>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <a href="index.html" class="footer-logo">
+                <div class="footer-logo-icon">UT</div>
+                <span>UTOPIA</span>
+            </a>
+            <p class="footer-text">&copy; 2026 UTOPIA. All rights reserved. Created by John Moses.</p>
+            <button onclick="scrollToTop()" class="back-to-top">Back to top</button>
+        </div>
+    </footer>
+
+    <script>
+        const sections = document.querySelectorAll('.policy-section');
+        const tocLinks = document.querySelectorAll('.toc-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= (sectionTop - 150)) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        const searchInput = document.getElementById('search');
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            sections.forEach(section => {
+                const text = section.innerText.toLowerCase();
+                const isMatch = text.includes(query);
+                
+                if (query === '') {
+                    section.style.opacity = '1';
+                    section.style.transform = 'scale(1)';
+                    section.style.display = 'block';
+                } else if (isMatch) {
+                    section.style.opacity = '1';
+                    section.style.transform = 'scale(1.01)';
+                    section.style.display = 'block';
+                } else {
+                    section.style.opacity = '0.15';
+                    section.style.transform = 'scale(0.98)';
+                }
+            });
+        });
+
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    </script>
+</body>
+</html>

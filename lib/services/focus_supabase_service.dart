@@ -560,6 +560,28 @@ class FocusSupabaseService {
           }
         }
       }
+
+      // Sync pending habits (new habits tracker)
+      final pendingNewHabits = await _db.getPendingHabits();
+      for (final h in pendingNewHabits) {
+        try {
+          await _client!.from('habits').upsert(h.toSupabaseMap(), onConflict: 'id');
+          await _db.markHabitSynced(h.id);
+        } catch (e) {
+          debugPrint('Focus Supabase: Sync upload pending habit ${h.id} failed: $e');
+        }
+      }
+
+      // Sync pending records (new habits tracker)
+      final pendingRecords = await _db.getPendingRecords();
+      for (final r in pendingRecords) {
+        try {
+          await _client!.from('habit_records').upsert(r.toSupabaseMap(), onConflict: 'id');
+          await _db.markRecordSynced(r.id);
+        } catch (e) {
+          debugPrint('Focus Supabase: Sync upload pending record ${r.id} failed: $e');
+        }
+      }
     } catch (e) {
       debugPrint('Focus sync failed: $e');
     }
@@ -635,6 +657,32 @@ class FocusSupabaseService {
           await _db.saveReminder(remoteReminder);
           // Reschedule local timezone-based notification
           await NotificationService.scheduleFocusReminder(remoteReminder);
+        }
+      }
+
+      // 4. Fetch and sync habits (new habits tracker)
+      final remoteHabitsResponse = await _client!.from('habits').select().eq('user_id', userId);
+      if (remoteHabitsResponse != null) {
+        final List<dynamic> rows = remoteHabitsResponse;
+        for (final row in rows) {
+          final remoteHabit = FocusHabit.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          final localHabit = await _db.getHabit(remoteHabit.id);
+          if (localHabit == null || remoteHabit.updatedAt.isAfter(localHabit.updatedAt)) {
+            await _db.saveHabit(remoteHabit);
+          }
+        }
+      }
+
+      // 5. Fetch and sync habit_records (new habits tracker)
+      final remoteRecordsResponse = await _client!.from('habit_records').select().eq('user_id', userId);
+      if (remoteRecordsResponse != null) {
+        final List<dynamic> rows = remoteRecordsResponse;
+        for (final row in rows) {
+          final remoteRecord = HabitRecord.fromMap(row as Map<String, dynamic>).copyWith(syncStatus: 'synced');
+          final localRecord = await _db.getRecord(remoteRecord.habitId, remoteRecord.date);
+          if (localRecord == null || remoteRecord.updatedAt.isAfter(localRecord.updatedAt)) {
+            await _db.saveRecord(remoteRecord);
+          }
         }
       }
 
@@ -806,8 +854,8 @@ class FocusSupabaseService {
 
       if (needsSync) {
         debugPrint('Focus Supabase Sync: Weekly auto-sync check triggered a sync!');
-        // Trigger sync asynchronously in background
-        performManualSync();
+        // Await the sync to prevent race conditions during initialization
+        await performManualSync();
       } else {
         debugPrint('Focus Supabase Sync: Weekly auto-sync checked, not needed yet.');
       }
