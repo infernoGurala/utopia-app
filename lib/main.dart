@@ -720,6 +720,12 @@ class U {
   static Color get lavender => appThemeNotifier.value.lavender;
   static Color get gray => appThemeNotifier.value.gray;
 
+  static Color getContrastColor(Color background) {
+    return ThemeData.estimateBrightnessForColor(background) == Brightness.dark
+        ? Colors.white
+        : const Color(0xFF111111);
+  }
+
   static Color get mdH1 => appThemeNotifier.value.mdH1;
   static Color get mdH2 => appThemeNotifier.value.mdH2;
   static Color get mdH3 => appThemeNotifier.value.mdH3;

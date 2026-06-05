@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -806,6 +807,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildLoadedState() {
     return Scaffold(
       backgroundColor: Colors.transparent,
+      extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 240),
         child: () {
@@ -825,35 +827,54 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   }
 
   Widget _buildBottomNavBar() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      height: 74,
-      decoration: BoxDecoration(
-        color: U.card,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: U.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    final isDark = appThemeNotifier.value.isDark;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+            child: Container(
+              height: 64,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? U.surface.withValues(alpha: 0.55)
+                    : U.surface.withValues(alpha: 0.65),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.12)
+                      : Colors.white.withValues(alpha: 0.6),
+                  width: 0.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(0, Icons.donut_large_rounded, 'Overview'),
+                  _buildNavItem(1, Icons.calendar_month_rounded, 'Calendar'),
+                  _buildNavItem(2, Icons.bar_chart_rounded, 'Insights'),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(0, Icons.donut_large_rounded, 'Overview'),
-          _buildNavItem(1, Icons.calendar_month_rounded, 'Calendar'),
-          _buildNavItem(2, Icons.bar_chart_rounded, 'Insights'),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildNavItem(int index, IconData icon, String label) {
     final isSelected = _currentTabIndex == index;
-    final color = isSelected ? U.green : U.sub;
+    final color = isSelected ? U.primary : U.sub;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _currentTabIndex = index),
@@ -877,7 +898,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               width: isSelected ? 12 : 0,
               height: 3,
               decoration: BoxDecoration(
-                color: U.green,
+                color: U.primary,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -1359,7 +1380,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         decoration: BoxDecoration(
           color: U.card,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: U.border),
+          border: Border.all(
+            color: U.border.withValues(alpha: 0.8),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              spreadRadius: -2,
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1417,7 +1449,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         decoration: BoxDecoration(
           color: U.card,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: U.border),
+          border: Border.all(
+            color: U.border.withValues(alpha: 0.8),
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+              spreadRadius: -2,
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -1548,7 +1591,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       decoration: BoxDecoration(
         color: U.card,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: U.border),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            spreadRadius: -2,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1760,13 +1814,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(24),
             gradient: LinearGradient(
               colors: [U.card, color.withValues(alpha: 0.14)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            border: Border.all(color: U.border),
+            border: Border.all(
+              color: U.border.withValues(alpha: 0.8),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+                spreadRadius: -2,
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1916,8 +1981,19 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: U.card,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: U.border),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            spreadRadius: -2,
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -1995,8 +2071,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: tint.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tint.withValues(alpha: 0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2038,13 +2114,22 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         ? 'Needs attention'
         : 'Attend $classesNeeded more class${classesNeeded == 1 ? '' : 'es'} to reach 75%';
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: U.card,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-        side: BorderSide(color: U.border),
+    return Container(
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            spreadRadius: -2,
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -2253,13 +2338,24 @@ class _GradientHero extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         gradient: LinearGradient(
           colors: [U.card, accentColor.withValues(alpha: 0.18)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: U.border),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            spreadRadius: -2,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

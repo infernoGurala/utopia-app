@@ -101,11 +101,21 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
         await _classService.addWriterByEmail(widget.classModel.classId, email);
         _loadMembers();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Writer added successfully'), backgroundColor: U.green));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Writer added successfully', style: GoogleFonts.outfit(color: U.getContrastColor(U.green))),
+              backgroundColor: U.green,
+            ),
+          );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: U.red));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', ''), style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+              backgroundColor: U.red,
+            ),
+          );
         }
       }
     }
@@ -135,7 +145,12 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
         _loadMembers();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll('Exception: ', '')), backgroundColor: U.red));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', ''), style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+              backgroundColor: U.red,
+            ),
+          );
         }
       }
     }
@@ -179,12 +194,22 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
         await _classService.deleteClass(widget.classModel.classId);
         if (mounted) {
           Navigator.popUntil(context, (route) => route.isFirst);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Class deleted successfully')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Class deleted successfully', style: GoogleFonts.outfit(color: U.getContrastColor(U.green))),
+              backgroundColor: U.green,
+            ),
+          );
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isDeleting = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deletion failed: $e'), backgroundColor: U.red));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Deletion failed: $e', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+              backgroundColor: U.red,
+            ),
+          );
         }
       }
     }

@@ -987,8 +987,7 @@ class _FocusScreenState extends State<FocusScreen> {
                         icon: Icons.bar_chart_rounded,
                         color: U.green,
                         onTap: () {
-                          Navigator.push(
-                            context,
+                          navigatorKey.currentState?.push(
                             MaterialPageRoute(builder: (_) => const AttendanceScreen()),
                           ).then((_) => _loadStats());
                         },
@@ -1547,7 +1546,9 @@ class _FocusScreenState extends State<FocusScreen> {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white,
+                                  color: appThemeNotifier.value.isDark
+                                      ? const Color(0xFF0B0612)
+                                      : Colors.white,
                                 ),
                               ),
                             ),

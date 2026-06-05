@@ -42,7 +42,10 @@ class _AdminEventsPanelState extends State<AdminEventsPanel> {
     final success = await EventService.instance.approveEvent(event.id!);
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${event.title} approved!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
+        SnackBar(
+          content: Text('${event.title} approved!', style: GoogleFonts.outfit(color: U.getContrastColor(U.teal))),
+          backgroundColor: U.teal,
+        ),
       );
       _loadData();
     }
@@ -67,7 +70,10 @@ class _AdminEventsPanelState extends State<AdminEventsPanel> {
       final success = await EventService.instance.rejectEvent(event.id!);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${event.title} rejected', style: GoogleFonts.outfit()), backgroundColor: U.red),
+          SnackBar(
+            content: Text('${event.title} rejected', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+            backgroundColor: U.red,
+          ),
         );
         _loadData();
       }

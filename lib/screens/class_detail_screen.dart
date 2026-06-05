@@ -13,7 +13,7 @@ import '../services/supabase_global_service.dart';
 import '../services/class_service.dart';
 import 'class_settings_screen.dart';
 import 'note_viewer_screen.dart';
-import '../widgets/genz_loading_overlay.dart';
+import '../widgets/utopia_loading_overlay.dart';
 
 
 const Map<String, (IconData, String)> kFolderIconCatalogue = {
@@ -323,7 +323,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save order: $e'),
+            content: Text('Failed to save order: $e', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
             backgroundColor: U.red,
           ),
         );
@@ -461,7 +461,13 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(success ? 'Renamed to $displayOld' : 'Failed to rename'), backgroundColor: success ? U.green : U.red),
+                          SnackBar(
+                            content: Text(
+                              success ? 'Renamed to $displayOld' : 'Failed to rename',
+                              style: GoogleFonts.outfit(color: U.getContrastColor(success ? U.green : U.red)),
+                            ),
+                            backgroundColor: success ? U.green : U.red,
+                          ),
                         );
                       }
                     },
@@ -669,9 +675,19 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
                   if (mounted) {
                     if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Deleted "$displayName"'), backgroundColor: U.green));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Deleted "$displayName"', style: GoogleFonts.outfit(color: U.getContrastColor(U.green))),
+                          backgroundColor: U.green,
+                        ),
+                      );
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to delete "$displayName"'), backgroundColor: U.red));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to delete "$displayName"', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+                          backgroundColor: U.red,
+                        ),
+                      );
                     }
                   }
                 },
@@ -776,7 +792,13 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(success ? '$name created!' : 'Failed to create $name'), backgroundColor: success ? U.green : U.red),
+                    SnackBar(
+                      content: Text(
+                        success ? '$name created!' : 'Failed to create $name',
+                        style: GoogleFonts.outfit(color: U.getContrastColor(success ? U.green : U.red)),
+                      ),
+                      backgroundColor: success ? U.green : U.red,
+                    ),
                   );
                 }
               },
@@ -1152,7 +1174,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                 ),
               ],
             ),
-            if (_isPushing) const GenZLoadingOverlay(),
+            if (_isPushing) const UtopiaLoadingOverlay(message: 'Working...'),
           ],
         ),
       ),

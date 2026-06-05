@@ -87,7 +87,16 @@ class _DocViewerScreenState extends State<DocViewerScreen> {
               ),
               TextButton(
                 onPressed: () => OpenFilex.open(filePath),
-                child: Text('Open', style: GoogleFonts.outfit(color: U.primary, fontWeight: FontWeight.w600)),
+                child: Text(
+                  'Open',
+                  style: GoogleFonts.outfit(
+                    color: (ThemeData.estimateBrightnessForColor(U.surface) == Brightness.light &&
+                            ThemeData.estimateBrightnessForColor(U.primary) == Brightness.light)
+                        ? const Color(0xFF0C7A65)
+                        : U.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           ),

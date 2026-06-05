@@ -217,7 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: U.red,
-            content: Text(message, style: GoogleFonts.outfit(color: U.bg)),
+            content: Text(message, style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
           ),
         );
       }
@@ -294,7 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: U.red,
-            content: Text(message, style: GoogleFonts.outfit(color: U.bg)),
+            content: Text(message, style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
           ),
         );
       }

@@ -8,7 +8,7 @@ import '../main.dart';
 import '../services/file_upload_service.dart';
 import '../services/supabase_notes_service.dart';
 import '../services/supabase_global_service.dart';
-import '../widgets/genz_loading_overlay.dart';
+import '../widgets/utopia_loading_overlay.dart';
 import '../services/ai_service.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -541,13 +541,19 @@ class _EditorScreenState extends State<EditorScreen> {
       if (success) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Saved successfully!'), backgroundColor: U.green),
+          SnackBar(
+            content: Text('Saved successfully!', style: GoogleFonts.outfit(color: U.getContrastColor(U.green))),
+            backgroundColor: U.green,
+          ),
         );
         Navigator.pop(context, content);
       } else {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Failed to save correctly.'), backgroundColor: U.red),
+          SnackBar(
+            content: Text('Failed to save correctly.', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
+            backgroundColor: U.red,
+          ),
         );
       }
     }
@@ -697,9 +703,9 @@ class _EditorScreenState extends State<EditorScreen> {
         SnackBar(
           content: Row(
             children: [
-              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: U.bg)),
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: U.getContrastColor(U.primary))),
               const SizedBox(width: 12),
-              Text('Uploading $displayName...', style: GoogleFonts.outfit(color: U.bg)),
+              Text('Uploading $displayName...', style: GoogleFonts.outfit(color: U.getContrastColor(U.primary))),
             ],
           ),
           backgroundColor: U.primary,
@@ -730,7 +736,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('File uploaded!', style: GoogleFonts.outfit(color: U.bg)),
+          content: Text('File uploaded!', style: GoogleFonts.outfit(color: U.getContrastColor(U.green))),
           backgroundColor: U.green,
           duration: const Duration(seconds: 2),
         ),
@@ -740,7 +746,7 @@ class _EditorScreenState extends State<EditorScreen> {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message, style: GoogleFonts.outfit(color: U.bg)),
+          content: Text(e.message, style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
           backgroundColor: U.red,
         ),
       );
@@ -749,7 +755,7 @@ class _EditorScreenState extends State<EditorScreen> {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Upload failed: $e', style: GoogleFonts.outfit(color: U.bg)),
+          content: Text('Upload failed: $e', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
           backgroundColor: U.red,
         ),
       );
@@ -804,15 +810,19 @@ class _EditorScreenState extends State<EditorScreen> {
       _blocks.removeAt(index);
       _hasChanges = true;
     });
-    _undoStack.add((removedIndex, removed));
+    final snackBarTextColor = U.getContrastColor(U.surface);
+    final isSurfaceLight = ThemeData.estimateBrightnessForColor(U.surface) == Brightness.light;
+    final isPrimaryLight = ThemeData.estimateBrightnessForColor(U.primary) == Brightness.light;
+    final actionColor = (isSurfaceLight && isPrimaryLight) ? const Color(0xFF0C7A65) : U.primary;
+
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Block deleted', style: GoogleFonts.outfit(color: U.bg)),
+        content: Text('Block deleted', style: GoogleFonts.outfit(color: snackBarTextColor)),
         backgroundColor: U.surface,
         action: SnackBarAction(
           label: 'Undo',
-          textColor: U.primary,
+          textColor: actionColor,
           onPressed: () {
             if (_undoStack.isNotEmpty) {
               final (idx, block) = _undoStack.removeLast();
@@ -1048,7 +1058,7 @@ class _EditorScreenState extends State<EditorScreen> {
         ],
       ),
       ),
-          if (_saving) const GenZLoadingOverlay(),
+          if (_saving) const UtopiaLoadingOverlay(),
         ],
       ),
       floatingActionButton: _activeFormatController != null
@@ -1376,7 +1386,7 @@ class _QABlockBodyState extends State<_QABlockBody> {
         SnackBar(
           content: Text(
             'Please type a question first, bro! 🧠',
-            style: GoogleFonts.outfit(color: Colors.white),
+            style: GoogleFonts.outfit(color: U.getContrastColor(U.red)),
           ),
           backgroundColor: U.red,
         ),
@@ -1405,7 +1415,7 @@ class _QABlockBodyState extends State<_QABlockBody> {
           SnackBar(
             content: Text(
               'Failed to fetch answer from Luna: $e',
-              style: GoogleFonts.outfit(color: Colors.white),
+              style: GoogleFonts.outfit(color: U.getContrastColor(U.red)),
             ),
             backgroundColor: U.red,
           ),

@@ -211,13 +211,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   Future<void> _publishEvent() async {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter an event title', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Please enter an event title', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
     if (_contactController.text.trim().isEmpty || _conductedByController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Contact numbers and conducted by are required', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Contact numbers and conducted by are required', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
@@ -229,7 +229,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
     if (cleanNum.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Contact number must be exactly 10 digits', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Contact number must be exactly 10 digits', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
@@ -238,19 +238,19 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     final hasPoster = _posterFile != null || _existingPosterUrl != null;
     if (!hasBanner && !hasPoster) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Either a Banner or a Poster image is required', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Either a Banner or a Poster image is required', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
     if (_permissionFile == null && _existingPermissionUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Permission letter is required', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Permission letter is required', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
     if (_requiresPayment && _feeAmountController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please enter the fee amount', style: GoogleFonts.outfit())),
+        SnackBar(content: Text('Please enter the fee amount', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
       );
       return;
     }
@@ -356,12 +356,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         if (mounted) {
           if (success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Event updated successfully!', style: GoogleFonts.outfit()), backgroundColor: U.teal),
+              SnackBar(content: Text('Event updated successfully!', style: GoogleFonts.outfit(color: U.getContrastColor(U.teal))), backgroundColor: U.teal),
             );
             Navigator.pop(context);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to update event.', style: GoogleFonts.outfit()), backgroundColor: U.red),
+              SnackBar(content: Text('Failed to update event.', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
             );
           }
         }
@@ -372,7 +372,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
             Navigator.pop(context);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to create event. Please try again.', style: GoogleFonts.outfit()), backgroundColor: U.red),
+              SnackBar(content: Text('Failed to create event. Please try again.', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))), backgroundColor: U.red),
             );
           }
         }
@@ -381,7 +381,7 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e', style: GoogleFonts.outfit()),
+            content: Text('Error: $e', style: GoogleFonts.outfit(color: U.getContrastColor(U.red))),
             backgroundColor: U.red,
           ),
         );

@@ -1035,7 +1035,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save order'),
+            content: Text('Failed to save order', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
             backgroundColor: U.red,
           ),
         );
@@ -1172,7 +1172,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         ScaffoldMessenger.of(context).hideCurrentSnackBar();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('$name branch created!'),
+                            content: Text('$name branch created!', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.green))),
                             backgroundColor: U.green,
                           ),
                         );
@@ -1182,7 +1182,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         ScaffoldMessenger.of(context).hideCurrentSnackBar();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Failed to create $name branch'),
+                            content: Text('Failed to create $name branch', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
                             backgroundColor: U.red,
                           ),
                         );
@@ -1191,7 +1191,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isCreating ? 'Creating...' : 'Create',
-                style: GoogleFonts.plusJakartaSans(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.primary)),
               ),
             ),
           ],
@@ -1339,6 +1339,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               success
                                   ? '$name created!'
                                   : 'Failed to create $name',
+                              style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(success ? U.green : U.red)),
                             ),
                             backgroundColor: success ? U.green : U.red,
                           ),
@@ -1352,7 +1353,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isCreating ? 'Creating...' : 'Create',
-                style: GoogleFonts.plusJakartaSans(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.primary)),
               ),
             ),
           ],
@@ -2258,11 +2259,11 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                             _load(forceRefresh: true);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('"$displayName" moved to trash'),
+                                content: Text('"$displayName" moved to trash', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.teal))),
                                 backgroundColor: U.teal,
                                 action: SnackBarAction(
                                   label: 'VIEW TRASH',
-                                  textColor: U.bg,
+                                  textColor: U.getContrastColor(U.teal),
                                   onPressed: _openTrash,
                                 ),
                               ),
@@ -2277,7 +2278,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                             }
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Failed to trash: $errorMsg'),
+                                content: Text('Failed to trash: $errorMsg', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
                                 backgroundColor: U.red,
                               ),
                             );
@@ -2287,7 +2288,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                 style: FilledButton.styleFrom(backgroundColor: U.red),
                 child: Text(
                   isDeleting ? 'Trashing...' : 'Move to Trash',
-                  style: GoogleFonts.plusJakartaSans(color: U.bg),
+                  style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red)),
                 ),
               ),
             ],
@@ -2404,6 +2405,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                               success
                                   ? 'Renamed successfully'
                                   : 'Failed to rename',
+                              style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(success ? U.green : U.red)),
                             ),
                             backgroundColor: success ? U.green : U.red,
                           ),
@@ -2417,7 +2419,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
               style: FilledButton.styleFrom(backgroundColor: U.primary),
               child: Text(
                 isRenaming ? 'Renaming...' : 'Rename',
-                style: GoogleFonts.plusJakartaSans(color: U.bg),
+                style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.primary)),
               ),
             ),
           ],
@@ -2482,8 +2484,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (path == null || path.isEmpty) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Unable to delete item: missing target path.'),
+              SnackBar(
+                content: Text('Unable to delete item: missing target path.', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
+                backgroundColor: U.red,
               ),
             );
             return;
@@ -2510,7 +2513,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Item deleted successfully.'),
+                content: Text('Item deleted successfully.', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.green))),
                 backgroundColor: U.green,
               ),
             );
@@ -2525,7 +2528,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Deletion failed: $e'),
+                content: Text('Deletion failed: $e', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
                 backgroundColor: U.red,
               ),
             );
@@ -2536,6 +2539,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
           SnackBar(
             content: Text(
               'Deletion approved ($newApprovalCount/${_getRequiredApprovals((deletionDoc.data() as Map<String, dynamic>?)?['path'] as String? ?? '')}).',
+              style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.primary)),
             ),
             backgroundColor: U.primary,
           ),
@@ -2544,7 +2548,10 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: U.red),
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
+            backgroundColor: U.red,
+          ),
         );
       }
     }
