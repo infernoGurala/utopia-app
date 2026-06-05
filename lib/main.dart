@@ -669,6 +669,15 @@ Future<void> _loadAppToggleSettings() async {
   if (cachedMorning != null) {
     morningNotifEnabledNotifier.value = cachedMorning == 'true';
   }
+
+  final cachedUniId = await CacheService().getAppSetting('cached_university_id');
+  if (cachedUniId != null) {
+    U.cachedUniversityId = cachedUniId;
+  }
+  final cachedUniName = await CacheService().getAppSetting('cached_university_name');
+  if (cachedUniName != null) {
+    U.cachedUniversityName = cachedUniName;
+  }
 }
 
 void main() async {
@@ -690,6 +699,9 @@ void main() async {
 }
 
 class U {
+  static String cachedUniversityId = '';
+  static String cachedUniversityName = '';
+
   static Color get bg => appThemeNotifier.value.bg;
   static Color get surface => appThemeNotifier.value.surface;
   static Color get card => appThemeNotifier.value.card;

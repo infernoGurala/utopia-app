@@ -3,7 +3,6 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -15,11 +14,16 @@ import 'habit_tracker_screen.dart';
 import 'reminders_screen.dart';
 import 'calendar_screen.dart';
 import 'rockets_screen.dart';
+import 'attendance_screen.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
 import '../widgets/news_brief_dashboard_card.dart';
 import '../services/google_calendar_service.dart';
 import '../services/calendar_cache_service.dart';
+import '../services/cache_service.dart';
+import '../services/secure_storage_service.dart';
+import '../services/attendance_cache_service.dart';
+import '../utils/habit_calculators.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -33,13 +37,19 @@ class _FocusScreenState extends State<FocusScreen> {
   String _quote = '';
   String _greetingText = '';
   int _streakDays = 0;
-  int _activeHabits = 0;
-  int _upcomingReminders = 0;
   int _scheduledHabitsCount = 0;
   int _completedHabitsCount = 0;
   String _dailyNoteInsight = 'Write today';
   String _remindersInsight = 'No upcoming';
   String _calendarInsight = 'Connect Google Account';
+
+  String _streakHabitId = '';
+  String _streakHabitName = '';
+  double? _attendancePct;
+
+  String _weatherCity = '';
+  double? _weatherTemp;
+  int? _weatherCode;
 
   String get _userName {
     final user = FirebaseAuth.instance.currentUser;
@@ -155,9 +165,236 @@ class _FocusScreenState extends State<FocusScreen> {
     final greetingText = _generateRandomGreeting(timeSlot);
     final userNameStr = _userName;
     _greetingText = userNameStr.isEmpty ? greetingText : '$greetingText, $userNameStr';
+    _loadCachedStreakHabit();
+    _loadCachedWeather();
     _loadData();
     _loadQuote();
-    _loadStats();
+  }
+
+  Future<void> _loadCachedStreakHabit() async {
+    try {
+      final habitId = await CacheService().getAppSetting('streak_habit_id');
+      final habitName = await CacheService().getAppSetting('streak_habit_name');
+      if (mounted) {
+        setState(() {
+          _streakHabitId = habitId ?? '';
+          _streakHabitName = habitName ?? '';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading cached streak habit: $e');
+    }
+  }
+
+  Future<void> _loadCachedWeather() async {
+    try {
+      final city = await CacheService().getAppSetting('weather_city');
+      final tempStr = await CacheService().getAppSetting('weather_temp');
+      final codeStr = await CacheService().getAppSetting('weather_code');
+      if (mounted) {
+        setState(() {
+          _weatherCity = city ?? (U.cachedUniversityName.isNotEmpty ? U.cachedUniversityName : 'Kakinada');
+          if (tempStr != null) _weatherTemp = double.tryParse(tempStr);
+          if (codeStr != null) _weatherCode = int.tryParse(codeStr);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading cached weather: $e');
+    }
+  }
+
+  Future<void> _fetchWeather() async {
+    if (_weatherCity.isEmpty) return;
+    try {
+      final geoUrl = Uri.parse(
+        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(_weatherCity)}&count=1&language=en&format=json',
+      );
+      final geoRes = await http.get(geoUrl);
+      if (geoRes.statusCode == 200) {
+        final geoData = jsonDecode(geoRes.body);
+        final results = geoData['results'] as List?;
+        if (results != null && results.isNotEmpty) {
+          final first = results.first;
+          final lat = first['latitude'];
+          final lon = first['longitude'];
+          final name = first['name'] as String? ?? _weatherCity;
+
+          final weatherUrl = Uri.parse(
+            'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current_weather=true',
+          );
+          final weatherRes = await http.get(weatherUrl);
+          if (weatherRes.statusCode == 200) {
+            final weatherData = jsonDecode(weatherRes.body);
+            final current = weatherData['current_weather'];
+            if (current != null) {
+              final temp = (current['temperature'] as num?)?.toDouble();
+              final code = current['weathercode'] as int?;
+
+              if (mounted) {
+                setState(() {
+                  _weatherTemp = temp;
+                  _weatherCode = code;
+                  _weatherCity = name;
+                });
+              }
+
+              await CacheService().saveAppSetting('weather_city', name);
+              if (temp != null) {
+                await CacheService().saveAppSetting('weather_temp', temp.toString());
+              }
+              if (code != null) {
+                await CacheService().saveAppSetting('weather_code', code.toString());
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching weather: $e');
+    }
+  }
+
+  IconData _getWeatherIcon(int? code) {
+    if (code == null) return Icons.thermostat_rounded;
+    if (code == 0) return Icons.wb_sunny_rounded;
+    if (code >= 1 && code <= 3) return Icons.wb_cloudy_rounded;
+    if (code == 45 || code == 48) return Icons.cloud_rounded;
+    if (code >= 51 && code <= 55) return Icons.grain_rounded;
+    if (code >= 61 && code <= 65) return Icons.umbrella_rounded;
+    if (code >= 71 && code <= 75) return Icons.ac_unit_rounded;
+    if (code >= 80 && code <= 82) return Icons.umbrella_rounded;
+    if (code >= 95 && code <= 99) return Icons.thunderstorm_rounded;
+    return Icons.thermostat_rounded;
+  }
+
+  void _showWeatherCityPicker() {
+    final controller = TextEditingController(text: _weatherCity);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: U.border, width: 0.5),
+        ),
+        title: Text(
+          'Set Weather Location',
+          style: GoogleFonts.outfit(
+            color: U.text,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          style: GoogleFonts.plusJakartaSans(color: U.text),
+          decoration: InputDecoration(
+            labelText: 'City Name',
+            labelStyle: GoogleFonts.plusJakartaSans(color: U.sub),
+            hintText: 'e.g. Kakinada, Surampalem',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(color: U.sub),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final newCity = controller.text.trim();
+              if (newCity.isNotEmpty) {
+                setState(() {
+                  _weatherCity = newCity;
+                });
+                Navigator.pop(ctx);
+                await CacheService().saveAppSetting('weather_city', newCity);
+                _fetchWeather();
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(
+              'Save',
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStreakHabitPicker() async {
+    final habits = await _service.getHabits(includeArchived: false);
+    if (habits.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please create a habit first in the Habit Tracker!')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select Habit for Streak',
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: habits.length,
+                itemBuilder: (context, index) {
+                  final h = habits[index];
+                  final isSelected = h.id == _streakHabitId;
+                  return ListTile(
+                    title: Text(
+                      h.name,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.text,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: isSelected ? Icon(Icons.check, color: U.primary) : null,
+                    onTap: () async {
+                      setState(() {
+                        _streakHabitId = h.id;
+                        _streakHabitName = h.name;
+                      });
+                      Navigator.pop(ctx);
+                      await CacheService().saveAppSetting('streak_habit_id', h.id);
+                      await CacheService().saveAppSetting('streak_habit_name', h.name);
+                      _loadStats();
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadData() async {
@@ -166,22 +403,10 @@ class _FocusScreenState extends State<FocusScreen> {
       // Start download sync in background to update local SQLite
       _service.syncDownAllData().then((_) {
         _loadStats();
-        _service.getBestActiveStreak().then((info) {
-          if (mounted) {
-            setState(() {
-              _streakDays = info?['streak'] as int? ?? 0;
-            });
-          }
-        });
+        _fetchWeather();
       });
-
-      final info = await _service.getBestActiveStreak();
-      if (mounted) {
-        setState(() {
-          _streakDays = info?['streak'] as int? ?? 0;
-        });
-      }
       _loadStats();
+      _fetchWeather();
     } catch (_) {}
   }
 
@@ -314,9 +539,6 @@ class _FocusScreenState extends State<FocusScreen> {
 
   Future<void> _loadStats() async {
     try {
-      final tasks = await _service.getAllTrackedTasks();
-      final activeTasks = tasks.length;
-
       int totalHabits = 0;
       int completedHabits = 0;
 
@@ -362,7 +584,7 @@ class _FocusScreenState extends State<FocusScreen> {
           } else {
             final left = scheduledCount - doneCount;
             if (left <= 0) {
-              dailyNoteInsight = 'All habits completed! 🎉';
+              dailyNoteInsight = 'All habits completed!';
             } else {
               dailyNoteInsight = '$left ${left == 1 ? "habit" : "habits"} remaining';
             }
@@ -372,13 +594,69 @@ class _FocusScreenState extends State<FocusScreen> {
         debugPrint('FocusScreen daily habits insight load failed: $e');
       }
 
+      // Calculate streak for chosen habit
+      try {
+        final habits = await _service.getHabits(includeArchived: false);
+        if (habits.isNotEmpty) {
+          String targetHabitId = _streakHabitId;
+          if (targetHabitId.isEmpty) {
+            targetHabitId = habits.first.id;
+            _streakHabitId = targetHabitId;
+            _streakHabitName = habits.first.name;
+            await CacheService().saveAppSetting('streak_habit_id', targetHabitId);
+            await CacheService().saveAppSetting('streak_habit_name', _streakHabitName);
+          }
+
+          final chosenHabit = habits.firstWhere(
+            (h) => h.id == targetHabitId,
+            orElse: () => habits.first,
+          );
+
+          final records = await _service.getRecordsForHabit(chosenHabit.id);
+          final streak = HabitCalculators.calculateCurrentStreak(chosenHabit, records);
+          
+          if (mounted) {
+            setState(() {
+              _streakDays = streak;
+              _streakHabitId = chosenHabit.id;
+              _streakHabitName = chosenHabit.name;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _streakDays = 0;
+              _streakHabitId = '';
+              _streakHabitName = 'No Habits';
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error calculating custom streak: $e');
+      }
+
+      // Load attendance percentage
+      double? attendancePct;
+      try {
+        final credentials = await SecureStorageService.getCredentials();
+        if (credentials != null) {
+          final roll = credentials['rollNumber'];
+          if (roll != null) {
+            final cachedAttendance = await AttendanceCacheService.load(roll);
+            if (cachedAttendance != null) {
+              attendancePct = cachedAttendance.data['overallPercentage'] as double?;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading cached attendance: $e');
+      }
+
       // 2. Get next upcoming reminder
       String remindersInsight = 'No reminders';
-      int reminderCount = 0;
       try {
         final reminders = await _service.getReminders();
         final activeReminders = reminders.where((r) => r.isActive).toList();
-        reminderCount = activeReminders.length;
 
         if (activeReminders.isEmpty) {
           remindersInsight = 'All clear! No tasks';
@@ -458,45 +736,64 @@ class _FocusScreenState extends State<FocusScreen> {
 
       if (mounted) {
         setState(() {
-          _activeHabits = activeTasks;
-          _upcomingReminders = reminderCount;
           _scheduledHabitsCount = totalHabits;
           _completedHabitsCount = completedHabits;
           _dailyNoteInsight = dailyNoteInsight;
           _remindersInsight = remindersInsight;
           _calendarInsight = calendarInsight;
+          _attendancePct = attendancePct;
         });
       }
     } catch (_) {}
   }
 
-  Widget _buildQuickPill({required String label, required Color color}) {
+  Widget _buildQuickPill({
+    required String label,
+    required IconData icon,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
     final isDark = appThemeNotifier.value.isDark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark
-                ? color.withValues(alpha: 0.06)
-                : color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
               color: isDark
-                  ? color.withValues(alpha: 0.2)
-                  : color.withValues(alpha: 0.25),
-              width: 0.8,
+                  ? color.withValues(alpha: 0.06)
+                  : color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDark
+                    ? color.withValues(alpha: 0.2)
+                    : color.withValues(alpha: 0.25),
+                width: 0.8,
+              ),
             ),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: isDark ? color.withValues(alpha: 0.95) : color.withValues(alpha: 0.85),
-              letterSpacing: 0.2,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 14,
+                  color: isDark ? color.withValues(alpha: 0.95) : color.withValues(alpha: 0.85),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? color.withValues(alpha: 0.95) : color.withValues(alpha: 0.85),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -675,18 +972,35 @@ class _FocusScreenState extends State<FocusScreen> {
                   child: Row(
                     children: [
                       _buildQuickPill(
-                        label: '🔥 $_streakDays Day Streak',
+                        label: _streakHabitName.isNotEmpty && _streakHabitName != 'No Habits'
+                            ? '$_streakDays Day $_streakHabitName Streak'
+                            : '$_streakDays Day Streak',
+                        icon: Icons.local_fire_department_rounded,
                         color: U.peach,
+                        onTap: _showStreakHabitPicker,
                       ),
                       const SizedBox(width: 8),
                       _buildQuickPill(
-                        label: '✓ $_completedHabitsCount/$_scheduledHabitsCount Habits',
+                        label: _attendancePct != null
+                            ? '${_attendancePct!.toStringAsFixed(0)}% Attendance'
+                            : 'Connect Attendance',
+                        icon: Icons.bar_chart_rounded,
                         color: U.green,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AttendanceScreen()),
+                          ).then((_) => _loadStats());
+                        },
                       ),
                       const SizedBox(width: 8),
                       _buildQuickPill(
-                        label: '🔔 $_upcomingReminders Tasks',
+                        label: _weatherTemp != null
+                            ? '${_weatherTemp!.toStringAsFixed(0)}°C $_weatherCity'
+                            : 'Set Location',
+                        icon: _getWeatherIcon(_weatherCode),
                         color: U.lavender,
+                        onTap: _showWeatherCityPicker,
                       ),
                     ],
                   ),
@@ -794,7 +1108,7 @@ class _FocusScreenState extends State<FocusScreen> {
                           final pct = _scheduledHabitsCount > 0
                               ? _completedHabitsCount / _scheduledHabitsCount
                               : 0.0;
-                          return Container(
+                          return SizedBox(
                             width: 76,
                             height: 76,
                             child: Stack(

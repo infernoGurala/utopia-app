@@ -31,6 +31,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Future<void> _signOut() async {
     RoleService().clearCache();
+    await CacheService().deleteAppSetting('cached_university_id');
+    await CacheService().deleteAppSetting('cached_university_name');
+    U.cachedUniversityId = '';
+    U.cachedUniversityName = '';
     if (PlatformSupport.supportsGoogleSignIn) {
       await GoogleSignIn.instance.initialize(
         serverClientId:

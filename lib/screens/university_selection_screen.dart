@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../main.dart';
 import '../models/university_model.dart';
 import '../services/university_service.dart';
-import '../services/university_service.dart';
+import '../services/cache_service.dart';
 
 class UniversitySelectionScreen extends StatefulWidget {
   const UniversitySelectionScreen({super.key});
@@ -71,6 +71,12 @@ class _UniversitySelectionScreenState extends State<UniversitySelectionScreen> {
     try {
       showAppLoading();
       await _universityService.setUserSelectedUniversity(user.uid, uni.id);
+      
+      // Cache the selected university locally
+      await CacheService().saveAppSetting('cached_university_id', uni.id);
+      await CacheService().saveAppSetting('cached_university_name', uni.name);
+      U.cachedUniversityId = uni.id;
+      U.cachedUniversityName = uni.name;
       
       // Supabase does not need full app clear yet
       

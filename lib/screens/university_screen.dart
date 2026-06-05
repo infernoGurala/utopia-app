@@ -16,6 +16,7 @@ import 'uni_chat_screen.dart';
 import 'docs_screen.dart';
 import 'events_screen.dart';
 import 'timetable_screen.dart';
+import '../services/cache_service.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -25,8 +26,8 @@ class UniversityScreen extends StatefulWidget {
 }
 
 class _UniversityScreenState extends State<UniversityScreen> {
-  String _universityId = '';
-  String _universityName = '';
+  String _universityId = U.cachedUniversityId;
+  String _universityName = U.cachedUniversityName;
   bool _isLoading = true;
 
   @override
@@ -54,6 +55,12 @@ class _UniversityScreenState extends State<UniversityScreen> {
           if (uniDoc.exists && uniDoc.data() != null) {
             uniName = uniDoc.data()?['name'] as String? ?? '';
           }
+
+          // Cache selected university locally
+          await CacheService().saveAppSetting('cached_university_id', uniId);
+          await CacheService().saveAppSetting('cached_university_name', uniName);
+          U.cachedUniversityId = uniId;
+          U.cachedUniversityName = uniName;
         }
 
         if (mounted) {
