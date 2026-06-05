@@ -3243,7 +3243,7 @@ create policy "Allow all actions for configurations" on public.rocket_player_con
         ),
         const SizedBox(width: 16),
         Switch.adaptive(
-          activeColor: U.primary,
+          activeTrackColor: U.primary,
           value: value,
           onChanged: onChanged,
         ),
