@@ -30,6 +30,7 @@ class ProposedAction {
   final DateTime startTime;
   final DateTime endTime;
   final bool isAllDay;
+  final String? colorId;
   bool isSelected;
 
   ProposedAction({
@@ -42,26 +43,40 @@ class ProposedAction {
     required this.startTime,
     required this.endTime,
     required this.isAllDay,
+    this.colorId,
     this.isSelected = true,
   });
 
-  factory ProposedAction.fromJson(Map<String, dynamic> json, int index) {
+  factory ProposedAction.fromJson(
+    Map<String, dynamic> json,
+    int index,
+    Map<String, GoogleCalendarEvent> eventMap,
+  ) {
     final action = json['action'] as String? ?? 'create';
-    // Generate a guaranteed unique ID for creates to avoid duplicate ID issues from LLM templates.
-    final id = action == 'create'
-        ? 'local_suggested_${DateTime.now().millisecondsSinceEpoch}_$index'
-        : (json['id'] as String? ?? 'local_suggested_${DateTime.now().millisecondsSinceEpoch}_$index');
+    String id = json['id'] as String? ?? '';
+    String calendarId = json['calendarId'] as String? ?? 'primary';
+
+    if (action != 'create' && eventMap.containsKey(id)) {
+      final originalEvent = eventMap[id]!;
+      id = originalEvent.id;
+      calendarId = originalEvent.calendarId;
+    } else if (action == 'create') {
+      id = 'local_suggested_${DateTime.now().millisecondsSinceEpoch}_$index';
+    } else if (id.isEmpty) {
+      id = 'local_suggested_${DateTime.now().millisecondsSinceEpoch}_$index';
+    }
 
     return ProposedAction(
       action: action,
       id: id,
-      calendarId: json['calendarId'] as String? ?? 'primary',
+      calendarId: calendarId,
       summary: json['summary'] as String? ?? 'Untitled Suggested Event',
       description: json['description'] as String? ?? '',
       location: json['location'] as String? ?? '',
       startTime: DateTime.tryParse(json['startTime'] as String? ?? '') ?? DateTime.now(),
       endTime: DateTime.tryParse(json['endTime'] as String? ?? '') ?? DateTime.now().add(const Duration(hours: 1)),
       isAllDay: json['isAllDay'] as bool? ?? false,
+      colorId: json['colorId']?.toString(),
     );
   }
 }
@@ -85,6 +100,7 @@ class _CalendarPlannerSheetState extends State<CalendarPlannerSheet> {
   final ScrollController _scrollController = ScrollController();
   final List<PlannerMessage> _messages = [];
   final List<Map<String, String>> _apiHistory = [];
+  final Map<String, GoogleCalendarEvent> _promptEventMap = {};
   
   List<GoogleCalendarEvent> _existingEvents = [];
   bool _isLoading = false;
@@ -112,8 +128,8 @@ class _CalendarPlannerSheetState extends State<CalendarPlannerSheet> {
 
   Future<void> _loadExistingEvents() async {
     final now = DateTime.now();
-    final start = now.subtract(const Duration(days: 7));
-    final end = now.add(const Duration(days: 14));
+    final start = now.subtract(const Duration(days: 3));
+    final end = now.add(const Duration(days: 7));
     final events = await CalendarCacheService.instance.getEvents(start: start, end: end);
     if (mounted) {
       setState(() {
@@ -157,18 +173,49 @@ class _CalendarPlannerSheetState extends State<CalendarPlannerSheet> {
       final writable = calendars.where((c) => c.accessRole == 'owner' || c.accessRole == 'writer').toList();
       final calendarsContext = writable.map((c) => '- ${c.id} (Name: "${c.summary}")').join('\n');
 
+      _promptEventMap.clear();
+      int eventCounter = 1;
       final eventsContext = _existingEvents.map((e) {
+        final key = 'E$eventCounter';
+        _promptEventMap[key] = e;
+        eventCounter++;
         final time = e.isAllDay
             ? 'All Day'
             : '${DateFormat('yyyy-MM-dd HH:mm').format(e.startTime!)} to ${DateFormat('yyyy-MM-dd HH:mm').format(e.endTime!)}';
-        return '- ${e.summary ?? "Untitled"} ($time) [Calendar ID: ${e.calendarId}] [Event ID: ${e.id}]';
+        return '- [$key] ${e.summary ?? "Untitled"} ($time)';
       }).join('\n');
 
       final systemPrompt = '''
 You are Luna, UTOPIA's Intelligent Calendar Planner.
-Your role is to help the user manage, plan, and schedule their calendar.
-You can propose creating new events, updating existing events, or deleting events.
-Improvise and make smart scheduling decisions based on the user's request. For example, if they ask for a 'study session tomorrow afternoon', choose a free afternoon slot (e.g. 2 PM - 4 PM or 3 PM - 5 PM) that does not overlap with their existing events/classes.
+Your role is to help the user manage, plan, schedule, reschedule, and postpone calendar events.
+You can propose creating new events ("action": "create"), updating/rescheduling existing events ("action": "update"), or deleting events ("action": "delete").
+
+For Rescheduling or Postponing:
+- Use the "update" action.
+- You MUST set the "id" to the short ID prefix (e.g. 'E1', 'E2') provided in the existing events list.
+- Supply the new postponed/rescheduled "startTime" and "endTime".
+- Explain what you rescheduled in the "explanation".
+
+For Timing Improvisation & Spacing Heuristics:
+- Improvise logical, realistic times. Avoid overlaps with active events or classes.
+- Schedule study sessions, university lectures, and work focus blocks in the morning or early/mid-afternoon.
+- Schedule health/workouts/sports in the early morning or late afternoon/evening.
+- Schedule social events, dinners, or casual meetings in the evening.
+- General durations: Study blocks (1.5 - 3 hours), workouts (1 - 1.5 hours), dinners/meals (30 - 60 mins), chores (30 - 60 mins).
+
+For Task Color Coding:
+- Provide a "colorId" string property (values "1" to "11") to organize tasks by category:
+  - "1": Lavender (General/casual/chores/miscellaneous)
+  - "2": Sage (Health/workouts/exercise/sports/meditation)
+  - "3": Grape (Social/hangouts/leisure/social meetings)
+  - "4": Flamingo (Urgent tasks/crucial reminders/high priority events)
+  - "5": Banana (Short breaks/meals/lunches/coffee)
+  - "6": Tangerine (Hobbies/creative work/games/reading)
+  - "7": Peacock (Studies/lectures/classes/exam prep/homework)
+  - "8": Graphite (Admin/setup/configuration/billing)
+  - "9": Blueberry (Technical coding/programming/projects/writing)
+  - "10": Basil (Relaxation/winding down/sleep blocks)
+  - "11": Tomato (Crucial deadlines/exams/submissions)
 
 You are fully capable of planning multiple events at once (even 10 or more). Ensure you list ALL requested events as separate entries in the "actions" array. Never omit any requested event, and never say you have scheduled them in the "explanation" without actually including them in the "actions" array.
 
@@ -177,7 +224,7 @@ Today's local time is: $todayStr, $timeStr.
 Here are the user's writable calendars:
 $calendarsContext
 
-Here are the user's existing events from ${DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 7)))} to ${DateFormat('yyyy-MM-dd').format(now.add(const Duration(days: 14)))}:
+Here are the user's existing events from ${DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 3)))} to ${DateFormat('yyyy-MM-dd').format(now.add(const Duration(days: 7)))}:
 $eventsContext
 
 You must respond in the following JSON format ONLY:
@@ -186,14 +233,15 @@ You must respond in the following JSON format ONLY:
   "actions": [
     {
       "action": "create", // "create", "update", "delete"
-      "id": "local_suggested_1", // for 'create' use a unique local ID like 'local_suggested_1', 'local_suggested_2', etc. for 'update' or 'delete', use the exact event ID provided in the existing events list.
+      "id": "local_suggested_1", // for 'create' use a unique local ID like 'local_suggested_1', 'local_suggested_2', etc. for 'update' or 'delete', use the exact short ID (e.g. 'E1', 'E2') provided in the existing events list.
       "calendarId": "<calendar ID from the list, or default to 'primary'>",
       "summary": "<summary/title>",
       "description": "<description/details>",
       "location": "<location, optional>",
       "startTime": "YYYY-MM-DDTHH:MM:SS", // ISO 8601 local date-time string
       "endTime": "YYYY-MM-DDTHH:MM:SS", // ISO 8601 local date-time string
-      "isAllDay": false
+      "isAllDay": false,
+      "colorId": "<color ID string, '1' to '11', based on the color map>"
     }
   ]
 }
@@ -216,15 +264,16 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
 
       setState(() {
         _apiHistory.add({'role': 'user', 'content': trimmed});
-        _apiHistory.add({'role': 'assistant', 'content': responseText});
+        
+        final explanation = parsed != null ? (parsed['explanation'] as String? ?? '') : responseText;
+        _apiHistory.add({'role': 'assistant', 'content': explanation});
         
         if (parsed != null) {
-          final explanation = parsed['explanation'] as String? ?? '';
           final rawActions = parsed['actions'] as List<dynamic>? ?? [];
           final actions = <ProposedAction>[];
           for (int i = 0; i < rawActions.length; i++) {
             if (rawActions[i] is Map<String, dynamic>) {
-              actions.add(ProposedAction.fromJson(rawActions[i] as Map<String, dynamic>, i));
+              actions.add(ProposedAction.fromJson(rawActions[i] as Map<String, dynamic>, i, _promptEventMap));
             }
           }
           _messages.add(PlannerMessage(
@@ -372,6 +421,7 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
             endTime: act.endTime,
             isAllDay: act.isAllDay,
             timezone: localTimeZone,
+            colorId: act.colorId,
             updatedAt: DateTime.now().millisecondsSinceEpoch,
           );
           final success = await GoogleCalendarService.instance.createEvent(event);
@@ -386,6 +436,7 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
               startTime: act.startTime,
               endTime: act.endTime,
               isAllDay: act.isAllDay,
+              colorId: act.colorId,
               updatedAt: DateTime.now().millisecondsSinceEpoch,
             );
             final success = await GoogleCalendarService.instance.updateEvent(updated);
@@ -546,40 +597,245 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: U.surface.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-                border: Border.all(color: U.border.withValues(alpha: 0.2)),
+            // ── Premium Orbital AI Graphic ──
+            SizedBox(
+              width: 180,
+              height: 180,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Ambient background glow
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: U.gold.withValues(alpha: 0.25),
+                          blurRadius: 45,
+                          spreadRadius: 10,
+                        ),
+                        BoxShadow(
+                          color: U.primary.withValues(alpha: 0.15),
+                          blurRadius: 35,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Outer dashed/thin ring
+                  Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  // Inner orbital ring
+                  Container(
+                    width: 110,
+                    height: 110,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: U.gold.withValues(alpha: 0.2),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  // Floating star 1
+                  Positioned(
+                    top: 25,
+                    right: 25,
+                    child: Icon(Icons.auto_awesome_rounded, color: U.gold.withValues(alpha: 0.75), size: 14),
+                  ),
+                  // Floating star 2
+                  Positioned(
+                    bottom: 30,
+                    left: 20,
+                    child: Icon(Icons.star_rounded, color: U.primary.withValues(alpha: 0.5), size: 10),
+                  ),
+                  // Floating star 3
+                  Positioned(
+                    top: 45,
+                    left: 35,
+                    child: Icon(Icons.auto_awesome_rounded, color: U.gold.withValues(alpha: 0.4), size: 12),
+                  ),
+                  // Central sphere
+                  Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          U.card,
+                          U.surface.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: U.gold.withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: U.gold.withValues(alpha: 0.08),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.psychology_rounded,
+                            color: U.gold,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Icon(Icons.psychology_rounded, color: U.primary, size: 36),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
+
+            // ── Text Title ──
             Text(
-              'Improvise Your Schedule',
+              'Luna Calendar Planner',
               style: GoogleFonts.playfairDisplay(
-                fontSize: 21,
-                fontWeight: FontWeight.w600,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
                 fontStyle: FontStyle.italic,
                 color: U.text,
+                letterSpacing: -0.2,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'Ask Luna to design, block, or shift your calendar slots. She will check your conflicts automatically.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
-                color: U.sub,
-                fontSize: 13,
-                height: 1.5,
+
+            // ── Subtext Description inside Glass Card ──
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: U.card.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: U.border.withValues(alpha: 0.2),
+                  width: 0.8,
+                ),
               ),
+              child: Text(
+                'Ask Luna to design, block, or shift your calendar slots. She will check your conflicts and class timings automatically.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 12.5,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── Features Grid (Preview of capability) ──
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: U.card.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.15),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.bolt_rounded, color: U.gold, size: 18),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Instant Planning',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: U.text,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Block exam prep & focus sessions',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5,
+                            color: U.dim,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: U.card.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.15),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(Icons.lock_clock_rounded, color: U.lavender, size: 18),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Conflict Free',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: U.text,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Detects and moves overlapping slots',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5,
+                            color: U.dim,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -763,6 +1019,21 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
             ? U.teal
             : U.primary;
 
+    final Map<String, Color> googleColors = {
+      '1': const Color(0xFF7986CB), // Lavender
+      '2': const Color(0xFF33B679), // Sage
+      '3': const Color(0xFF8E24AA), // Grape
+      '4': const Color(0xFFE67C73), // Flamingo
+      '5': const Color(0xFFF6BF26), // Banana
+      '6': const Color(0xFFF4511E), // Tangerine
+      '7': const Color(0xFF039BE5), // Peacock
+      '8': const Color(0xFF616161), // Graphite
+      '9': const Color(0xFF3F51B5), // Blueberry
+      '10': const Color(0xFF0B8043), // Basil
+      '11': const Color(0xFFD50000), // Tomato
+    };
+    final taskColor = act.colorId != null ? googleColors[act.colorId] : null;
+
     final badgeText = isDelete
         ? 'Delete'
         : isUpdate
@@ -820,16 +1091,32 @@ Do NOT wrap the JSON in anything except a standard ```json markdown code block. 
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            act.summary,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: U.text,
-                              decoration: isDelete ? TextDecoration.lineThrough : null,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              if (taskColor != null)
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    color: taskColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              Expanded(
+                                child: Text(
+                                  act.summary,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: U.text,
+                                    decoration: isDelete ? TextDecoration.lineThrough : null,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 3),
                           Text(

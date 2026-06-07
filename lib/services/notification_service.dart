@@ -1269,4 +1269,102 @@ class NotificationService {
       }
     } catch (e) {}
   }
+
+  // ---------------------------------------------------------------------------
+  // Delve Vocabulary Reminders (IDs 200, 201, 202)
+  // ---------------------------------------------------------------------------
+
+  static const int _delveNotifMorningId = 200;
+  static const int _delveNotifAfternoonId = 201;
+  static const int _delveNotifEveningId = 202;
+
+  /// Schedule 3 daily notifications for Delve vocabulary session reminders.
+  /// Morning (9 AM), Afternoon (2 PM), Evening (8 PM).
+  static Future<void> scheduleDelveReminders() async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      await initialize();
+
+      tz.initializeTimeZones();
+      try {
+        final String timeZoneName = (await FlutterTimezone.getLocalTimezone()).identifier;
+        tz.setLocalLocation(tz.getLocation(timeZoneName));
+      } catch (_) {}
+      final localLocation = tz.local;
+      final now = tz.TZDateTime.now(localLocation);
+
+      final reminders = <Map<String, dynamic>>[
+        {
+          'id': _delveNotifMorningId,
+          'hour': 9,
+          'minute': 0,
+          'title': 'Delve – Morning Review',
+          'body': 'Start your day strong! Your vocabulary session is waiting.',
+        },
+        {
+          'id': _delveNotifAfternoonId,
+          'hour': 14,
+          'minute': 0,
+          'title': 'Delve – Afternoon Boost',
+          'body': 'Quick break? Spend 2 minutes reviewing today\'s words.',
+        },
+        {
+          'id': _delveNotifEveningId,
+          'hour': 20,
+          'minute': 0,
+          'title': 'Delve – Evening Wrap-up',
+          'body': 'Don\'t miss today\'s session! Complete it before bed.',
+        },
+      ];
+
+      for (final r in reminders) {
+        var scheduledDate = tz.TZDateTime(
+          localLocation,
+          now.year,
+          now.month,
+          now.day,
+          r['hour'] as int,
+          r['minute'] as int,
+        );
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+
+        final payloadString = jsonEncode({
+          'title': r['title'],
+          'body': r['body'],
+          'data': {'type': 'delve_reminder'},
+        });
+
+        await _safeZonedSchedule(
+          id: r['id'] as int,
+          title: r['title'] as String,
+          body: r['body'] as String,
+          scheduledDate: scheduledDate,
+          channelId: 'utopia_high_importance',
+          channelName: 'UTOPIA Notifications',
+          channelDescription: 'Delve vocabulary session reminders',
+          payload: payloadString,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
+      debugPrint('NOTIF: Delve reminders scheduled (9 AM, 2 PM, 8 PM)');
+    } catch (e) {
+      debugPrint('NOTIF: Failed to schedule Delve reminders: $e');
+    }
+  }
+
+  /// Cancel all Delve vocabulary session reminders.
+  static Future<void> cancelDelveReminders() async {
+    if (!PlatformSupport.supportsNotifications) return;
+    try {
+      await _localNotifications.cancel(_delveNotifMorningId);
+      await _localNotifications.cancel(_delveNotifAfternoonId);
+      await _localNotifications.cancel(_delveNotifEveningId);
+      debugPrint('NOTIF: Delve reminders cancelled.');
+    } catch (e) {
+      debugPrint('NOTIF: Failed to cancel Delve reminders: $e');
+    }
+  }
 }
+

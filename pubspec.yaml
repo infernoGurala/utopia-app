@@ -30,6 +30,7 @@ dependencies:
   crypto: ^3.0.6
   encrypt: ^5.0.3
   google_fonts: ^6.2.1
+  provider: ^6.1.2
   connectivity_plus: ^6.1.3
   flutter_secure_storage: ^9.2.2
   flutter_math_fork: ^0.7.2
@@ -82,6 +83,7 @@ flutter:
     - assets/icon_cropped.png
     - assets/icons/
     - assets/voices/
+    - assets/logos/
   fonts:
     - family: OrangeAvenue
       fonts:

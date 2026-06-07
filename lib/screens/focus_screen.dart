@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 import '../main.dart';
 import '../theme/image_overlay_colors.dart';
@@ -15,6 +16,13 @@ import 'reminders_screen.dart';
 import 'calendar_screen.dart';
 import 'rockets_screen.dart';
 import 'attendance_screen.dart';
+import 'scratch_pad_screen.dart';
+import 'delve/delve_shell.dart';
+import '../providers/delve_theme_provider.dart';
+import '../providers/delve_deck_provider.dart';
+import '../providers/delve_inventory_provider.dart';
+import '../providers/delve_session_provider.dart';
+import 'package:intl/intl.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
 import '../widgets/news_brief_dashboard_card.dart';
@@ -42,6 +50,8 @@ class _FocusScreenState extends State<FocusScreen> {
   String _dailyNoteInsight = 'Write today';
   String _remindersInsight = 'No upcoming';
   String _calendarInsight = 'Connect Google Account';
+  String _scratchPadInsight = 'Write daily offline scratches...';
+  String _delveInsight = 'Start learning intelligence words';
 
   String _streakHabitId = '';
   String _streakHabitName = '';
@@ -734,6 +744,61 @@ class _FocusScreenState extends State<FocusScreen> {
         debugPrint('FocusScreen calendar insight load failed: $e');
       }
 
+      // 4. Get today's scratch pad note snippet
+      String scratchPadInsight = 'Write daily offline scratches...';
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        final todayScratch = prefs.getString('scratch_pad_$todayStr');
+        if (todayScratch != null && todayScratch.trim().isNotEmpty) {
+          scratchPadInsight = todayScratch.trim().replaceAll('\n', ' ');
+          if (scratchPadInsight.length > 60) {
+            scratchPadInsight = '${scratchPadInsight.substring(0, 60)}...';
+          }
+        }
+      } catch (e) {
+        debugPrint('FocusScreen scratch pad insight load failed: $e');
+      }
+
+      // 5. Get Delve vocabulary learning insight
+      String delveInsight = 'Start learning intelligence words';
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final deckString = prefs.getString('delve_active_deck');
+        if (deckString != null) {
+          final deckMap = jsonDecode(deckString);
+          final currentDay = deckMap['currentDay'] as int? ?? 1;
+          final lastSessionDateStr = deckMap['lastSessionDate'] as String?;
+          bool completedToday = false;
+          if (lastSessionDateStr != null) {
+            final lastSessionDate = DateTime.parse(lastSessionDateStr);
+            final now = DateTime.now();
+            completedToday = lastSessionDate.year == now.year &&
+                lastSessionDate.month == now.month &&
+                lastSessionDate.day == now.day;
+          }
+          if (completedToday) {
+            delveInsight = 'Day $currentDay completed today!';
+          } else {
+            delveInsight = 'Day $currentDay: Session is waiting';
+          }
+        } else {
+          final inventoryString = prefs.getString('delve_inventory');
+          int wordCount = 0;
+          if (inventoryString != null) {
+            final List<dynamic> jsonList = jsonDecode(inventoryString);
+            wordCount = jsonList.length;
+          }
+          if (wordCount < 15) {
+            delveInsight = 'Need ${15 - wordCount} more words to start deck';
+          } else {
+            delveInsight = '15+ words ready! Begin Day 1';
+          }
+        }
+      } catch (e) {
+        debugPrint('FocusScreen Delve insight load failed: $e');
+      }
+
       if (mounted) {
         setState(() {
           _scheduledHabitsCount = totalHabits;
@@ -741,6 +806,8 @@ class _FocusScreenState extends State<FocusScreen> {
           _dailyNoteInsight = dailyNoteInsight;
           _remindersInsight = remindersInsight;
           _calendarInsight = calendarInsight;
+          _scratchPadInsight = scratchPadInsight;
+          _delveInsight = delveInsight;
           _attendancePct = attendancePct;
         });
       }
@@ -1156,166 +1223,12 @@ class _FocusScreenState extends State<FocusScreen> {
 
               const SizedBox(height: 16),
 
-              // ── Middle Row: Reminders & Calendar ──
+              // ── Row 2: Calendar & Stacked (Scratch Pad + Reminders) (Side-by-side) ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Reminders Card
-                    Expanded(
-                      child: PressableCard(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const RemindersScreen()),
-                        ).then((_) => _loadData()),
-                        child: Container(
-                          height: 190,
-                          decoration: BoxDecoration(
-                            color: U.card,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: U.border.withValues(alpha: 0.8),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                                spreadRadius: -2,
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
-                            child: Stack(
-                              children: [
-                                // Left accent line
-                                Positioned(
-                                  left: 0,
-                                  top: 0,
-                                  bottom: 0,
-                                  width: 4,
-                                  child: Container(color: U.lavender),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(18),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: U.lavender.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              Icons.alarm_on_rounded,
-                                              color: U.lavender,
-                                              size: 16,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'TASKS',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 1.5,
-                                              color: U.lavender.withValues(alpha: 0.85),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Spacer(),
-                                      Text(
-                                        'Reminders',
-                                        style: GoogleFonts.newsreader(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle: FontStyle.italic,
-                                          color: U.text,
-                                          letterSpacing: -0.3,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      (() {
-                                        final parts = _remindersInsight.split(': ');
-                                        if (parts.length >= 2) {
-                                          final time = parts[0];
-                                          final label = parts.sublist(1).join(': ');
-                                          return Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                label,
-                                                style: GoogleFonts.plusJakartaSans(
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: U.text,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: U.lavender.withValues(alpha: 0.1),
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color: U.lavender.withValues(alpha: 0.25),
-                                                    width: 0.8,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.access_time_rounded, color: U.lavender, size: 10),
-                                                    const SizedBox(width: 4),
-                                                    Flexible(
-                                                      child: Text(
-                                                        time,
-                                                        style: GoogleFonts.plusJakartaSans(
-                                                          fontSize: 9.5,
-                                                          fontWeight: FontWeight.w800,
-                                                          color: U.lavender.withValues(alpha: 0.9),
-                                                        ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        } else {
-                                          return Text(
-                                            _remindersInsight,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              color: U.sub,
-                                              height: 1.35,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          );
-                                        }
-                                      })(),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
                     // Calendar Card
                     Expanded(
                       child: PressableCard(
@@ -1442,15 +1355,196 @@ class _FocusScreenState extends State<FocusScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    // Scratch Pad & Reminders Stacked Column
+                    Expanded(
+                      child: Column(
+                        children: [
+                          // Scratch Pad Block
+                          PressableCard(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ScratchPadScreen()),
+                            ).then((_) => _loadData()),
+                            child: Container(
+                              height: 87,
+                              decoration: BoxDecoration(
+                                color: U.card,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: U.border.withValues(alpha: 0.8),
+                                  width: 1.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                    spreadRadius: -2,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Stack(
+                                  children: [
+                                    // Left accent line
+                                    Positioned(
+                                      left: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      width: 4,
+                                      child: Container(color: U.blue),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.edit_note_rounded,
+                                                color: U.blue,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'Scratch Pad',
+                                                  style: GoogleFonts.newsreader(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontStyle: FontStyle.italic,
+                                                    color: U.text,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _scratchPadInsight,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 11,
+                                              color: U.sub,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Reminders Block
+                          PressableCard(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const RemindersScreen()),
+                            ).then((_) => _loadData()),
+                            child: Container(
+                              height: 87,
+                              decoration: BoxDecoration(
+                                color: U.card,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: U.border.withValues(alpha: 0.8),
+                                  width: 1.0,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 4),
+                                    spreadRadius: -2,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Stack(
+                                  children: [
+                                    // Left accent line
+                                    Positioned(
+                                      left: 0,
+                                      top: 0,
+                                      bottom: 0,
+                                      width: 4,
+                                      child: Container(color: U.lavender),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.alarm_on_rounded,
+                                                color: U.lavender,
+                                                size: 16,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'Reminders',
+                                                  style: GoogleFonts.newsreader(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontStyle: FontStyle.italic,
+                                                    color: U.text,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _remindersInsight,
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 11,
+                                              color: U.sub,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
+              ).animate()
+                  .fadeIn(delay: 300.ms, duration: 500.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+
+              const SizedBox(height: 16),
+
+              // ── Row 4: Today's Brief Card (News) ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: const NewsBriefDashboardCard(),
               ).animate()
                   .fadeIn(delay: 350.ms, duration: 500.ms)
                   .slideY(begin: 0.1, end: 0, delay: 350.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
               const SizedBox(height: 16),
 
-              // ── Rockets Visualizer Card (Wide) ──
+              // ── Row 5: Rockets Visualizer Card (Wide) ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: PressableCard(
@@ -1521,7 +1615,7 @@ class _FocusScreenState extends State<FocusScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Listen to your notes via neural AI TTS.',
+                                'Neural AI TTS.',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 13,
                                   color: U.sub,
@@ -1562,13 +1656,147 @@ class _FocusScreenState extends State<FocusScreen> {
                   .fadeIn(delay: 400.ms, duration: 500.ms)
                   .slideY(begin: 0.1, end: 0, delay: 400.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // ── Today's Brief Card ──
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
-                child: NewsBriefDashboardCard(),
-              ),
+              // ── Row 6: Delve Project (Beta) Card (Wide) ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: PressableCard(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MultiProvider(
+                          providers: [
+                            ChangeNotifierProvider(create: (_) => DelveThemeProvider()),
+                            ChangeNotifierProvider(
+                              create: (_) {
+                                final provider = InventoryProvider();
+                                final user = FirebaseAuth.instance.currentUser;
+                                if (user != null) {
+                                  provider.initForUser(user.uid);
+                                }
+                                return provider;
+                              },
+                            ),
+                            ChangeNotifierProvider(
+                              create: (_) {
+                                final provider = DeckProvider();
+                                final user = FirebaseAuth.instance.currentUser;
+                                if (user != null) {
+                                  provider.initForUser(user.uid);
+                                }
+                                return provider;
+                              },
+                            ),
+                            ChangeNotifierProvider(create: (_) => SessionProvider()),
+                          ],
+                          child: const DelveShell(),
+                        ),
+                      ),
+                    ).then((_) => _loadData());
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: U.card,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: U.border.withValues(alpha: 0.8),
+                        width: 1.0,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                          spreadRadius: -2,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: U.teal.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.spa_rounded,
+                                      color: U.teal,
+                                      size: 16,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'INTELLIGENCE',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.5,
+                                      color: U.teal.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: U.teal.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'BETA',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: U.teal,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Delve Project',
+                                style: GoogleFonts.newsreader(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: U.text,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _delveInsight,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  color: U.sub,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Icon(
+                          Icons.menu_book_rounded,
+                          color: U.teal.withValues(alpha: 0.6),
+                          size: 32,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ).animate()
+                  .fadeIn(delay: 450.ms, duration: 500.ms)
+                  .slideY(begin: 0.1, end: 0, delay: 450.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
               const SizedBox(height: 140),
             ],

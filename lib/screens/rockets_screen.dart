@@ -2728,14 +2728,7 @@ class _EmbeddedPlayerScreenState extends State<EmbeddedPlayerScreen> {
                               ),
                             ),
                           )
-                        : _isLoadingAudio
-                            ? SizedBox(
-                                height: 180,
-                                child: Center(
-                                  child: CircularProgressIndicator(color: U.primary, strokeWidth: 2.5),
-                                ),
-                              )
-                            : Column(
+                        : Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (_showHistory && _currentSlideIndex > 0 && _slides.isNotEmpty)
