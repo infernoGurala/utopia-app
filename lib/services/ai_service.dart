@@ -432,11 +432,83 @@ class AIService {
     }
   }
 
+  static Future<String> sendCustomMessage({
+    required List<Map<String, String>> messages,
+    int maxTokens = 2048,
+  }) async {
+    try {
+      await initialize();
+
+      if (await _isOffline()) {
+        throw Exception(
+          'I\'m offline right now. Check your connection and try again.',
+        );
+      }
+
+      if (_providers.isEmpty) {
+        throw Exception(
+          'IAA is not configured yet. Add at least one AI provider in Firestore.',
+        );
+      }
+
+      String? responseText;
+      _AIRequestException? lastError;
+
+      for (final provider in _providers) {
+        for (final apiKey in provider.apiKeys) {
+          for (final model in provider.models) {
+            try {
+              responseText = await _sendOpenAICompatibleRequest(
+                provider: provider,
+                apiKey: apiKey,
+                model: model,
+                messages: messages,
+                maxTokens: maxTokens,
+              );
+              if (responseText.trim().isNotEmpty) {
+                break;
+              }
+            } catch (error) {
+              final requestError = _normalizeRequestError(error);
+              lastError = requestError;
+              if (!_shouldTryAnotherRoute(requestError)) {
+                throw Exception(_friendlySendError(requestError));
+              }
+            }
+          }
+          if (responseText != null && responseText.trim().isNotEmpty) {
+            break;
+          }
+        }
+        if (responseText != null && responseText.trim().isNotEmpty) {
+          break;
+        }
+      }
+
+      final text = responseText?.trim();
+      if (text == null || text.isEmpty) {
+        throw Exception(
+          _friendlySendError(
+            lastError ??
+                const _AIRequestException(
+                  message: 'IAA could not generate a response right now.',
+                ),
+          ),
+        );
+      }
+
+      return text;
+    } catch (error) {
+      throw Exception(_friendlySendError(error));
+    }
+  }
+
   static Future<String> _sendOpenAICompatibleRequest({
     required _IAAProvider provider,
     required String apiKey,
     required String model,
     required List<Map<String, String>> messages,
+    int maxTokens = 500,
   }) async {
     final headers = <String, String>{
       'Authorization': 'Bearer $apiKey',
@@ -452,7 +524,7 @@ class AIService {
             'model': model,
             'messages': messages,
             'temperature': 0.4,
-            'max_tokens': 500,
+            'max_tokens': maxTokens,
           }),
         )
         .timeout(const Duration(seconds: 25));

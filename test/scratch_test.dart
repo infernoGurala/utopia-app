@@ -16,3 +16,4 @@ void main() {
     print('WEB_APP_CONFIG_DATA: ${doc.data()}');
   });
 }
+

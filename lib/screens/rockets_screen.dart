@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../main.dart';
@@ -193,6 +194,22 @@ class _RocketsScreenState extends State<RocketsScreen> {
   }
 
   Future<void> _loadPlayerConfigs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _defaultPlaybackSpeed = prefs.getDouble('rocket_pref_speed') ?? 1.0;
+          _defaultHighlightMode = prefs.getBool('rocket_pref_highlight_mode') ?? true;
+          _defaultIsDarkStage = prefs.getBool('rocket_pref_is_dark_stage') ?? false;
+          _defaultWordByWordMode = prefs.getBool('rocket_pref_word_by_word_mode') ?? false;
+          _defaultShowHistory = prefs.getBool('rocket_pref_show_history') ?? true;
+          _showSamples = prefs.getBool('rocket_pref_show_samples') ?? true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Local load configs failed: $e');
+    }
+
     if (_userId.isEmpty || _supabaseService.client == null) return;
     try {
       final data = await _supabaseService.client!
@@ -210,13 +227,39 @@ class _RocketsScreenState extends State<RocketsScreen> {
           _defaultShowHistory = data['show_history'] != false;
           _showSamples = data['show_samples'] != false;
         });
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble('rocket_pref_speed', _defaultPlaybackSpeed);
+        await prefs.setBool('rocket_pref_highlight_mode', _defaultHighlightMode);
+        await prefs.setBool('rocket_pref_is_dark_stage', _defaultIsDarkStage);
+        await prefs.setBool('rocket_pref_word_by_word_mode', _defaultWordByWordMode);
+        await prefs.setBool('rocket_pref_show_history', _defaultShowHistory);
+        await prefs.setBool('rocket_pref_show_samples', _showSamples);
       }
     } catch (e) {
-      debugPrint('Rockets: Failed to load player configs: $e');
+      debugPrint('Rockets: Supabase configurations table not accessible, using local config cache: $e');
     }
   }
 
   Future<void> _loadFolders() async {
+    List<Map<String, dynamic>> localFolders = [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final foldersJson = prefs.getString('rocket_pref_folders');
+      if (foldersJson != null) {
+        final decoded = json.decode(foldersJson) as List;
+        localFolders = decoded.map((f) => Map<String, dynamic>.from(f)).toList();
+      }
+    } catch (e) {
+      debugPrint('Failed to load folders locally: $e');
+    }
+
+    if (mounted && localFolders.isNotEmpty) {
+      setState(() {
+        _folders = localFolders;
+      });
+    }
+
     if (_userId.isEmpty || _supabaseService.client == null) return;
     try {
       final data = await _supabaseService.client!
@@ -224,13 +267,18 @@ class _RocketsScreenState extends State<RocketsScreen> {
           .select()
           .eq('user_id', _userId)
           .order('created_at', ascending: false);
+      
+      final dbFolders = List<Map<String, dynamic>>.from(data as List);
       if (mounted) {
         setState(() {
-          _folders = List<Map<String, dynamic>>.from(data as List);
+          _folders = dbFolders;
         });
       }
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('rocket_pref_folders', json.encode(dbFolders));
     } catch (e) {
-      debugPrint('Rockets: Failed to load folders: $e');
+      debugPrint('Rockets: focus_folders table not accessible: $e');
     }
   }
 
@@ -253,7 +301,25 @@ class _RocketsScreenState extends State<RocketsScreen> {
           .order('created_at', ascending: false);
 
       if (mounted) {
-        _dbRockets = List<Map<String, dynamic>>.from(data as List);
+        final fetchedRockets = List<Map<String, dynamic>>.from(data as List);
+        
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final localMappingsJson = prefs.getString('rocket_pref_rocket_folders');
+          if (localMappingsJson != null) {
+            final localMappings = Map<String, dynamic>.from(json.decode(localMappingsJson));
+            for (var r in fetchedRockets) {
+              final rocketId = r['id'] as String?;
+              if (rocketId != null && localMappings.containsKey(rocketId)) {
+                r['folder_id'] = localMappings[rocketId];
+              }
+            }
+          }
+        } catch (err) {
+          debugPrint('Error loading local rocket folder mappings: $err');
+        }
+
+        _dbRockets = fetchedRockets;
         setState(() {
           _isLoadingList = false;
         });
@@ -436,59 +502,132 @@ class _RocketsScreenState extends State<RocketsScreen> {
   }
 
   Future<void> _createFolder(String name) async {
-    if (_userId.isEmpty || _supabaseService.client == null) return;
+    final folderId = const Uuid().v4();
+    final newFolder = {
+      'id': folderId,
+      'user_id': _userId,
+      'name': name,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
     try {
-      final folderId = const Uuid().v4();
-      await _supabaseService.client!.from('focus_folders').insert({
-        'id': folderId,
-        'user_id': _userId,
-        'name': name,
-        'created_at': DateTime.now().toIso8601String(),
-      });
-      await _loadFolders();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Folder "$name" created successfully')),
-      );
+      final prefs = await SharedPreferences.getInstance();
+      final foldersList = List<Map<String, dynamic>>.from(_folders);
+      foldersList.insert(0, newFolder);
+      await prefs.setString('rocket_pref_folders', json.encode(foldersList));
+      if (mounted) {
+        setState(() {
+          _folders = foldersList;
+        });
+      }
     } catch (e) {
-      debugPrint('Rockets: Failed to create folder: $e');
+      debugPrint('Failed to create folder locally: $e');
+    }
+
+    bool savedToSupabase = false;
+    if (_userId.isNotEmpty && _supabaseService.client != null) {
+      try {
+        await _supabaseService.client!.from('focus_folders').insert(newFolder);
+        savedToSupabase = true;
+      } catch (e) {
+        debugPrint('Supabase folder creation failed: $e');
+      }
+    }
+
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Please make sure focus_folders table exists (see SQL Setup).')),
+        SnackBar(
+          content: Text(savedToSupabase
+              ? 'Folder "$name" created.'
+              : 'Folder "$name" created locally.'),
+        ),
       );
     }
   }
 
   Future<void> _deleteFolder(String id) async {
-    if (_userId.isEmpty || _supabaseService.client == null) return;
     try {
-      await _supabaseService.client!.from('focus_folders').delete().eq('id', id);
-      await _supabaseService.client!.from('focus_rockets').update({'folder_id': null}).eq('folder_id', id);
-      
-      if (_currentFolderId == id) {
+      final prefs = await SharedPreferences.getInstance();
+      final foldersList = List<Map<String, dynamic>>.from(_folders);
+      foldersList.removeWhere((f) => f['id'] == id);
+      await prefs.setString('rocket_pref_folders', json.encode(foldersList));
+
+      final localRocketFoldersJson = prefs.getString('rocket_pref_rocket_folders');
+      if (localRocketFoldersJson != null) {
+        final localMappings = Map<String, String>.from(json.decode(localRocketFoldersJson));
+        localMappings.removeWhere((key, val) => val == id);
+        await prefs.setString('rocket_pref_rocket_folders', json.encode(localMappings));
+      }
+
+      if (mounted) {
         setState(() {
-          _currentFolderId = null;
-          _currentFolderName = null;
+          _folders = foldersList;
+          if (_currentFolderId == id) {
+            _currentFolderId = null;
+            _currentFolderName = null;
+          }
         });
       }
-      
-      await _loadFolders();
-      await _loadRockets();
     } catch (e) {
-      debugPrint('Rockets: Failed to delete folder: $e');
+      debugPrint('Failed to delete folder locally: $e');
     }
+
+    if (_userId.isNotEmpty && _supabaseService.client != null) {
+      try {
+        await _supabaseService.client!.from('focus_folders').delete().eq('id', id);
+        await _supabaseService.client!.from('focus_rockets').update({'folder_id': null}).eq('folder_id', id);
+      } catch (e) {
+        debugPrint('Supabase delete folder failed: $e');
+      }
+    }
+    
+    await _loadRockets();
   }
 
   Future<void> _moveRocketToFolder(String rocketId, String? folderId) async {
-    if (_userId.isEmpty || _supabaseService.client == null) return;
     try {
-      await _supabaseService.client!.from('focus_rockets').update({'folder_id': folderId}).eq('id', rocketId);
-      await _loadRockets();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Moved successfully')),
-      );
+      final prefs = await SharedPreferences.getInstance();
+      final localMappingsJson = prefs.getString('rocket_pref_rocket_folders') ?? '{}';
+      final localMappings = Map<String, dynamic>.from(json.decode(localMappingsJson));
+      if (folderId == null) {
+        localMappings.remove(rocketId);
+      } else {
+        localMappings[rocketId] = folderId;
+      }
+      await prefs.setString('rocket_pref_rocket_folders', json.encode(localMappings));
+      
+      setState(() {
+        for (var r in _dbRockets) {
+          if (r['id'] == rocketId) {
+            r['folder_id'] = folderId;
+          }
+        }
+        _updateRocketsList();
+      });
     } catch (e) {
-      debugPrint('Rockets: Failed to move rocket: $e');
+      debugPrint('Failed to move rocket locally: $e');
+    }
+
+    bool movedInSupabase = false;
+    if (_userId.isNotEmpty && _supabaseService.client != null) {
+      try {
+        await _supabaseService.client!
+            .from('focus_rockets')
+            .update({'folder_id': folderId})
+            .eq('id', rocketId);
+        movedInSupabase = true;
+      } catch (e) {
+        debugPrint('Supabase move rocket failed, mapped locally: $e');
+      }
+    }
+
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Make sure folder_id column exists on focus_rockets (see SQL Setup).')),
+        SnackBar(
+          content: Text(movedInSupabase
+              ? 'Moved successfully.'
+              : 'Moved successfully (locally).'),
+        ),
       );
     }
   }
@@ -531,37 +670,140 @@ class _RocketsScreenState extends State<RocketsScreen> {
     );
   }
 
-  void _showMoveRocketDialog(String rocketId) {
+  Future<void> _renameFolder(String id, String newName) async {
+    if (_userId.isEmpty || _supabaseService.client == null) return;
+    try {
+      await _supabaseService.client!
+          .from('focus_folders')
+          .update({'name': newName})
+          .eq('id', id);
+      await _loadFolders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Folder renamed to "$newName"')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Rockets: Failed to rename folder: $e');
+    }
+  }
+
+  void _showRenameFolderDialog(String id, String currentName) {
+    final controller = TextEditingController(text: currentName);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: U.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text('Move to Folder', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.bold, fontSize: 16)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              ListTile(
-                leading: Icon(Icons.folder_open_rounded, color: U.primary, size: 20),
-                title: Text('Main Directory (Root)', style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 13)),
-                onTap: () {
-                  _moveRocketToFolder(rocketId, null);
-                  Navigator.pop(context);
-                },
-              ),
-              const Divider(color: Colors.white12, height: 1),
-              ..._folders.map((f) => ListTile(
-                leading: Icon(Icons.folder_rounded, color: U.peach, size: 20),
-                title: Text(f['name'] ?? 'Untitled Folder', style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 13)),
-                onTap: () {
-                  _moveRocketToFolder(rocketId, f['id']);
-                  Navigator.pop(context);
-                },
-              )),
-            ],
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Rename Folder', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.bold, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: 'Enter new name',
+            hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: U.primary)),
           ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.outfit(color: U.dim, fontSize: 13, fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty && name != currentName) {
+                _renameFolder(id, name);
+              }
+              Navigator.pop(context);
+            },
+            child: Text('Rename', style: GoogleFonts.outfit(color: U.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoveRocketDialog(String rocketId) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: U.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: Border.all(color: U.border.withValues(alpha: 0.5), width: 0.5),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MOVE TO FOLDER',
+              style: GoogleFonts.outfit(
+                color: U.dim,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.4,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: U.primary.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.folder_open_rounded, color: U.primary, size: 20),
+                    ),
+                    title: Text('Main Directory (Root)', style: GoogleFonts.outfit(color: U.text, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    onTap: () {
+                      _moveRocketToFolder(rocketId, null);
+                      Navigator.pop(context);
+                    },
+                  ),
+                  const Divider(color: Colors.white10, height: 16),
+                  if (_folders.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'No folders created yet.',
+                          style: GoogleFonts.plusJakartaSans(color: U.dim, fontSize: 12),
+                        ),
+                      ),
+                    )
+                  else
+                    ..._folders.map((f) => ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: U.peach.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.folder_rounded, color: U.peach, size: 20),
+                      ),
+                      title: Text(f['name'] ?? 'Untitled Folder', style: GoogleFonts.outfit(color: U.text, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                      onTap: () {
+                        _moveRocketToFolder(rocketId, f['id']);
+                        Navigator.pop(context);
+                      },
+                    )),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -663,21 +905,36 @@ class _RocketsScreenState extends State<RocketsScreen> {
         if (_currentFolderId != null)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: U.surface.withValues(alpha: 0.3),
             child: Row(
               children: [
-                IconButton(
-                  onPressed: _goBackToRoot,
-                  icon: Icon(Icons.arrow_back_rounded, color: U.text, size: 20),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
+                GestureDetector(
+                  onTap: _goBackToRoot,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_back_rounded, color: U.dim, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Rockets',
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.dim,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right_rounded, color: U.dim, size: 16),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _currentFolderName ?? 'Folder',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(
-                      color: U.text,
+                      color: U.primary,
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
@@ -692,80 +949,116 @@ class _RocketsScreenState extends State<RocketsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             children: [
               if (_currentFolderId == null && _folders.isNotEmpty) ...[
-                Text(
-                  'FOLDERS',
-                  style: GoogleFonts.outfit(
-                    color: U.dim,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.5,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'FOLDERS',
+                      style: GoogleFonts.outfit(
+                        color: U.dim,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _showNewFolderDialog,
+                      icon: Icon(Icons.create_new_folder_outlined, color: U.primary, size: 18),
+                      tooltip: 'Create New Folder',
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    mainAxisExtent: 75,
-                  ),
-                  itemCount: _folders.length,
-                  itemBuilder: (context, index) {
-                    final folder = _folders[index];
-                    final folderRocketsCount = _dbRockets.where((r) => r['folder_id'] == folder['id']).length;
-                    
-                    return GestureDetector(
-                      onTap: () => _openFolder(folder['id'], folder['name']),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: U.card,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: U.border, width: 0.5),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.folder_rounded, color: U.peach, size: 28),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
+                SizedBox(
+                  height: 110,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _folders.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final folder = _folders[index];
+                      final folderId = folder['id'];
+                      final folderName = folder['name'] ?? 'Folder';
+                      final folderRocketsCount = _dbRockets.where((r) => r['folder_id'] == folderId).length;
+
+                      return GestureDetector(
+                        onTap: () => _openFolder(folderId, folderName),
+                        child: Container(
+                          width: 155,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: U.card,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: U.border.withValues(alpha: 0.6), width: 0.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    folder['name'] ?? 'Folder',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.outfit(
-                                      color: U.text,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '$folderRocketsCount items',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      color: U.dim,
-                                      fontSize: 10,
-                                    ),
+                                  Icon(Icons.folder_rounded, color: U.peach, size: 30),
+                                  PopupMenuButton<String>(
+                                    icon: Icon(Icons.more_vert_rounded, color: U.dim, size: 18),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    color: U.surface,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    onSelected: (value) {
+                                      if (value == 'rename') {
+                                        _showRenameFolderDialog(folderId, folderName);
+                                      } else if (value == 'delete') {
+                                        _deleteFolder(folderId);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'rename',
+                                        child: Text('Rename', style: GoogleFonts.outfit(color: U.text, fontSize: 12)),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Text('Delete', style: GoogleFonts.outfit(color: U.red, fontSize: 12)),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () => _deleteFolder(folder['id']),
-                              icon: Icon(Icons.delete_outline_rounded, color: U.dim, size: 16),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                            ),
-                          ],
+                              const Spacer(),
+                              Text(
+                                folderName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.outfit(
+                                  color: U.text,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$folderRocketsCount sessions',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: U.dim,
+                                  fontSize: 10.5,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
                 const SizedBox(height: 24),
               ],
@@ -948,6 +1241,60 @@ class _RocketsScreenState extends State<RocketsScreen> {
     );
   }
 
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: U.border, width: 0.5),
+              ),
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rockets',
+                  style: GoogleFonts.newsreader(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                    color: U.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Listen to your notes via neural AI TTS.',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: U.sub,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _openSettingsSheet,
+            icon: Icon(Icons.settings_rounded, color: U.primary, size: 22),
+            tooltip: 'Settings',
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.08, end: 0, duration: 400.ms, curve: Curves.easeOut);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -963,35 +1310,20 @@ class _RocketsScreenState extends State<RocketsScreen> {
       ),
       child: Scaffold(
         backgroundColor: U.bg,
-        appBar: AppBar(
-          backgroundColor: U.bg,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          leading: IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: _isLoadingList
+                    ? Center(
+                        child: CircularProgressIndicator(color: U.primary, strokeWidth: 2.5),
+                      )
+                    : _buildBody(),
+              ),
+            ],
           ),
-          title: Text(
-            'Rockets',
-            style: GoogleFonts.outfit(
-              color: U.text,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          actions: [
-            IconButton(
-              onPressed: _openSettingsSheet,
-              icon: Icon(Icons.settings_rounded, color: U.text, size: 22),
-              tooltip: 'Settings',
-            ),
-          ],
         ),
-        body: _isLoadingList
-            ? Center(
-                child: CircularProgressIndicator(color: U.primary, strokeWidth: 2.5),
-              )
-            : _buildBody(),
         floatingActionButton: FloatingActionButton(
           onPressed: _showCreateMenu,
           backgroundColor: U.primary,
@@ -2852,63 +3184,14 @@ class _RocketsSettingsSheet extends StatefulWidget {
   State<_RocketsSettingsSheet> createState() => _RocketsSettingsSheetState();
 }
 
-class _RocketsSettingsSheetState extends State<_RocketsSettingsSheet> with SingleTickerProviderStateMixin {
+class _RocketsSettingsSheetState extends State<_RocketsSettingsSheet> {
   late double _speed;
   late bool _highlightMode;
   late bool _isDarkStage;
   late bool _wordByWordMode;
   late bool _showHistory;
   late bool _showSamples;
-
-  late TabController _tabController;
-  final _sqlController = TextEditingController();
-  String _sqlOutput = '';
-  bool _isExecutingSql = false;
   bool _isSaving = false;
-
-  static const String _setupSqlScript = '''-- Create exec_sql helper RPC function
-create or replace function exec_sql(sql_query text)
-returns jsonb language plpgsql security definer as \$\$
-declare result jsonb;
-begin
-    if upper(trim(sql_query)) like 'SELECT%' or upper(trim(sql_query)) like 'WITH%' then
-        execute 'select jsonb_agg(t) from (' || sql_query || ') t' into result;
-        return coalesce(result, '[]'::jsonb);
-    else
-        execute sql_query;
-        return jsonb_build_object('status', 'success');
-    end if;
-exception when others then
-    return jsonb_build_object('error', SQLERRM);
-end;
-\$\$;
-
--- Create focus_folders table
-create table if not exists public.focus_folders (
-    id text primary key,
-    user_id text not null,
-    name text not null,
-    created_at timestamp with time zone default now() not null
-);
-alter table public.focus_folders enable row level security;
-create policy "Allow all actions for folders" on public.focus_folders for all using (true) with check (true);
-
--- Add folder_id to focus_rockets
-alter table public.focus_rockets add column if not exists folder_id text;
-
--- Create rocket_player_configs table
-create table if not exists public.rocket_player_configs (
-    user_id text primary key,
-    playback_speed double precision default 1.0,
-    highlight_mode boolean default true,
-    is_dark_stage boolean default false,
-    word_by_word_mode boolean default false,
-    show_history boolean default true,
-    show_samples boolean default true,
-    updated_at timestamp with time zone default now() not null
-);
-alter table public.rocket_player_configs enable row level security;
-create policy "Allow all actions for configurations" on public.rocket_player_configs for all using (true) with check (true);''';
 
   @override
   void initState() {
@@ -2919,103 +3202,67 @@ create policy "Allow all actions for configurations" on public.rocket_player_con
     _wordByWordMode = widget.initialWordByWordMode;
     _showHistory = widget.initialShowHistory;
     _showSamples = widget.initialShowSamples;
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _sqlController.dispose();
-    super.dispose();
   }
 
   Future<void> _saveConfigs() async {
-    if (widget.userId.isEmpty || widget.supabaseService.client == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: Supabase client or User ID is missing.')),
-      );
-      return;
-    }
-
     setState(() => _isSaving = true);
+    
     try {
-      await widget.supabaseService.client!.from('rocket_player_configs').upsert({
-        'user_id': widget.userId,
-        'playback_speed': _speed,
-        'highlight_mode': _highlightMode,
-        'is_dark_stage': _isDarkStage,
-        'word_by_word_mode': _wordByWordMode,
-        'show_history': _showHistory,
-        'show_samples': _showSamples,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('rocket_pref_speed', _speed);
+      await prefs.setBool('rocket_pref_highlight_mode', _highlightMode);
+      await prefs.setBool('rocket_pref_is_dark_stage', _isDarkStage);
+      await prefs.setBool('rocket_pref_word_by_word_mode', _wordByWordMode);
+      await prefs.setBool('rocket_pref_show_history', _showHistory);
+      await prefs.setBool('rocket_pref_show_samples', _showSamples);
+    } catch (e) {
+      debugPrint('Failed to save configs locally: $e');
+    }
 
-      widget.onSaved(
-        _speed,
-        _highlightMode,
-        _isDarkStage,
-        _wordByWordMode,
-        _showHistory,
-        _showSamples,
+    bool savedToSupabase = false;
+    if (widget.userId.isNotEmpty && widget.supabaseService.client != null) {
+      try {
+        await widget.supabaseService.client!.from('rocket_player_configs').upsert({
+          'user_id': widget.userId,
+          'playback_speed': _speed,
+          'highlight_mode': _highlightMode,
+          'is_dark_stage': _isDarkStage,
+          'word_by_word_mode': _wordByWordMode,
+          'show_history': _showHistory,
+          'show_samples': _showSamples,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        savedToSupabase = true;
+      } catch (e) {
+        debugPrint('Supabase upsert failed, configurations remain local: $e');
+      }
+    }
+
+    widget.onSaved(
+      _speed,
+      _highlightMode,
+      _isDarkStage,
+      _wordByWordMode,
+      _showHistory,
+      _showSamples,
+    );
+
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(savedToSupabase 
+              ? 'Default configurations updated.' 
+              : 'Configurations saved locally (database tables not initialized).'),
+        ),
       );
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Default configurations saved.')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Failed to save configs: $e');
-      if (mounted) {
-        setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving configurations. Ensure database table exists: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _executeSql() async {
-    final query = _sqlController.text.trim();
-    if (query.isEmpty) return;
-
-    if (widget.supabaseService.client == null) {
-      setState(() {
-        _sqlOutput = 'Error: Supabase client is not initialized.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isExecutingSql = true;
-      _sqlOutput = 'Executing query...';
-    });
-
-    try {
-      final response = await widget.supabaseService.client!
-          .rpc('exec_sql', params: {'sql_query': query});
-      
-      if (mounted) {
-        setState(() {
-          _isExecutingSql = false;
-          _sqlOutput = const JsonEncoder.withIndent('  ').convert(response);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isExecutingSql = false;
-          _sqlOutput = 'Execution Error:\n$e';
-        });
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.82,
+      height: MediaQuery.of(context).size.height * 0.65,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
@@ -3065,154 +3312,133 @@ create policy "Allow all actions for configurations" on public.rocket_player_con
             ),
           ),
           const SizedBox(height: 12),
-          TabBar(
-            controller: _tabController,
-            indicatorColor: U.primary,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white38,
-            labelStyle: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold),
-            tabs: const [
-              Tab(text: 'Player Preferences'),
-              Tab(text: 'SQL Query Editor'),
-            ],
-          ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               children: [
-                _buildPlayerTab(),
-                _buildSqlTab(),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DEFAULT PLAYBACK SPEED',
+                        style: GoogleFonts.outfit(
+                          color: U.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Speed multiplier used for new sessions',
+                            style: GoogleFonts.plusJakartaSans(color: Colors.white70, fontSize: 12),
+                          ),
+                          DropdownButton<double>(
+                            value: _speed,
+                            dropdownColor: const Color(0xFF1B0F2A),
+                            underline: const SizedBox(),
+                            items: const [
+                              DropdownMenuItem(value: 0.75, child: Text('0.75x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                              DropdownMenuItem(value: 0.9, child: Text('0.9x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                              DropdownMenuItem(value: 1.0, child: Text('1.0x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                              DropdownMenuItem(value: 1.15, child: Text('1.15x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                              DropdownMenuItem(value: 1.3, child: Text('1.3x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                              DropdownMenuItem(value: 1.5, child: Text('1.5x', style: TextStyle(color: Colors.white, fontSize: 13))),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setState(() => _speed = v);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildConfigSwitch(
+                        title: 'Box Highlight Mode',
+                        subtitle: 'Draw box highlight around active reading word, otherwise draw underline.',
+                        value: _highlightMode,
+                        onChanged: (v) => setState(() => _highlightMode = v),
+                      ),
+                      const Divider(color: Colors.white12, height: 24),
+                      _buildConfigSwitch(
+                        title: 'Dark Stage Theme',
+                        subtitle: 'Enable dark theme background on the reading stage screen by default.',
+                        value: _isDarkStage,
+                        onChanged: (v) => setState(() => _isDarkStage = v),
+                      ),
+                      const Divider(color: Colors.white12, height: 24),
+                      _buildConfigSwitch(
+                        title: 'Word bt Word reveal',
+                        subtitle: 'Make text appear word-by-word synchronously instead of whole block.',
+                        value: _wordByWordMode,
+                        onChanged: (v) => setState(() => _wordByWordMode = v),
+                      ),
+                      const Divider(color: Colors.white12, height: 24),
+                      _buildConfigSwitch(
+                        title: 'Show History line',
+                        subtitle: 'Show the previous sentence slide in dimmed/opaque style on the stage.',
+                        value: _showHistory,
+                        onChanged: (v) => setState(() => _showHistory = v),
+                      ),
+                      const Divider(color: Colors.white12, height: 24),
+                      _buildConfigSwitch(
+                        title: 'Show Offline Samples',
+                        subtitle: 'List standard pre-aligned sample rockets on main screen.',
+                        value: _showSamples,
+                        onChanged: (v) => setState(() => _showSamples = v),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveConfigs,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: U.primary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text(
+                            'SAVE CONFIGURATIONS',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPlayerTab() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'DEFAULT PLAYBACK SPEED',
-                style: GoogleFonts.outfit(
-                  color: U.primary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Speed multiplier used for new sessions',
-                    style: GoogleFonts.plusJakartaSans(color: Colors.white70, fontSize: 12),
-                  ),
-                  DropdownButton<double>(
-                    value: _speed,
-                    dropdownColor: const Color(0xFF1B0F2A),
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: 0.75, child: Text('0.75x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                      DropdownMenuItem(value: 0.9, child: Text('0.9x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                      DropdownMenuItem(value: 1.0, child: Text('1.0x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                      DropdownMenuItem(value: 1.15, child: Text('1.15x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                      DropdownMenuItem(value: 1.3, child: Text('1.3x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                      DropdownMenuItem(value: 1.5, child: Text('1.5x', style: TextStyle(color: Colors.white, fontSize: 13))),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setState(() => _speed = v);
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            children: [
-              _buildConfigSwitch(
-                title: 'Box Highlight Mode',
-                subtitle: 'Draw box highlight around active reading word, otherwise draw underline.',
-                value: _highlightMode,
-                onChanged: (v) => setState(() => _highlightMode = v),
-              ),
-              const Divider(color: Colors.white12, height: 24),
-              _buildConfigSwitch(
-                title: 'Dark Stage Theme',
-                subtitle: 'Enable dark theme background on the reading stage screen by default.',
-                value: _isDarkStage,
-                onChanged: (v) => setState(() => _isDarkStage = v),
-              ),
-              const Divider(color: Colors.white12, height: 24),
-              _buildConfigSwitch(
-                title: 'Word bt Word reveal',
-                subtitle: 'Make text appear word-by-word synchronously instead of whole block.',
-                value: _wordByWordMode,
-                onChanged: (v) => setState(() => _wordByWordMode = v),
-              ),
-              const Divider(color: Colors.white12, height: 24),
-              _buildConfigSwitch(
-                title: 'Show History line',
-                subtitle: 'Show the previous sentence slide in dimmed/opaque style on the stage.',
-                value: _showHistory,
-                onChanged: (v) => setState(() => _showHistory = v),
-              ),
-              const Divider(color: Colors.white12, height: 24),
-              _buildConfigSwitch(
-                title: 'Show Offline Samples',
-                subtitle: 'List standard pre-aligned sample rockets on main screen.',
-                value: _showSamples,
-                onChanged: (v) => setState(() => _showSamples = v),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _isSaving ? null : _saveConfigs,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: U.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: _isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : Text(
-                    'SAVE CONFIGURATIONS',
-                    style: GoogleFonts.outfit(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 24),
-      ],
     );
   }
 
@@ -3247,171 +3473,6 @@ create policy "Allow all actions for configurations" on public.rocket_player_con
           value: value,
           onChanged: onChanged,
         ),
-      ],
-    );
-  }
-
-  Widget _buildSqlTab() {
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      children: [
-        Text(
-          'SQL QUERY CONSOLE',
-          style: GoogleFonts.outfit(
-            color: U.primary,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _sqlController,
-          maxLines: 5,
-          style: GoogleFonts.jetBrainsMono(color: Colors.white, fontSize: 12),
-          decoration: InputDecoration(
-            hintText: 'SELECT * FROM focus_rockets LIMIT 5;',
-            hintStyle: GoogleFonts.jetBrainsMono(color: Colors.white24, fontSize: 12),
-            filled: true,
-            fillColor: Colors.black26,
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Colors.white10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: U.primary),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            contentPadding: const EdgeInsets.all(12),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _isExecutingSql ? null : _executeSql,
-                icon: const Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white),
-                label: Text(
-                  'EXECUTE QUERY',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: U.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            OutlinedButton(
-              onPressed: () {
-                _sqlController.clear();
-                setState(() => _sqlOutput = '');
-              },
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.white24),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-              ),
-              child: Text(
-                'CLEAR',
-                style: GoogleFonts.outfit(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'EXECUTION RESULTS',
-          style: GoogleFonts.outfit(
-            color: Colors.white70,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.0,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          height: 180,
-          decoration: BoxDecoration(
-            color: Colors.black38,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white10),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: SingleChildScrollView(
-            child: SelectableText(
-              _sqlOutput.isEmpty ? 'Console output will appear here after query execution.' : _sqlOutput,
-              style: GoogleFonts.jetBrainsMono(
-                color: _sqlOutput.startsWith('Execution Error') ? U.red : Colors.greenAccent,
-                fontSize: 11,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Card(
-          color: Colors.white.withValues(alpha: 0.02),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: Colors.white10),
-          ),
-          margin: EdgeInsets.zero,
-          child: ExpansionTile(
-            title: Text(
-              'Database Setup Migration Script',
-              style: GoogleFonts.outfit(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              'Copy SQL setup code to establish folders & configurations schema.',
-              style: GoogleFonts.plusJakartaSans(color: Colors.white38, fontSize: 10),
-            ),
-            iconColor: Colors.white,
-            collapsedIconColor: Colors.white54,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      color: Colors.black26,
-                      height: 160,
-                      child: SingleChildScrollView(
-                        child: Text(
-                          _setupSqlScript,
-                          style: GoogleFonts.jetBrainsMono(color: Colors.white54, fontSize: 9.5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Clipboard.setData(const ClipboardData(text: _setupSqlScript));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('SQL setup script copied to clipboard!')),
-                        );
-                      },
-                      icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white),
-                      label: Text(
-                        'COPY SQL SETUP SCRIPT',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white10,
-                        elevation: 0,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
       ],
     );
   }

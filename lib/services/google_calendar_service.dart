@@ -109,6 +109,14 @@ class GoogleCalendarService {
         final accountFuture = GoogleSignIn.instance.attemptLightweightAuthentication(reportAllExceptions: false);
         final account = accountFuture != null ? await accountFuture : null;
         if (account != null) {
+          // Clear the old expired token from the local authorization cache
+          // to force the plugin/native SDK to fetch a fresh one from the network.
+          try {
+            await account.authorizationClient.clearAuthorizationToken(accessToken: token);
+          } catch (clearErr) {
+            debugPrint("GOOGLE_CAL: Failed to clear old token from cache: $clearErr");
+          }
+
           final authz = await account.authorizationClient.authorizationForScopes([
             calendar.CalendarApi.calendarScope,
           ]);
@@ -387,7 +395,7 @@ class GoogleCalendarService {
       // If error occurs, fallback to caching locally
       await CalendarCacheService.instance.saveEvent(event.copyWith(isDirty: true));
       await CalendarNotificationService.instance.scheduleEventReminders(event);
-      return true;
+      return false;
     }
   }
 
@@ -427,7 +435,7 @@ class GoogleCalendarService {
       debugPrint("GOOGLE_CAL: Failed to update event: $e");
       await CalendarCacheService.instance.saveEvent(event.copyWith(isDirty: true));
       await CalendarNotificationService.instance.scheduleEventReminders(event);
-      return true;
+      return false;
     }
   }
 
@@ -553,6 +561,13 @@ class GoogleCalendarService {
       ..description = e.description
       ..location = e.location;
 
+    String getSafeTimeZone(String? tz) {
+      if (tz == null || tz.isEmpty) return 'UTC';
+      if (tz == 'UTC') return 'UTC';
+      if (!tz.contains('/')) return 'UTC';
+      return tz;
+    }
+
     // Start time mapping
     if (e.startTime != null) {
       if (e.isAllDay) {
@@ -560,7 +575,7 @@ class GoogleCalendarService {
       } else {
         event.start = calendar.EventDateTime()
           ..dateTime = e.startTime!.toUtc()
-          ..timeZone = e.timezone ?? 'UTC';
+          ..timeZone = getSafeTimeZone(e.timezone);
       }
     }
 
@@ -571,7 +586,7 @@ class GoogleCalendarService {
       } else {
         event.end = calendar.EventDateTime()
           ..dateTime = e.endTime!.toUtc()
-          ..timeZone = e.timezone ?? 'UTC';
+          ..timeZone = getSafeTimeZone(e.timezone);
       }
     }
 

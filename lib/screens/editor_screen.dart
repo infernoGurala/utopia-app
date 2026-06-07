@@ -1292,6 +1292,19 @@ class _TextBlockBodyState extends State<_TextBlockBody> {
   void _handleBodyFocus() => widget.onFocus?.call(_bodyFocus.hasFocus, _bodyController, _bodyUndoController);
 
   @override
+  void didUpdateWidget(covariant _TextBlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      if (_titleController.text != widget.block.title) {
+        _titleController.text = widget.block.title;
+      }
+      if (_bodyController.text != widget.block.body) {
+        _bodyController.text = widget.block.body;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _titleFocus.removeListener(_handleTitleFocus);
     _bodyFocus.removeListener(_handleBodyFocus);
@@ -1365,6 +1378,19 @@ class _QABlockBodyState extends State<_QABlockBody> {
 
   void _handleQFocus() => widget.onFocus?.call(_qFocus.hasFocus, _qController, _qUndoController);
   void _handleAFocus() => widget.onFocus?.call(_aFocus.hasFocus, _aController, _aUndoController);
+
+  @override
+  void didUpdateWidget(covariant _QABlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      if (_qController.text != widget.block.question) {
+        _qController.text = widget.block.question;
+      }
+      if (_aController.text != widget.block.answer) {
+        _aController.text = widget.block.answer;
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -1549,10 +1575,18 @@ class _QABlockBodyState extends State<_QABlockBody> {
 }
 
 // ── Code Block ──
-class _CodeBlockBody extends StatelessWidget {
+class _CodeBlockBody extends StatefulWidget {
   final EditorBlock block;
   final VoidCallback onChanged;
   const _CodeBlockBody({required this.block, required this.onChanged});
+
+  @override
+  State<_CodeBlockBody> createState() => _CodeBlockBodyState();
+}
+
+class _CodeBlockBodyState extends State<_CodeBlockBody> {
+  late TextEditingController _titleController;
+  late TextEditingController _codeController;
 
   static const _languages = [
     '', 'c', 'cpp', 'java', 'python', 'javascript', 'typescript',
@@ -1560,14 +1594,36 @@ class _CodeBlockBody extends StatelessWidget {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.block.title);
+    _codeController = TextEditingController(text: widget.block.codeContent);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CodeBlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      _titleController.text = widget.block.title;
+      _codeController.text = widget.block.codeContent;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextField(
-          controller: TextEditingController(text: block.title)
-            ..selection = TextSelection.collapsed(offset: block.title.length),
-          onChanged: (v) { block.title = v; onChanged(); },
+          controller: _titleController,
+          onChanged: (v) { widget.block.title = v; widget.onChanged(); },
           style: GoogleFonts.outfit(color: U.text, fontSize: 14, fontWeight: FontWeight.w600),
           decoration: _blockInputDecor('Title (optional)', dense: true),
         ),
@@ -1582,8 +1638,8 @@ class _CodeBlockBody extends StatelessWidget {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: _languages.contains(block.codeLanguage.toLowerCase())
-                  ? block.codeLanguage.toLowerCase()
+              value: _languages.contains(widget.block.codeLanguage.toLowerCase())
+                  ? widget.block.codeLanguage.toLowerCase()
                   : '',
               isExpanded: true,
               dropdownColor: U.card,
@@ -1597,17 +1653,18 @@ class _CodeBlockBody extends StatelessWidget {
                 ),
               )).toList(),
               onChanged: (v) {
-                block.codeLanguage = v ?? '';
-                onChanged();
+                setState(() {
+                  widget.block.codeLanguage = v ?? '';
+                });
+                widget.onChanged();
               },
             ),
           ),
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: TextEditingController(text: block.codeContent)
-            ..selection = TextSelection.collapsed(offset: block.codeContent.length),
-          onChanged: (v) { block.codeContent = v; onChanged(); },
+          controller: _codeController,
+          onChanged: (v) { widget.block.codeContent = v; widget.onChanged(); },
           maxLines: null,
           minLines: 4,
           style: GoogleFonts.sourceCodePro(color: U.text, fontSize: 13, height: 1.6),
@@ -1619,17 +1676,43 @@ class _CodeBlockBody extends StatelessWidget {
 }
 
 // ── LaTeX Block ──
-class _LatexBlockBody extends StatelessWidget {
+class _LatexBlockBody extends StatefulWidget {
   final EditorBlock block;
   final VoidCallback onChanged;
   const _LatexBlockBody({required this.block, required this.onChanged});
 
   @override
+  State<_LatexBlockBody> createState() => _LatexBlockBodyState();
+}
+
+class _LatexBlockBodyState extends State<_LatexBlockBody> {
+  late TextEditingController _latexController;
+
+  @override
+  void initState() {
+    super.initState();
+    _latexController = TextEditingController(text: widget.block.latexContent);
+  }
+
+  @override
+  void dispose() {
+    _latexController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LatexBlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      _latexController.text = widget.block.latexContent;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: TextEditingController(text: block.latexContent)
-        ..selection = TextSelection.collapsed(offset: block.latexContent.length),
-      onChanged: (v) { block.latexContent = v; onChanged(); },
+      controller: _latexController,
+      onChanged: (v) { widget.block.latexContent = v; widget.onChanged(); },
       maxLines: null,
       minLines: 2,
       style: GoogleFonts.sourceCodePro(color: U.text, fontSize: 13, height: 1.6),
@@ -1649,10 +1732,57 @@ class _TableBlockBody extends StatefulWidget {
 }
 
 class _TableBlockBodyState extends State<_TableBlockBody> {
+  late TextEditingController _titleController;
+  late List<List<TextEditingController>> _cellControllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.block.title);
+    _initCellControllers();
+  }
+
+  void _initCellControllers() {
+    _cellControllers = [];
+    for (int r = 0; r < widget.block.tableData.length; r++) {
+      final row = <TextEditingController>[];
+      for (int c = 0; c < widget.block.tableData[r].length; c++) {
+        row.add(TextEditingController(text: widget.block.tableData[r][c]));
+      }
+      _cellControllers.add(row);
+    }
+  }
+
+  void _disposeCellControllers() {
+    for (final row in _cellControllers) {
+      for (final controller in row) {
+        controller.dispose();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _disposeCellControllers();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TableBlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      _titleController.text = widget.block.title;
+      _disposeCellControllers();
+      _initCellControllers();
+    }
+  }
+
   void _addRow() {
     setState(() {
       widget.block.tableRows++;
       widget.block.tableData.add(List.generate(widget.block.tableCols, (_) => ''));
+      _cellControllers.add(List.generate(widget.block.tableCols, (_) => TextEditingController()));
     });
     widget.onChanged();
   }
@@ -1660,8 +1790,9 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
   void _addCol() {
     setState(() {
       widget.block.tableCols++;
-      for (final row in widget.block.tableData) {
-        row.add('');
+      for (int r = 0; r < widget.block.tableData.length; r++) {
+        widget.block.tableData[r].add('');
+        _cellControllers[r].add(TextEditingController());
       }
     });
     widget.onChanged();
@@ -1672,6 +1803,10 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
     setState(() {
       widget.block.tableRows--;
       widget.block.tableData.removeLast();
+      final removed = _cellControllers.removeLast();
+      for (final ctrl in removed) {
+        ctrl.dispose();
+      }
     });
     widget.onChanged();
   }
@@ -1680,8 +1815,12 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
     if (widget.block.tableCols <= 1) return;
     setState(() {
       widget.block.tableCols--;
-      for (final row in widget.block.tableData) {
-        if (row.isNotEmpty) row.removeLast();
+      for (int r = 0; r < widget.block.tableData.length; r++) {
+        if (widget.block.tableData[r].isNotEmpty) widget.block.tableData[r].removeLast();
+        if (_cellControllers[r].isNotEmpty) {
+          final removed = _cellControllers[r].removeLast();
+          removed.dispose();
+        }
       }
     });
     widget.onChanged();
@@ -1693,8 +1832,7 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
     return Column(
       children: [
         TextField(
-          controller: TextEditingController(text: widget.block.title)
-            ..selection = TextSelection.collapsed(offset: widget.block.title.length),
+          controller: _titleController,
           onChanged: (v) { widget.block.title = v; widget.onChanged(); },
           style: GoogleFonts.outfit(color: U.text, fontSize: 14, fontWeight: FontWeight.w600),
           decoration: _blockInputDecor('Title (optional)', dense: true),
@@ -1731,8 +1869,7 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
                     width: 100,
                     margin: const EdgeInsets.all(1),
                     child: TextField(
-                      controller: TextEditingController(text: data[r][c])
-                        ..selection = TextSelection.collapsed(offset: data[r][c].length),
+                      controller: _cellControllers[r][c],
                       onChanged: (v) {
                         data[r][c] = v;
                         widget.onChanged();
@@ -1797,10 +1934,17 @@ class _TableBlockBodyState extends State<_TableBlockBody> {
 }
 
 // ── Mermaid Block ──
-class _MermaidBlockBody extends StatelessWidget {
+class _MermaidBlockBody extends StatefulWidget {
   final EditorBlock block;
   final VoidCallback onChanged;
   const _MermaidBlockBody({required this.block, required this.onChanged});
+
+  @override
+  State<_MermaidBlockBody> createState() => _MermaidBlockBodyState();
+}
+
+class _MermaidBlockBodyState extends State<_MermaidBlockBody> {
+  late TextEditingController _mermaidController;
 
   static const _directions = [
     ('TD', 'Top → Down'),
@@ -1808,6 +1952,26 @@ class _MermaidBlockBody extends StatelessWidget {
     ('BT', 'Bottom → Top'),
     ('RL', 'Right → Left'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _mermaidController = TextEditingController(text: widget.block.mermaidContent);
+  }
+
+  @override
+  void dispose() {
+    _mermaidController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MermaidBlockBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.block != widget.block) {
+      _mermaidController.text = widget.block.mermaidContent;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1818,11 +1982,13 @@ class _MermaidBlockBody extends StatelessWidget {
         Wrap(
           spacing: 8,
           children: _directions.map((d) {
-            final isSelected = block.mermaidDirection == d.$1;
+            final isSelected = widget.block.mermaidDirection == d.$1;
             return GestureDetector(
               onTap: () {
-                block.mermaidDirection = d.$1;
-                onChanged();
+                setState(() {
+                  widget.block.mermaidDirection = d.$1;
+                });
+                widget.onChanged();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1845,9 +2011,8 @@ class _MermaidBlockBody extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         TextField(
-          controller: TextEditingController(text: block.mermaidContent)
-            ..selection = TextSelection.collapsed(offset: block.mermaidContent.length),
-          onChanged: (v) { block.mermaidContent = v; onChanged(); },
+          controller: _mermaidController,
+          onChanged: (v) { widget.block.mermaidContent = v; widget.onChanged(); },
           maxLines: null,
           minLines: 3,
           style: GoogleFonts.sourceCodePro(color: U.text, fontSize: 13, height: 1.6),

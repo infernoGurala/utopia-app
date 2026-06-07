@@ -10,6 +10,7 @@ import 'package:utopia_app/services/focus_database_service.dart';
 import 'package:utopia_app/services/focus_supabase_service.dart';
 import 'package:utopia_app/services/notification_service.dart';
 import 'package:utopia_app/services/reminder_calendar_bridge.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 
 class EventEditorScreen extends StatefulWidget {
   const EventEditorScreen({super.key, this.event, this.initialDate});
@@ -255,6 +256,13 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
 
     setState(() => _saving = true);
 
+    String localTimeZone = 'UTC';
+    try {
+      localTimeZone = (await FlutterTimezone.getLocalTimezone()).identifier;
+    } catch (_) {
+      localTimeZone = DateTime.now().timeZoneName;
+    }
+
     final eventId = widget.event?.id ?? 'local_${DateTime.now().millisecondsSinceEpoch}';
     
     String finalDescription = _descController.text.trim();
@@ -295,7 +303,7 @@ class _EventEditorScreenState extends State<EventEditorScreen> {
       startTime: _startDate,
       endTime: _endDate,
       isAllDay: _isAllDay,
-      timezone: DateTime.now().timeZoneName,
+      timezone: localTimeZone,
       rrule: _rrule.isEmpty ? null : _rrule,
       colorId: _selectedColorId,
       visibility: _visibility,

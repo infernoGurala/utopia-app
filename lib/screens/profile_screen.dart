@@ -579,63 +579,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         ),
                     const SizedBox(height: 24),
 
-                    // Play Store Banner Card
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: theme.primary.withValues(alpha: 0.06),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: theme.primary.withValues(alpha: 0.2),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: theme.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(Icons.android_rounded, color: theme.primary, size: 20),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Coming to Play Store soon',
-                                  style: GoogleFonts.outfit(
-                                    color: U.text,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Native mobile application is currently in active development.',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    color: U.sub,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(delay: 300.ms, duration: 450.ms).slideY(
-                          begin: 0.1,
-                          end: 0,
-                          delay: 300.ms,
-                          duration: 450.ms,
-                          curve: Curves.easeOutCubic,
-                        ),
-                    const SizedBox(height: 24),
-
                     // Sign Out Button
                     Center(
                       child: TextButton.icon(

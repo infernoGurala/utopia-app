@@ -10,6 +10,7 @@ import 'package:utopia_app/services/calendar_cache_service.dart';
 import 'package:utopia_app/services/google_calendar_service.dart';
 import 'calendar_manage_drawer.dart';
 import 'event_editor_screen.dart';
+import 'calendar_planner_sheet.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -27,6 +28,7 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
   bool _isConnected = false;
   bool _loading = true;
   bool _searching = false;
+  bool _isFABExpanded = false;
   List<GoogleCalendarEvent> _events = [];
   List<GoogleCalendarEvent> _searchResults = [];
   final TextEditingController _searchController = TextEditingController();
@@ -145,6 +147,19 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
     );
   }
 
+  void _openCalendarPlanner() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => CalendarPlannerSheet(
+        onRefresh: () {
+          _loadEvents();
+        },
+      ),
+    );
+  }
+
   Future<void> _openEventEditor({GoogleCalendarEvent? event, DateTime? initialDate}) async {
     final result = await Navigator.push<bool>(
       context,
@@ -199,6 +214,144 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
     return U.gold;
   }
 
+  Widget _buildFloatingActionButton() {
+    if (!_isConnected) return const SizedBox();
+
+    final isDark = appThemeNotifier.value.isDark;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // ── Luna AI Planner Button ──
+        AnimatedAlign(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutBack,
+          alignment: Alignment.bottomRight,
+          heightFactor: _isFABExpanded ? 1.0 : 0.0,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutBack,
+            scale: _isFABExpanded ? 1.0 : 0.0,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _isFABExpanded ? 1.0 : 0.0,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Card(
+                      color: U.card,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Text(
+                          'Luna AI Planner',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: U.text,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FloatingActionButton.small(
+                      heroTag: 'calendar_ai_fab',
+                      backgroundColor: U.gold,
+                      foregroundColor: isDark ? U.bg : Colors.white,
+                      onPressed: () {
+                        setState(() {
+                          _isFABExpanded = false;
+                        });
+                        _openCalendarPlanner();
+                      },
+                      child: const Icon(Icons.auto_awesome_rounded, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Add Event Button ──
+        AnimatedAlign(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
+          alignment: Alignment.bottomRight,
+          heightFactor: _isFABExpanded ? 1.0 : 0.0,
+          child: AnimatedScale(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutBack,
+            scale: _isFABExpanded ? 1.0 : 0.0,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: _isFABExpanded ? 1.0 : 0.0,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Card(
+                      color: U.card,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        child: Text(
+                          'Add Event',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: U.text,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FloatingActionButton.small(
+                      heroTag: 'calendar_add_fab',
+                      backgroundColor: U.primary,
+                      foregroundColor: isDark ? U.bg : Colors.white,
+                      onPressed: () {
+                        setState(() {
+                          _isFABExpanded = false;
+                        });
+                        _openEventEditor(initialDate: _selectedDate);
+                      },
+                      child: const Icon(Icons.add, size: 18),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // ── Main Toggle FAB ──
+        FloatingActionButton(
+          heroTag: 'calendar_main_fab',
+          backgroundColor: _isFABExpanded ? U.surface : U.primary,
+          foregroundColor: _isFABExpanded ? U.text : (isDark ? U.bg : Colors.white),
+          onPressed: () {
+            setState(() {
+              _isFABExpanded = !_isFABExpanded;
+            });
+          },
+          child: AnimatedRotation(
+            turns: _isFABExpanded ? 0.125 : 0.0, // Rotate 45 degrees to turn "+" into "x"
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            child: const Icon(Icons.add),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = appThemeNotifier.value.isDark;
@@ -210,14 +363,7 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
       ),
       child: Scaffold(
         backgroundColor: U.bg,
-        floatingActionButton: _isConnected
-            ? FloatingActionButton(
-                backgroundColor: U.primary,
-                foregroundColor: U.bg,
-                onPressed: () => _openEventEditor(initialDate: _selectedDate),
-                child: const Icon(Icons.add),
-              )
-            : null,
+        floatingActionButton: _buildFloatingActionButton(),
         body: SafeArea(
           child: Column(
             children: [
@@ -250,10 +396,20 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            IconButton(
-              icon: Icon(Icons.arrow_back, color: U.text),
-              onPressed: _closeSearch,
+            GestureDetector(
+              onTap: _closeSearch,
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: U.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: U.border, width: 0.5),
+                ),
+                child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+              ),
             ),
+            const SizedBox(width: 14),
             Expanded(
               child: TextField(
                 controller: _searchController,
@@ -275,31 +431,31 @@ class _CalendarScreenState extends State<CalendarScreen> with WidgetsBindingObse
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
-              padding: const EdgeInsets.all(8),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: U.card,
-                shape: BoxShape.circle,
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: U.border, width: 0.5),
               ),
-              child: Icon(Icons.arrow_back_rounded, color: U.text, size: 20),
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
             ),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               'Calendar',
-              style: GoogleFonts.playfairDisplay(
+              style: GoogleFonts.newsreader(
                 fontSize: 28,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w400,
                 fontStyle: FontStyle.italic,
                 color: U.text,
-                letterSpacing: -0.3,
               ),
             ),
           ),

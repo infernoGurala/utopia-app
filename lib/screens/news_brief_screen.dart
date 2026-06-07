@@ -277,50 +277,72 @@ class _NewsBriefScreenState extends State<NewsBriefScreen> {
         ],
       );
     }
-
     return Scaffold(
       backgroundColor: U.bg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: U.text, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: false,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+      body: SafeArea(
+        child: Column(
           children: [
-            Text(
-              _getFormattedDate(),
-              style: GoogleFonts.outfit(
-                color: U.sub,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
-            ),
-            Text(
-              "Today's Brief",
-              style: GoogleFonts.outfit(
-                color: U.text,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
+            _buildHeader(),
+            Expanded(
+              child: bodyContent,
             ),
           ],
         ),
-        actions: [
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: U.border, width: 0.5),
+              ),
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Today's Brief",
+                  style: GoogleFonts.newsreader(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.italic,
+                    color: U.text,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _getFormattedDate(),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: U.sub,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: U.text),
+            icon: Icon(Icons.refresh_rounded, color: U.primary, size: 22),
             onPressed: _loadNewsBriefs,
           ),
-          const SizedBox(width: 8),
         ],
       ),
-      body: bodyContent,
-    );
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.08, end: 0, duration: 400.ms, curve: Curves.easeOut);
   }
 
   Widget _buildCategoryTabs(bool isDark) {
