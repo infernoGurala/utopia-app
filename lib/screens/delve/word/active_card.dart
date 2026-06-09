@@ -42,7 +42,7 @@ class _ActiveCardState extends State<ActiveCard> with TickerProviderStateMixin {
     _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _animationController,
-        curve: Curves.elasticOut,
+        curve: const Interval(0.0, 0.8, curve: Curves.elasticOut),
       ),
     );
 
@@ -63,7 +63,7 @@ class _ActiveCardState extends State<ActiveCard> with TickerProviderStateMixin {
       ),
     );
 
-    _animationController.forward();
+    _animationController.animateTo(0.8);
   }
 
   void _submit() async {
@@ -125,7 +125,6 @@ class _ActiveCardState extends State<ActiveCard> with TickerProviderStateMixin {
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(32),
           gradient: LinearGradient(

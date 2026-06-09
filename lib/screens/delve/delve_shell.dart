@@ -18,10 +18,34 @@ class DelveShell extends StatefulWidget {
   State<DelveShell> createState() => _DelveShellState();
 }
 
-class _DelveShellState extends State<DelveShell> {
+class _DelveShellState extends State<DelveShell> with WidgetsBindingObserver {
   String _searchQuery = '';
   bool _showArchive = false;
   final Set<int> _expandedDecks = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DeckProvider>().checkMissedDayAndSync();
+      context.read<SessionProvider>().checkAndClearOldSession();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<DeckProvider>().checkMissedDayAndSync();
+      context.read<SessionProvider>().checkAndClearOldSession();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +108,10 @@ class _DelveShellState extends State<DelveShell> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.help_outline_rounded, color: U.text),
+            onPressed: () => _showHelpGuideSheet(context),
+          ),
           if (activeDeck != null)
             PopupMenuButton<String>(
               icon: Icon(Icons.more_vert_rounded, color: U.text),
@@ -294,6 +322,9 @@ class _DelveShellState extends State<DelveShell> {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: () {
+                    if (inventoryProvider.archive.isEmpty) {
+                      inventoryProvider.seedInitialArchive();
+                    }
                     deckProvider.createDeckFromWords(inventoryProvider.getRandomWords(15));
                   },
                   style: FilledButton.styleFrom(
@@ -530,6 +561,12 @@ class _DelveShellState extends State<DelveShell> {
 
   Widget _buildStackedDeck(int deckIndex, List<Word> deckWords) {
     final isExpanded = _expandedDecks.contains(deckIndex);
+    final deckProvider = context.read<DeckProvider>();
+    final activeDeck = deckProvider.activeDeck;
+    final isActive = !_showArchive &&
+        activeDeck != null &&
+        deckWords.every((w) => activeDeck.allWordIds.contains(w.id));
+
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
@@ -561,86 +598,473 @@ class _DelveShellState extends State<DelveShell> {
             ),
           ),
         ],
-        Container(
-          margin: const EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: 12,
+        GestureDetector(
+          onLongPress: () => _showDeckActions(context, deckIndex, deckWords, isActive),
+          child: Container(
+            margin: const EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 8,
+              bottom: 12,
+            ),
+            decoration: BoxDecoration(
+              color: U.card,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isActive
+                    ? U.teal
+                    : (isExpanded ? U.teal.withValues(alpha: 0.4) : U.border.withValues(alpha: 0.2)),
+                width: isActive ? 1.5 : 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isActive ? U.teal.withValues(alpha: 0.12) : Colors.black.withValues(alpha: isExpanded ? 0.05 : 0.02),
+                  blurRadius: isActive ? 12 : 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isActive ? U.teal.withValues(alpha: 0.12) : U.teal.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.style_rounded, color: U.teal, size: 24),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        'Deck ${deckIndex + 1}',
+                        style: GoogleFonts.playfairDisplay(
+                          color: U.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (isActive) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: U.teal.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: U.teal.withValues(alpha: 0.3), width: 0.5),
+                          ),
+                          child: Text(
+                            'ACTIVE',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: U.teal,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  subtitle: Text(
+                    '${deckWords.length} Words • Tap to ${isExpanded ? 'collapse' : 'expand'}',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: isActive ? U.teal : U.sub,
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: Icon(
+                    isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                    color: U.dim,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      if (isExpanded) {
+                        _expandedDecks.remove(deckIndex);
+                      } else {
+                        _expandedDecks.add(deckIndex);
+                      }
+                    });
+                  },
+                ),
+                if (isExpanded) ...[
+                  Divider(color: U.border.withValues(alpha: 0.15), height: 1),
+                  Container(
+                    color: U.bg.withValues(alpha: 0.2),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: deckWords.length,
+                      itemBuilder: (context, idx) {
+                        final word = deckWords[idx];
+                        return WordListTile(
+                          word: word,
+                          onEdit: () => _showEditSheet(context, word),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ),
           ),
+        ),
+      ],
+    );
+  }
+
+  void _showDeckActions(
+    BuildContext context,
+    int deckIndex,
+    List<Word> deckWords,
+    bool isActive,
+  ) {
+    final inventoryProvider = context.read<InventoryProvider>();
+    final deckProvider = context.read<DeckProvider>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
           decoration: BoxDecoration(
             color: U.card,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isExpanded ? U.teal.withValues(alpha: 0.4) : U.border.withValues(alpha: 0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isExpanded ? 0.05 : 0.02),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: U.border.withValues(alpha: 0.15)),
           ),
-          child: Column(
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: U.teal.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: U.dim.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: Icon(Icons.style_rounded, color: U.teal, size: 24),
                 ),
-                title: Text(
-                  'Deck ${deckIndex + 1}',
+                const SizedBox(height: 20),
+                Text(
+                  _showArchive ? 'Archived Deck ${deckIndex + 1}' : 'Deck ${deckIndex + 1}',
                   style: GoogleFonts.playfairDisplay(
                     color: U.text,
-                    fontSize: 16,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                subtitle: Text(
-                  '${deckWords.length} Words • Tap to ${isExpanded ? 'collapse' : 'expand'}',
+                const SizedBox(height: 6),
+                Text(
+                  '${deckWords.length} words in this deck',
                   style: GoogleFonts.plusJakartaSans(
                     color: U.sub,
-                    fontSize: 12,
+                    fontSize: 13,
                   ),
                 ),
-                trailing: Icon(
-                  isExpanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                  color: U.dim,
-                ),
-                onTap: () {
-                  setState(() {
-                    if (isExpanded) {
-                      _expandedDecks.remove(deckIndex);
-                    } else {
-                      _expandedDecks.add(deckIndex);
-                    }
-                  });
-                },
-              ),
-              if (isExpanded) ...[
-                Divider(color: U.border.withValues(alpha: 0.15), height: 1),
-                Container(
-                  color: U.bg.withValues(alpha: 0.2),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: deckWords.length,
-                    itemBuilder: (context, idx) {
-                      final word = deckWords[idx];
-                      return WordListTile(
-                        word: word,
-                        onEdit: () => _showEditSheet(context, word),
-                      );
+                const SizedBox(height: 20),
+                if (!_showArchive) ...[
+                  // Inventory options: Archive, Delete
+                  ListTile(
+                    leading: Icon(Icons.archive_rounded, color: U.teal),
+                    title: Text(
+                      'Move to Archive',
+                      style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Archive all 15 words. They will be used in future review sessions.',
+                      style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 11),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      if (isActive) {
+                        _confirmActiveDeckAction(
+                          context,
+                          title: 'Archive Active Deck?',
+                          message: 'This deck is currently active. Archiving its words will abandon your active study cycle. Do you want to proceed?',
+                          onConfirm: () {
+                            deckProvider.abandonDeck();
+                            inventoryProvider.archiveWords(deckWords.map((w) => w.id).toList());
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Active deck words moved to archive.')),
+                            );
+                            setState(() {});
+                          },
+                        );
+                      } else {
+                        inventoryProvider.archiveWords(deckWords.map((w) => w.id).toList());
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Deck words moved to archive.')),
+                        );
+                        setState(() {});
+                      }
                     },
                   ),
+                  Divider(color: U.border.withValues(alpha: 0.15), height: 1),
+                ] else ...[
+                  // Archive options: Restore, Delete
+                  ListTile(
+                    leading: Icon(Icons.unarchive_rounded, color: U.teal),
+                    title: Text(
+                      'Restore to Inventory',
+                      style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Move all 15 words back to your active vocabulary list.',
+                      style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 11),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      inventoryProvider.restoreWords(deckWords.map((w) => w.id).toList());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Deck words restored to inventory.')),
+                      );
+                      setState(() {});
+                    },
+                  ),
+                  Divider(color: U.border.withValues(alpha: 0.15), height: 1),
+                ],
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: U.red),
+                  title: Text(
+                    'Delete Deck',
+                    style: GoogleFonts.plusJakartaSans(color: U.red, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Permanently delete all 15 words from your account.',
+                    style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    if (isActive) {
+                      _confirmActiveDeckAction(
+                        context,
+                        title: 'Delete Active Deck?',
+                        message: 'This deck is currently active. Deleting it will abandon your active study cycle. Proceed?',
+                        onConfirm: () {
+                          deckProvider.abandonDeck();
+                          inventoryProvider.removeWords(deckWords.map((w) => w.id).toList());
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Active deck deleted.')),
+                          );
+                          setState(() {});
+                        },
+                      );
+                    } else {
+                      _confirmDeleteDeck(context, () {
+                        inventoryProvider.removeWords(deckWords.map((w) => w.id).toList());
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Deck deleted.')),
+                        );
+                        setState(() {});
+                      });
+                    }
+                  },
                 ),
-                const SizedBox(height: 8),
               ],
-            ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmActiveDeckAction(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required VoidCallback onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: GoogleFonts.playfairDisplay(color: U.text, fontWeight: FontWeight.bold)),
+        content: Text(
+          message,
+          style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirm();
+            },
+            child: Text('Proceed', style: GoogleFonts.plusJakartaSans(color: U.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteDeck(BuildContext context, VoidCallback onConfirm) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Delete this deck?', style: GoogleFonts.playfairDisplay(color: U.text, fontWeight: FontWeight.bold)),
+        content: Text(
+          'This will permanently delete all 15 words in this deck. This action cannot be undone.',
+          style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirm();
+            },
+            child: Text('Delete', style: GoogleFonts.plusJakartaSans(color: U.red, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpGuideSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: U.border.withValues(alpha: 0.15)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: U.dim.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Icon(Icons.auto_awesome_rounded, color: U.teal, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Delve Vocabulary Guide',
+                      style: GoogleFonts.playfairDisplay(
+                        color: U.text,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHelpSection(
+                          title: '13-Day Study Cycle',
+                          icon: Icons.calendar_month_rounded,
+                          content: 'Delve chunks your vocabulary into organized decks of 15 words. Each deck undergoes a tailored 13-day retention schedule:\n\n'
+                              '• Days 1–12: Swipe-review 5 new target words. Spell-test 2 review cards retrieved from your Archive to solidify long-term recall.\n'
+                              '• Day 13 (Test Day): Prove your knowledge of all 15 words in a comprehensive spelling/recall test validated by AI.',
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHelpSection(
+                          title: 'Active Decks & Grouping',
+                          icon: Icons.style_rounded,
+                          content: 'Words in your inventory are automatically stacked into decks of 15 words. '
+                              'The currently active deck is styled with a glowing teal border and marked with an [ACTIVE] badge. '
+                              'Any remaining words (less than 15) are shown as individual word cards below the decks.',
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHelpSection(
+                          title: 'Passed vs. Failed Words',
+                          icon: Icons.check_circle_outline_rounded,
+                          content: 'On Test Day:\n'
+                              '• Words you pass are automatically moved to your Archive.\n'
+                              '• Words you fail return to your active Inventory so they can be re-studied in future cycles.',
+                        ),
+                        const SizedBox(height: 20),
+                        _buildHelpSection(
+                          title: 'Manage Your Decks',
+                          icon: Icons.touch_app_rounded,
+                          content: 'Press and hold (long-press) any deck stack to manage its contents:\n'
+                              '• Inventory: Archive the entire deck (moves all 15 words to archive) or permanently delete it.\n'
+                              '• Archive: Restore the entire deck (moves all 15 words back to active inventory) or permanently delete it.',
+                        ),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHelpSection({
+    required String title,
+    required IconData icon,
+    required String content,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: U.teal, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                color: U.text,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 26),
+          child: Text(
+            content,
+            style: GoogleFonts.plusJakartaSans(
+              color: U.sub,
+              fontSize: 13,
+              height: 1.5,
+            ),
           ),
         ),
       ],

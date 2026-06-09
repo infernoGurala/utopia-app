@@ -44,6 +44,24 @@ class NoteBlock {
   }
 }
 
+class ScratchPadInfo {
+  final String id;
+  String title;
+  String emoji;
+
+  ScratchPadInfo({required this.id, required this.title, required this.emoji});
+
+  Map<String, dynamic> toJson() => {'id': id, 'title': title, 'emoji': emoji};
+
+  factory ScratchPadInfo.fromJson(Map<String, dynamic> json) {
+    return ScratchPadInfo(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      emoji: json['emoji'] as String,
+    );
+  }
+}
+
 class ScratchPadScreen extends StatefulWidget {
   const ScratchPadScreen({super.key});
 
@@ -52,6 +70,9 @@ class ScratchPadScreen extends StatefulWidget {
 }
 
 class _ScratchPadScreenState extends State<ScratchPadScreen> {
+  List<ScratchPadInfo> _todayPads = [];
+  String _activePadId = '';
+
   List<NoteBlock> _blocks = [];
   String _emoji = '📝';
   bool _showEmojiPicker = false;
@@ -192,26 +213,62 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
       final prefs = await SharedPreferences.getInstance();
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      final emoji = prefs.getString('scratch_pad_emoji_$todayStr') ?? '📝';
-      final blocksJson = prefs.getString('scratch_pad_blocks_$todayStr');
-      List<NoteBlock> loadedBlocks = [];
+      final padsJson = prefs.getString('scratch_pad_list_$todayStr');
+      List<ScratchPadInfo> loadedPads = [];
 
+      if (padsJson != null && padsJson.isNotEmpty) {
+        try {
+          final List decoded = json.decode(padsJson);
+          loadedPads = decoded.map((e) => ScratchPadInfo.fromJson(e)).toList();
+        } catch (e) {
+          debugPrint('Error decoding scratch pads list JSON: $e');
+        }
+      }
+
+      if (loadedPads.isEmpty) {
+        // Fallback/Migration: Check if there's any existing note today
+        final oldEmoji = prefs.getString('scratch_pad_emoji_$todayStr') ?? '📝';
+        final oldBlocksJson = prefs.getString('scratch_pad_blocks_$todayStr');
+        final oldContent = prefs.getString('scratch_pad_$todayStr') ?? '';
+
+        if ((oldBlocksJson != null && oldBlocksJson.isNotEmpty) || oldContent.isNotEmpty) {
+          loadedPads = [
+            ScratchPadInfo(id: 'main', title: 'Main Pad', emoji: oldEmoji)
+          ];
+        } else {
+          loadedPads = [
+            ScratchPadInfo(id: 'main', title: 'Main Pad', emoji: '📝')
+          ];
+        }
+        await prefs.setString('scratch_pad_list_$todayStr', json.encode(loadedPads.map((e) => e.toJson()).toList()));
+      }
+
+      final initialPadId = loadedPads.first.id;
+      final initialEmoji = loadedPads.first.emoji;
+
+      // Load blocks for active pad
+      final blocksJson = prefs.getString('scratch_pad_blocks_${todayStr}_$initialPadId') ?? 
+                         (initialPadId == 'main' ? prefs.getString('scratch_pad_blocks_$todayStr') : null);
+      
+      List<NoteBlock> loadedBlocks = [];
       if (blocksJson != null && blocksJson.isNotEmpty) {
         try {
           final List decoded = json.decode(blocksJson);
           loadedBlocks = decoded.map((e) => NoteBlock.fromJson(e)).toList();
         } catch (e) {
-          debugPrint('Error decoding block JSON: $e');
+          debugPrint('Error decoding active block JSON: $e');
         }
       }
 
       if (loadedBlocks.isEmpty) {
-        final content = prefs.getString('scratch_pad_$todayStr') ?? '';
+        final content = initialPadId == 'main' ? prefs.getString('scratch_pad_$todayStr') ?? '' : '';
         loadedBlocks = _parseMarkdownToBlocks(content);
       }
 
       setState(() {
-        _emoji = emoji;
+        _todayPads = loadedPads;
+        _activePadId = initialPadId;
+        _emoji = initialEmoji;
         _blocks = loadedBlocks;
         _controllers.clear();
         _focusNodes.clear();
@@ -229,7 +286,14 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      await prefs.setString('scratch_pad_emoji_$todayStr', em);
+
+      final activePad = _todayPads.firstWhere((p) => p.id == _activePadId, orElse: () => _todayPads.first);
+      setState(() {
+        activePad.emoji = em;
+      });
+
+      await prefs.setString('scratch_pad_list_$todayStr', json.encode(_todayPads.map((e) => e.toJson()).toList()));
+      await prefs.setString('scratch_pad_emoji_${todayStr}_$_activePadId', em);
     } catch (e) {
       debugPrint('Error saving scratch emoji: $e');
     }
@@ -247,12 +311,24 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
         return e.toJson();
       }).toList());
 
+      // Save key-specific pad blocks
+      await prefs.setString('scratch_pad_blocks_${todayStr}_$_activePadId', blocksJson);
+
+      // Compile and update primary today note key for dashboard compatibility
       if (markdownContent.trim().isEmpty) {
-        await prefs.remove('scratch_pad_$todayStr');
-        await prefs.remove('scratch_pad_blocks_$todayStr');
+        if (_activePadId == 'main') {
+          await prefs.remove('scratch_pad_$todayStr');
+          await prefs.remove('scratch_pad_blocks_$todayStr');
+        }
       } else {
-        await prefs.setString('scratch_pad_$todayStr', markdownContent);
-        await prefs.setString('scratch_pad_blocks_$todayStr', blocksJson);
+        if (_activePadId == 'main') {
+          await prefs.setString('scratch_pad_$todayStr', markdownContent);
+          await prefs.setString('scratch_pad_blocks_$todayStr', blocksJson);
+        } else {
+          // If a secondary pad is active, we also save it under scratch_pad_$todayStr
+          // so dashboard card displays whichever pad the user worked on last!
+          await prefs.setString('scratch_pad_$todayStr', markdownContent);
+        }
       }
     } catch (e) {
       debugPrint('Error saving scratch note: $e');
@@ -331,6 +407,262 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
     });
 
     _saveNote();
+  }
+
+  Future<void> _switchPad(String padId) async {
+    await _saveNote();
+
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    final blocksJson = prefs.getString('scratch_pad_blocks_${todayStr}_$padId') ?? 
+                       (padId == 'main' ? prefs.getString('scratch_pad_blocks_$todayStr') : null);
+
+    List<NoteBlock> loadedBlocks = [];
+    if (blocksJson != null && blocksJson.isNotEmpty) {
+      try {
+        final List decoded = json.decode(blocksJson);
+        loadedBlocks = decoded.map((e) => NoteBlock.fromJson(e)).toList();
+      } catch (e) {
+        debugPrint('Error decoding switch blocks: $e');
+      }
+    }
+
+    if (loadedBlocks.isEmpty) {
+      final oldContent = padId == 'main' ? prefs.getString('scratch_pad_$todayStr') : null;
+      if (oldContent != null && oldContent.isNotEmpty) {
+        loadedBlocks = _parseMarkdownToBlocks(oldContent);
+      } else {
+        loadedBlocks = [NoteBlock(id: UniqueKey().toString(), type: BlockType.paragraph, content: '')];
+      }
+    }
+
+    final targetPad = _todayPads.firstWhere((p) => p.id == padId);
+
+    setState(() {
+      _activePadId = padId;
+      _emoji = targetPad.emoji;
+      _blocks = loadedBlocks;
+      _controllers.clear();
+      _focusNodes.clear();
+      for (final b in _blocks) {
+        _getOrCreateController(b.id, b.content);
+        _getOrCreateFocusNode(b.id);
+      }
+    });
+
+    await _saveNote();
+  }
+
+  Future<void> _createNewPad() async {
+    await _saveNote();
+
+    final newId = UniqueKey().toString();
+    final newTitle = 'Pad ${_todayPads.length + 1}';
+    final newPad = ScratchPadInfo(id: newId, title: newTitle, emoji: '📝');
+
+    setState(() {
+      _todayPads.add(newPad);
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    await prefs.setString('scratch_pad_list_$todayStr', json.encode(_todayPads.map((e) => e.toJson()).toList()));
+
+    await _switchPad(newId);
+  }
+
+  Future<void> _deletePad(ScratchPadInfo pad) async {
+    if (_todayPads.length <= 1) return;
+
+    final index = _todayPads.indexOf(pad);
+    setState(() {
+      _todayPads.removeAt(index);
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    await prefs.setString('scratch_pad_list_$todayStr', json.encode(_todayPads.map((e) => e.toJson()).toList()));
+    await prefs.remove('scratch_pad_blocks_${todayStr}_${pad.id}');
+    if (pad.id == 'main') {
+      await prefs.remove('scratch_pad_blocks_$todayStr');
+      await prefs.remove('scratch_pad_$todayStr');
+    }
+
+    if (_activePadId == pad.id) {
+      final fallbackId = _todayPads.first.id;
+      await _switchPad(fallbackId);
+    } else {
+      await _saveNote();
+    }
+  }
+
+  void _renamePadDialog(ScratchPadInfo pad, StateSetter setSheetState) {
+    final textController = TextEditingController(text: pad.title);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: U.card,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Rename Pad',
+            style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600),
+          ),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            style: GoogleFonts.outfit(color: U.text),
+            decoration: InputDecoration(
+              hintText: 'Enter pad name...',
+              hintStyle: GoogleFonts.outfit(color: U.dim),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: U.border)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: U.primary)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: GoogleFonts.outfit(color: U.primary)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newName = textController.text.trim();
+                if (newName.isNotEmpty) {
+                  setState(() {
+                    pad.title = newName;
+                  });
+                  setSheetState(() {});
+                  final prefs = await SharedPreferences.getInstance();
+                  final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+                  await prefs.setString('scratch_pad_list_$todayStr', json.encode(_todayPads.map((e) => e.toJson()).toList()));
+                }
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              child: Text('Save', style: GoogleFonts.outfit(color: U.primary)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPadsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "Today's Pads",
+                        style: GoogleFonts.outfit(
+                          color: U.text,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close_rounded, color: U.text),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 250),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _todayPads.length,
+                      itemBuilder: (context, index) {
+                        final pad = _todayPads[index];
+                        final isActive = pad.id == _activePadId;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: isActive ? U.primary.withValues(alpha: 0.08) : U.card,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isActive ? U.primary : U.border.withValues(alpha: 0.5),
+                              width: isActive ? 1.2 : 0.8,
+                            ),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            leading: Text(pad.emoji, style: const TextStyle(fontSize: 20)),
+                            title: Text(
+                              pad.title,
+                              style: GoogleFonts.outfit(
+                                color: U.text,
+                                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit_outlined, color: U.sub, size: 18),
+                                  onPressed: () => _renamePadDialog(pad, setSheetState),
+                                ),
+                                if (_todayPads.length > 1)
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline_rounded, color: U.red, size: 18),
+                                    onPressed: () {
+                                      _deletePad(pad);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(context);
+                              _switchPad(pad.id);
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: U.primary,
+                        foregroundColor: appThemeNotifier.value.isDark ? Colors.black : Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: Text("Create New Pad", style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _createNewPad();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _clearText() {
@@ -673,7 +1005,28 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
     _saveNote();
   }
 
+  void _applySlashCommand(NoteBlock block, BlockType type) {
+    final controller = _controllers[block.id];
+    if (controller != null) {
+      controller.clear();
+    }
+    setState(() {
+      block.type = type;
+      if (type == BlockType.todo) {
+        block.isCompleted = false;
+      }
+    });
+    _saveNote();
+  }
+
   Widget _buildFloatingToolbar() {
+    final activeBlock = _activeFocusBlockId != null
+        ? _blocks.firstWhere((b) => b.id == _activeFocusBlockId, orElse: () => _blocks.first)
+        : null;
+    final controller = _activeFocusBlockId != null ? _controllers[_activeFocusBlockId] : null;
+    final text = controller?.text ?? '';
+    final showSlashCommands = text.startsWith('/');
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       height: 48,
@@ -697,12 +1050,20 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _toolbarButton(Icons.format_bold, () => _insertMarkdown('**', '**'), tooltip: 'Bold'),
-                _toolbarButton(Icons.format_italic, () => _insertMarkdown('*', '*'), tooltip: 'Italics'),
-                _toolbarButton(Icons.link_rounded, () => _insertMarkdown('[', '](url)'), tooltip: 'Link'),
-                _toolbarButton(Icons.code_rounded, () => _insertMarkdown('`', '`'), tooltip: 'Code'),
-              ],
+              children: showSlashCommands && activeBlock != null
+                  ? [
+                      _toolbarTextButton('H1', () => _applySlashCommand(activeBlock, BlockType.h1), tooltip: 'Heading 1'),
+                      _toolbarTextButton('H2', () => _applySlashCommand(activeBlock, BlockType.h2), tooltip: 'Heading 2'),
+                      _toolbarTextButton('Todo', () => _applySlashCommand(activeBlock, BlockType.todo), tooltip: 'To-do List'),
+                      _toolbarTextButton('List', () => _applySlashCommand(activeBlock, BlockType.bullet), tooltip: 'Bulleted List'),
+                      _toolbarTextButton('Text', () => _applySlashCommand(activeBlock, BlockType.paragraph), tooltip: 'Standard Text'),
+                    ]
+                  : [
+                      _toolbarIconButton(Icons.format_bold, () => _insertMarkdown('**', '**'), tooltip: 'Bold'),
+                      _toolbarIconButton(Icons.format_italic, () => _insertMarkdown('*', '*'), tooltip: 'Italics'),
+                      _toolbarIconButton(Icons.link_rounded, () => _insertMarkdown('[', '](url)'), tooltip: 'Link'),
+                      _toolbarIconButton(Icons.code_rounded, () => _insertMarkdown('`', '`'), tooltip: 'Code'),
+                    ],
             ),
           ),
         ),
@@ -710,90 +1071,133 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
     );
   }
 
-  Widget _toolbarButton(IconData icon, VoidCallback onPressed, {required String tooltip}) {
-    return IconButton(
-      icon: Icon(icon, color: U.text, size: 20),
-      onPressed: onPressed,
-      tooltip: tooltip,
-      splashRadius: 20,
+  Widget _toolbarIconButton(IconData icon, VoidCallback onPressed, {required String tooltip}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Icon(icon, color: U.text, size: 20),
+        ),
+      ),
     );
+  }
+
+  Widget _toolbarTextButton(String label, VoidCallback onPressed, {required String tooltip}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBlockMenu(Offset position, NoteBlock block) {
+    final RenderBox overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(position.dx, position.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      color: U.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      items: [
+        PopupMenuItem(
+          value: 'turn_to_paragraph',
+          child: _buildMenuRow(Icons.short_text_rounded, 'Text'),
+        ),
+        PopupMenuItem(
+          value: 'turn_to_h1',
+          child: _buildMenuRow(Icons.title_rounded, 'Heading 1'),
+        ),
+        PopupMenuItem(
+          value: 'turn_to_h2',
+          child: _buildMenuRow(Icons.subtitles_rounded, 'Heading 2'),
+        ),
+        PopupMenuItem(
+          value: 'turn_to_todo',
+          child: _buildMenuRow(Icons.playlist_add_check_rounded, 'To-do list'),
+        ),
+        PopupMenuItem(
+          value: 'turn_to_bullet',
+          child: _buildMenuRow(Icons.format_list_bulleted_rounded, 'Bulleted list'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'insert_above',
+          child: _buildMenuRow(Icons.arrow_upward_rounded, 'Insert Above'),
+        ),
+        PopupMenuItem(
+          value: 'insert_below',
+          child: _buildMenuRow(Icons.arrow_downward_rounded, 'Insert Below'),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, color: U.red, size: 18),
+              const SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: U.red)),
+            ],
+          ),
+        ),
+      ],
+    ).then((action) {
+      if (action == null) return;
+      if (action == 'delete') {
+        _deleteBlock(block);
+      } else if (action.startsWith('turn_to_')) {
+        final typeStr = action.replaceFirst('turn_to_', '');
+        final type = BlockType.values.firstWhere((e) => e.name == typeStr);
+        setState(() {
+          block.type = type;
+        });
+        _saveNote();
+      } else if (action == 'insert_above') {
+        _insertBlockAbove(block);
+      } else if (action == 'insert_below') {
+        _insertBlockBelow(block, BlockType.paragraph);
+      }
+    });
   }
 
   Widget _buildBlockControls(NoteBlock block, int index) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: Icon(Icons.add_rounded, size: 16, color: U.dim),
-          onPressed: () => _insertBlockBelow(block, BlockType.paragraph),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          splashRadius: 14,
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _insertBlockBelow(block, BlockType.paragraph),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 8.0),
+            child: Icon(Icons.add_rounded, size: 14, color: U.dim),
+          ),
         ),
-        const SizedBox(width: 2),
-        PopupMenuButton<String>(
-          icon: Icon(Icons.drag_indicator_rounded, size: 16, color: U.dim),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-          color: U.surface,
-          onSelected: (action) {
-            if (action == 'delete') {
-              _deleteBlock(block);
-            } else if (action.startsWith('turn_to_')) {
-              final typeStr = action.replaceFirst('turn_to_', '');
-              final type = BlockType.values.firstWhere((e) => e.name == typeStr);
-              setState(() {
-                block.type = type;
-              });
-              _saveNote();
-            } else if (action == 'insert_above') {
-              _insertBlockAbove(block);
-            } else if (action == 'insert_below') {
-              _insertBlockBelow(block, BlockType.paragraph);
-            }
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) {
+            _showBlockMenu(details.globalPosition, block);
           },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'turn_to_paragraph',
-              child: _buildMenuRow(Icons.short_text_rounded, 'Text'),
-            ),
-            PopupMenuItem(
-              value: 'turn_to_h1',
-              child: _buildMenuRow(Icons.title_rounded, 'Heading 1'),
-            ),
-            PopupMenuItem(
-              value: 'turn_to_h2',
-              child: _buildMenuRow(Icons.subtitles_rounded, 'Heading 2'),
-            ),
-            PopupMenuItem(
-              value: 'turn_to_todo',
-              child: _buildMenuRow(Icons.playlist_add_check_rounded, 'To-do list'),
-            ),
-            PopupMenuItem(
-              value: 'turn_to_bullet',
-              child: _buildMenuRow(Icons.format_list_bulleted_rounded, 'Bulleted list'),
-            ),
-            const PopupMenuDivider(),
-            PopupMenuItem(
-              value: 'insert_above',
-              child: _buildMenuRow(Icons.arrow_upward_rounded, 'Insert Above'),
-            ),
-            PopupMenuItem(
-              value: 'insert_below',
-              child: _buildMenuRow(Icons.arrow_downward_rounded, 'Insert Below'),
-            ),
-            const PopupMenuDivider(),
-            PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete_outline_rounded, color: U.red, size: 18),
-                  const SizedBox(width: 8),
-                  Text('Delete', style: TextStyle(color: U.red)),
-                ],
-              ),
-            ),
-          ],
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 8.0),
+            child: Icon(Icons.drag_indicator_rounded, size: 14, color: U.dim),
+          ),
         ),
       ],
     );
@@ -912,7 +1316,7 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
 
     switch (block.type) {
       case BlockType.h1:
-        prefixWidget = const SizedBox(width: 8);
+        prefixWidget = const SizedBox(width: 4);
         textStyle = GoogleFonts.outfit(
           color: U.text,
           fontSize: 22,
@@ -921,7 +1325,7 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
         );
         break;
       case BlockType.h2:
-        prefixWidget = const SizedBox(width: 8);
+        prefixWidget = const SizedBox(width: 4);
         textStyle = GoogleFonts.outfit(
           color: U.text,
           fontSize: 18,
@@ -931,7 +1335,7 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
         break;
       case BlockType.todo:
         prefixWidget = Padding(
-          padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+          padding: const EdgeInsets.only(right: 6.0, top: 2.0),
           child: SizedBox(
             width: 18,
             height: 18,
@@ -958,7 +1362,7 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
         break;
       case BlockType.bullet:
         prefixWidget = Padding(
-          padding: const EdgeInsets.only(left: 6.0, right: 12.0, top: 8.0),
+          padding: const EdgeInsets.only(left: 2.0, right: 8.0, top: 8.0),
           child: Container(
             width: 5,
             height: 5,
@@ -975,7 +1379,7 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
         );
         break;
       case BlockType.paragraph:
-        prefixWidget = const SizedBox(width: 8);
+        prefixWidget = const SizedBox(width: 4);
         textStyle = GoogleFonts.outfit(
           color: U.text,
           fontSize: 15.5,
@@ -1193,13 +1597,32 @@ class _ScratchPadScreenState extends State<ScratchPadScreen> {
                               duration: const Duration(milliseconds: 200),
                             ),
                             const SizedBox(height: 16),
-                            Text(
-                              "Today's Scratch Pad",
-                              style: GoogleFonts.outfit(
-                                color: U.text,
-                                fontSize: 30,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: -0.6,
+                            GestureDetector(
+                              onTap: _showPadsSheet,
+                              behavior: HitTestBehavior.opaque,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      _todayPads.firstWhere((p) => p.id == _activePadId, orElse: () => ScratchPadInfo(id: 'main', title: 'Main Pad', emoji: '📝')).title,
+                                      style: GoogleFonts.outfit(
+                                        color: U.text,
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: -0.6,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: U.text,
+                                    size: 28,
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -1324,7 +1747,8 @@ class MarkdownTextEditingController extends TextEditingController {
       r'(~~[^~]+~~)|'     // 4. strikethrough
       r'(\[[^\]]+\]\([^)]+\))|' // 5. link
       r'(\$[^\$]+\$)|'     // 6. single latex
-      r'(^#{2,4}\s[^\n]*)', // 7. Headings
+      r'(`[^`]+`)|'        // 7. inline code
+      r'(^#{2,4}\s[^\n]*)', // 8. Headings
       multiLine: true,
     );
 
@@ -1385,7 +1809,20 @@ class MarkdownTextEditingController extends TextEditingController {
           TextSpan(text: matchText.substring(1, matchText.length - 1), style: defaultStyle.copyWith(fontFamily: 'Courier', color: U.green)),
           TextSpan(text: r'$', style: tagStyle),
         ]));
-      } else if (match.group(7) != null) { // Headings (##, ###, ####)
+      } else if (match.group(7) != null) { // Inline Code
+        spans.add(TextSpan(children: [
+          TextSpan(text: '`', style: tagStyle),
+          TextSpan(
+            text: matchText.substring(1, matchText.length - 1),
+            style: defaultStyle.copyWith(
+              fontFamily: 'monospace',
+              color: U.green,
+              backgroundColor: U.green.withValues(alpha: 0.08),
+            ),
+          ),
+          TextSpan(text: '`', style: tagStyle),
+        ]));
+      } else if (match.group(8) != null) { // Headings (##, ###, ####)
         final int hashCount = matchText.indexOf(' ');
         final String hashTags = matchText.substring(0, hashCount + 1);
         final String content = matchText.substring(hashCount + 1);

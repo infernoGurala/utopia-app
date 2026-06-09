@@ -201,6 +201,27 @@ class InventoryProvider extends ChangeNotifier {
       _supabaseService.deleteInventoryWord(id).catchError((e) {
         debugPrint('Failed to sync removeWord to Supabase: $e');
       });
+      _supabaseService.deleteArchiveWord(id).catchError((e) {
+        debugPrint('Failed to sync deleteArchiveWord to Supabase: $e');
+      });
+    }
+  }
+
+  void removeWords(List<String> ids) {
+    _inventory.removeWhere((w) => ids.contains(w.id));
+    _archive.removeWhere((w) => ids.contains(w.id));
+    notifyListeners();
+    _saveLocalCache();
+
+    if (_uid != null) {
+      for (final id in ids) {
+        _supabaseService.deleteInventoryWord(id).catchError((e) {
+          debugPrint('Failed to sync removeWord to Supabase: $e');
+        });
+        _supabaseService.deleteArchiveWord(id).catchError((e) {
+          debugPrint('Failed to sync deleteArchiveWord to Supabase: $e');
+        });
+      }
     }
   }
 
@@ -217,6 +238,54 @@ class InventoryProvider extends ChangeNotifier {
         _supabaseService.addWordToArchive(_uid!, word).catchError((e) {
           debugPrint('Failed to sync archiveWord to Supabase: $e');
         });
+      }
+    }
+  }
+
+  void archiveWords(List<String> ids) {
+    final List<Word> wordsToArchive = [];
+    for (final id in ids) {
+      final index = _inventory.indexWhere((w) => w.id == id);
+      if (index != -1) {
+        final word = _inventory.removeAt(index);
+        final archivedWord = word.copyWith(archivedAt: DateTime.now());
+        _archive.add(archivedWord);
+        wordsToArchive.add(archivedWord);
+      }
+    }
+    if (wordsToArchive.isNotEmpty) {
+      notifyListeners();
+      _saveLocalCache();
+      if (_uid != null) {
+        for (final word in wordsToArchive) {
+          _supabaseService.addWordToArchive(_uid!, word).catchError((e) {
+            debugPrint('Failed to sync archiveWord to Supabase: $e');
+          });
+        }
+      }
+    }
+  }
+
+  void restoreWords(List<String> ids) {
+    final List<Word> wordsToRestore = [];
+    for (final id in ids) {
+      final index = _archive.indexWhere((w) => w.id == id);
+      if (index != -1) {
+        final word = _archive.removeAt(index);
+        final restoredWord = word.copyWith(archivedAt: null);
+        _inventory.add(restoredWord);
+        wordsToRestore.add(restoredWord);
+      }
+    }
+    if (wordsToRestore.isNotEmpty) {
+      notifyListeners();
+      _saveLocalCache();
+      if (_uid != null) {
+        for (final word in wordsToRestore) {
+          _supabaseService.returnToInventory(_uid!, word).catchError((e) {
+            debugPrint('Failed to sync returnToInventory to Supabase: $e');
+          });
+        }
       }
     }
   }
@@ -252,6 +321,37 @@ class InventoryProvider extends ChangeNotifier {
     }
   }
 
+  void seedInitialArchive() {
+    if (_archive.isNotEmpty) return;
+    
+    final initialArchive = [
+      {'word': 'Smile', 'meaning': 'A happy expression on the face'},
+      {'word': 'Water', 'meaning': 'A clear liquid that falls as rain'},
+      {'word': 'Ocean', 'meaning': 'A very large area of salt water'},
+      {'word': 'Apple', 'meaning': 'A round fruit with red or green skin'},
+      {'word': 'House', 'meaning': 'A building where people live'},
+    ];
+
+    final uuid = const Uuid();
+    for (var w in initialArchive) {
+      final archivedWord = Word(
+        id: uuid.v4(),
+        word: w['word']!,
+        meaning: w['meaning']!,
+        addedAt: DateTime.now().subtract(const Duration(days: 1)),
+        archivedAt: DateTime.now(),
+      );
+      _archive.add(archivedWord);
+      if (_uid != null) {
+        _supabaseService.addWordToArchive(_uid!, archivedWord).catchError((e) {
+          debugPrint('Failed to sync initial archive word: $e');
+        });
+      }
+    }
+    notifyListeners();
+    _saveLocalCache();
+  }
+
   void loadStarterDeck() {
     final initialWords = [
       {'word': 'Ephemeral', 'meaning': 'Lasting for a very short time'},
@@ -280,5 +380,8 @@ class InventoryProvider extends ChangeNotifier {
         addedAt: DateTime.now(),
       ));
     }
+
+    // Seed archive words as well
+    seedInitialArchive();
   }
 }

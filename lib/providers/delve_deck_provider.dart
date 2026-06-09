@@ -55,7 +55,7 @@ class DeckProvider extends ChangeNotifier {
     _completedDecksCount = prefs.getInt(_completedDecksKey) ?? 0;
     
     // Check missed days on local load
-    _checkMissedDay();
+    checkMissedDayAndSync();
     _syncDelveNotifications();
     notifyListeners();
   }
@@ -73,7 +73,7 @@ class DeckProvider extends ChangeNotifier {
       }
 
       // Check missed days after cloud load
-      _checkMissedDay();
+      checkMissedDayAndSync();
       _syncDelveNotifications();
       notifyListeners();
       _saveLocalCache();
@@ -96,24 +96,32 @@ class DeckProvider extends ChangeNotifier {
   // Missed Day Detection
   // ---------------------------------------------------------------------------
 
-  void _checkMissedDay() {
+  void checkMissedDayAndSync() {
     if (_activeDeck == null) return;
     if (_activeDeck!.status == DeckStatus.completed) return;
 
+    bool changed = false;
     if (_activeDeck!.hasMissedDay) {
       debugPrint('Missed day detected. Resetting deck to Day 1.');
       _activeDeck = _activeDeck!.copyWith(
         currentDay: 1,
         status: DeckStatus.active,
       );
-      _syncDeckToCloud();
+      changed = true;
     } else if (_activeDeck!.isNewDayReady && _activeDeck!.currentDay < 13) {
       final nextDay = _activeDeck!.currentDay + 1;
       _activeDeck = _activeDeck!.copyWith(
         currentDay: nextDay,
         status: nextDay == 13 ? DeckStatus.testDay : DeckStatus.active,
       );
+      changed = true;
+    }
+
+    if (changed) {
       _syncDeckToCloud();
+      _saveLocalCache();
+      _syncDelveNotifications();
+      notifyListeners();
     }
   }
 

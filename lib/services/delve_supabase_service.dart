@@ -195,6 +195,15 @@ class DelveSupabaseService {
     }
   }
 
+  Future<void> deleteArchiveWord(String id) async {
+    if (!_initialized || _client == null) return;
+    try {
+      await _client!.from('delve_archive').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Delve deleteArchiveWord error: $e');
+    }
+  }
+
   Future<void> returnToInventory(String uid, Word word) async {
     if (!_initialized || _client == null) return;
     try {

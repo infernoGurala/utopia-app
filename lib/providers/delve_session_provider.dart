@@ -23,21 +23,36 @@ class SessionProvider extends ChangeNotifier {
     if (jsonStr != null) {
       _currentSession = Session.fromJson(jsonDecode(jsonStr));
       
-      // If the saved session is from a previous day and was completed, clear it
-      if (_currentSession != null && _currentSession!.status == SessionStatus.completed) {
+      // If the saved session is from a previous day, clear it so a new day can begin
+      if (_currentSession != null) {
         final sessionDate = _currentSession!.date;
         final now = DateTime.now();
         final isToday = sessionDate.year == now.year &&
             sessionDate.month == now.month &&
             sessionDate.day == now.day;
         if (!isToday) {
-          // Old completed session — clear it so a new day can begin
           _currentSession = null;
           await prefs.remove(_sessionKey);
         }
       }
       
       notifyListeners();
+    }
+  }
+
+  /// If the current session is from a previous day, clear it (completed or incomplete)
+  void checkAndClearOldSession() async {
+    if (_currentSession != null) {
+      final sessionDate = _currentSession!.date;
+      final now = DateTime.now();
+      final isToday = sessionDate.year == now.year &&
+          sessionDate.month == now.month &&
+          sessionDate.day == now.day;
+      if (!isToday) {
+        _currentSession = null;
+        await _saveData();
+        notifyListeners();
+      }
     }
   }
 

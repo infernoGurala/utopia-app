@@ -362,6 +362,7 @@ class _SwipeCardState extends State<SwipeCard> with TickerProviderStateMixin {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         // Glassmorphism-inspired card
+        borderRadius: BorderRadius.circular(32),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -496,11 +497,12 @@ class _SwipeCardState extends State<SwipeCard> with TickerProviderStateMixin {
           ),
 
           // Bottom indicator
-          Positioned(
-            bottom: 28,
-            left: 0,
-            right: 0,
-            child: Center(
+          if (MediaQuery.of(context).viewInsets.bottom == 0)
+            Positioned(
+              bottom: 28,
+              left: 0,
+              right: 0,
+              child: Center(
               child: isBack
                   ? _isTypingDone
                       ? Row(

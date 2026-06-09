@@ -187,47 +187,8 @@ class _ActiveDeckState extends StatelessWidget {
       );
     }
 
-    // 3. Session just finished (completed but deck not yet marked) → process it
-    if (sessionProvider.currentSession != null &&
-        sessionProvider.currentSession!.status == SessionStatus.completed &&
-        !deck.isSessionCompletedToday) {
-      // Process the completion
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _processSessionCompletion(context, deck, sessionProvider);
-      });
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    // 4. No session yet today → show "Begin Session" screen
+    // 3. No session yet today → show "Begin Session" screen
     return _BeginSessionState(deck: deck);
-  }
-
-  void _processSessionCompletion(
-    BuildContext context,
-    Deck deck,
-    SessionProvider sessionProvider,
-  ) {
-    final deckProvider = context.read<DeckProvider>();
-    final inventoryProvider = context.read<InventoryProvider>();
-
-    if (deck.currentDay == 13) {
-      // Test Day: process pass/fail for all 15 words
-      final results = sessionProvider.getSessionResults();
-      for (final wordId in results['passed']!) {
-        inventoryProvider.archiveWord(wordId);
-      }
-      for (final wordId in results['failed']!) {
-        final word = inventoryProvider.getWordById(wordId);
-        if (word != null) {
-          inventoryProvider.updateWord(
-            word.copyWith(failCount: word.failCount + 1),
-          );
-        }
-      }
-    }
-
-    // Mark session date on the deck
-    deckProvider.markSessionCompleted();
   }
 }
 
@@ -361,7 +322,61 @@ class _InSessionStateState extends State<_InSessionState> {
   }
 
   void _completeCard(ActiveCardResult result) {
-    context.read<SessionProvider>().completeCurrentCard(result);
+    final sessionProvider = context.read<SessionProvider>();
+    sessionProvider.completeCurrentCard(result);
+
+    final session = sessionProvider.currentSession;
+    if (session != null && session.status == SessionStatus.completed) {
+      final deck = context.read<DeckProvider>().activeDeck;
+      if (deck != null) {
+        _processSessionCompletion(context, deck, sessionProvider);
+      }
+    }
+  }
+
+  void _processSessionCompletion(
+    BuildContext context,
+    Deck deck,
+    SessionProvider sessionProvider,
+  ) {
+    final deckProvider = context.read<DeckProvider>();
+    final inventoryProvider = context.read<InventoryProvider>();
+
+    if (deck.currentDay == 13) {
+      // Test Day: process pass/fail for all 15 words
+      final results = sessionProvider.getSessionResults();
+      for (final wordId in results['passed']!) {
+        inventoryProvider.archiveWord(wordId);
+      }
+      for (final wordId in results['failed']!) {
+        final word = inventoryProvider.getWordById(wordId);
+        if (word != null) {
+          inventoryProvider.updateWord(
+            word.copyWith(failCount: word.failCount + 1),
+          );
+        }
+      }
+    } else {
+      // Days 1-12: process the 2 archive active cards
+      final results = sessionProvider.getSessionResults();
+      for (final wordId in results['failed']!) {
+        final word = inventoryProvider.getWordById(wordId);
+        if (word != null) {
+          // Move from archive back to inventory
+          inventoryProvider.restoreWords([wordId]);
+          // And increment failCount
+          inventoryProvider.updateWord(
+            word.copyWith(
+              archivedAt: null,
+              failCount: word.failCount + 1,
+            ),
+          );
+        }
+      }
+    }
+
+    // Mark session date on the deck
+    deckProvider.markSessionCompleted();
   }
 
   @override
@@ -440,7 +455,7 @@ class _InSessionStateState extends State<_InSessionState> {
                           ),
               ),
             ),
-            const SizedBox(height: 120),
+            SizedBox(height: MediaQuery.of(context).viewInsets.bottom > 0 ? 16 : 120),
           ],
         ),
       ],
@@ -490,7 +505,7 @@ class _InSessionStateState extends State<_InSessionState> {
               ),
             ),
             onPressed: () {
-              provider.completeCurrentCard(ActiveCardResult.passed);
+              _completeCard(ActiveCardResult.passed);
             },
             child: const Text('Continue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
@@ -816,7 +831,7 @@ class _TestDayResults extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 100),
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom > 0 ? 12 : 100),
         ],
       ),
     );

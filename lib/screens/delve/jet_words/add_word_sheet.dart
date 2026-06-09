@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../main.dart';
 import '../../../models/delve_word_model.dart';
 import '../../../providers/delve_theme_provider.dart';
+import '../../../providers/delve_deck_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../../providers/delve_inventory_provider.dart';
@@ -116,8 +119,43 @@ class _AddWordSheetState extends State<AddWordSheet> {
 
   void _delete() {
     if (widget.existingWord != null) {
-      context.read<InventoryProvider>().removeWord(widget.existingWord!.id);
-      Navigator.of(context).pop();
+      final deckProvider = context.read<DeckProvider>();
+      final activeDeck = deckProvider.activeDeck;
+      final isPartOfActive = activeDeck != null &&
+          activeDeck.allWordIds.contains(widget.existingWord!.id);
+
+      if (isPartOfActive) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: U.card,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text('Delete active card?', style: GoogleFonts.playfairDisplay(color: U.text, fontWeight: FontWeight.bold)),
+            content: Text(
+              'This word is part of your active study deck. Deleting it will abandon your active study cycle. Do you want to proceed?',
+              style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 13, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  deckProvider.abandonDeck();
+                  context.read<InventoryProvider>().removeWord(widget.existingWord!.id);
+                  Navigator.of(context).pop();
+                },
+                child: Text('Delete & Abandon', style: GoogleFonts.plusJakartaSans(color: U.red, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      } else {
+        context.read<InventoryProvider>().removeWord(widget.existingWord!.id);
+        Navigator.of(context).pop();
+      }
     }
   }
 
