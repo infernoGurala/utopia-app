@@ -1,4 +1,4 @@
-package com.example.utopia_app
+package com.superwave.utopia
 
 import android.content.Intent
 import android.os.Build

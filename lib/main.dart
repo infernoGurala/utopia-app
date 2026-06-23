@@ -16,7 +16,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:app_links/app_links.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'firebase_options.dart';
-import 'services/app_update_service.dart';
+
 import 'services/cache_service.dart';
 import 'services/chat_service.dart';
 import 'services/notification_service.dart';
@@ -26,7 +26,7 @@ import 'screens/join_class_screen.dart';
 import 'screens/university_selection_screen.dart';
 import 'services/class_service.dart';
 import 'services/focus_supabase_service.dart';
-import 'widgets/app_update_prompt.dart';
+
 import 'screens/event_details_screen.dart';
 import 'services/event_service.dart';
 
@@ -1083,8 +1083,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   final Future<AppInitializationState> _appInit = appInitialization;
   bool _greetingCyclePassed = false;
-  bool _updateDismissed = false;
-  AppUpdateInfo? _pendingUpdate;
+
   StreamSubscription<Uri>? _linkSub;
 
   @override
@@ -1095,7 +1094,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     if (PlatformSupport.supportsNotifications) {
       unawaited(NotificationService.ensureNotificationPermissions());
     }
-    _loadUpdateInfo();
+
     _initDeepLinks();
     Future.delayed(SplashScreen.minimumDisplayDuration, () {
       if (mounted) {
@@ -1129,16 +1128,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadUpdateInfo() async {
-    await _appInit;
-    final updateInfo = await AppUpdateService.checkForUpdate();
-    if (!mounted || updateInfo == null) {
-      return;
-    }
-    setState(() {
-      _pendingUpdate = updateInfo;
-    });
-  }
+
 
   void _initDeepLinks() {
     final appLinks = AppLinks();
@@ -1221,14 +1211,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                 'This platform is not configured for UTOPIA yet.',
           );
         }
-        if (_pendingUpdate != null &&
-            !_updateDismissed &&
-            _pendingUpdate!.shouldUpdate) {
-          return AppUpdatePrompt(
-            info: _pendingUpdate!,
-            onSkip: () => setState(() => _updateDismissed = true),
-          );
-        }
+
 
         return StreamBuilder<User?>(
           stream: FirebaseAuth.instance.authStateChanges(),
@@ -1406,6 +1389,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _error;
+  int _logoTapCount = 0;
+  DateTime? _lastLogoTap;
 
   Future<void> _signIn() async {
     if (!PlatformSupport.supportsGoogleSignIn) {
@@ -1446,6 +1431,183 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showAdminLoginDialog() {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool dialogLoading = false;
+    String? dialogError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: !_loading,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: U.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                'Admin Login',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: U.text,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enter administrator email and password to log in.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: U.sub,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: TextStyle(color: U.text),
+                    decoration: InputDecoration(
+                      hintText: 'Admin Email',
+                      hintStyle: TextStyle(color: U.dim),
+                      filled: true,
+                      fillColor: U.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.border, width: 0.8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.border, width: 0.8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.primary, width: 1.2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    style: TextStyle(color: U.text),
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      hintStyle: TextStyle(color: U.dim),
+                      filled: true,
+                      fillColor: U.surface,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.border, width: 0.8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.border, width: 0.8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: U.primary, width: 1.2),
+                      ),
+                    ),
+                  ),
+                  if (dialogError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      dialogError!,
+                      style: GoogleFonts.outfit(
+                        color: U.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: dialogLoading ? null : () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.outfit(
+                      color: U.sub,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: dialogLoading
+                      ? null
+                      : () async {
+                          final email = emailController.text.trim();
+                          final password = passwordController.text.trim();
+                          if (email.isEmpty || password.isEmpty) {
+                            setDialogState(() {
+                              dialogError = 'Email and password cannot be empty.';
+                            });
+                            return;
+                          }
+                          setDialogState(() {
+                            dialogLoading = true;
+                            dialogError = null;
+                          });
+                          try {
+                            final credential = await FirebaseAuth.instance
+                                .signInWithEmailAndPassword(
+                              email: email,
+                              password: password,
+                            );
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(credential.user?.uid)
+                                .set({
+                              'displayName': credential.user?.displayName ?? email.split('@')[0],
+                              'email': credential.user?.email ?? email,
+                              'photoUrl': credential.user?.photoURL,
+                              'lastSeen': FieldValue.serverTimestamp(),
+                            }, SetOptions(merge: true));
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              setDialogState(() {
+                                dialogLoading = false;
+                                dialogError = 'Login failed: ${e.toString().split(']').last.trim()}';
+                              });
+                            }
+                          }
+                        },
+                  child: dialogLoading
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: U.primary,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Login',
+                          style: GoogleFonts.outfit(
+                            color: U.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1457,22 +1619,38 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(flex: 4),
-              Text(
-                'UTOPIA',
-                style: GoogleFonts.playfairDisplay(
-                  fontSize: 52,
-                  fontWeight: FontWeight.w700,
-                  color: U.primary,
-                  fontStyle: FontStyle.italic,
-                  height: 1,
-                  letterSpacing: -1,
-                  shadows: [
-                    Shadow(
-                      color: U.primary.withValues(alpha: 0.2),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+              GestureDetector(
+                onTap: () {
+                  final now = DateTime.now();
+                  if (_lastLogoTap == null || now.difference(_lastLogoTap!) < const Duration(seconds: 2)) {
+                    _logoTapCount++;
+                  } else {
+                    _logoTapCount = 1;
+                  }
+                  _lastLogoTap = now;
+
+                  if (_logoTapCount >= 5) {
+                    _logoTapCount = 0;
+                    _showAdminLoginDialog();
+                  }
+                },
+                child: Text(
+                  'UTOPIA',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 52,
+                    fontWeight: FontWeight.w700,
+                    color: U.primary,
+                    fontStyle: FontStyle.italic,
+                    height: 1,
+                    letterSpacing: -1,
+                    shadows: [
+                      Shadow(
+                        color: U.primary.withValues(alpha: 0.2),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                 ),
               )
                   .animate()
@@ -1563,7 +1741,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
               Center(
                 child: Text(
-                  'Designed by Humans, Powered by AI',
+                  'Designed by Inferno',
                   style: GoogleFonts.outfit(
                     fontSize: 11,
                     color: U.dim,

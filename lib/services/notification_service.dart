@@ -26,7 +26,6 @@ import 'package:uuid/uuid.dart';
 import 'package:utopia_app/models/focus_models.dart';
 import 'package:utopia_app/services/user_timetable_service.dart';
 import 'package:utopia_app/models/user_timetable.dart';
-import 'package:utopia_app/screens/calendar_screen.dart';
 import 'package:utopia_app/services/focus_database_service.dart';
 import 'package:utopia_app/services/focus_supabase_service.dart';
 
@@ -560,15 +559,6 @@ class NotificationService {
       if (navigator != null) {
         await navigator.push(
           MaterialPageRoute(builder: (_) => const TimetableScreen()),
-        );
-      }
-      return;
-    }
-    if (type == 'calendar') {
-      final navigator = navigatorKey.currentState;
-      if (navigator != null) {
-        await navigator.push(
-          MaterialPageRoute(builder: (_) => const CalendarScreen()),
         );
       }
       return;

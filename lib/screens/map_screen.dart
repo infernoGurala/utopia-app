@@ -402,17 +402,6 @@ class _MapScreenState extends State<MapScreen> {
         return false;
       }
 
-      if (permission == LocationPermission.whileInUse) {
-        if (mounted) {
-          showUtopiaSnackBar(
-            context,
-            message:
-                'GPS sharing works now. "Always allow" is optional for better background updates.',
-            tone: UtopiaSnackBarTone.info,
-          );
-        }
-      }
-
       return true;
     } catch (e) {
       print('Permission precheck error: $e');

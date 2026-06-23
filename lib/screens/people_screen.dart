@@ -22,19 +22,17 @@ class PeopleScreen extends StatefulWidget {
 class _PeopleScreenState extends State<PeopleScreen> {
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  late final Stream<QuerySnapshot<Map<String, dynamic>>> _usersStream;
 
   String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
-
-  Stream<QuerySnapshot<Map<String, dynamic>>> _buildStream() {
-    return FirebaseFirestore.instance
-        .collection('users')
-        .orderBy('displayName')
-        .snapshots();
-  }
 
   @override
   void initState() {
     super.initState();
+    _usersStream = FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('displayName')
+        .snapshots();
     _searchController.addListener(() {
       if (mounted) setState(() {});
     });
@@ -163,7 +161,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
 
             if (!_isSearching)
               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _buildStream(),
+                stream: _usersStream,
                 builder: (context, snap) {
                   final count = snap.data?.docs.length ?? 0;
                   final countStr = count > 0 ? ' • $count people' : '';
@@ -183,7 +181,7 @@ class _PeopleScreenState extends State<PeopleScreen> {
             // ── List ────────────────────────────────────────────────────────
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: _buildStream(),
+                stream: _usersStream,
                 builder: (context, snap) {
                   if (snap.connectionState ==
                       ConnectionState.waiting) {

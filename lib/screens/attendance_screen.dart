@@ -11,7 +11,6 @@ import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
 import '../widgets/utopia_loader.dart';
-import '../services/attendance_server_preference.dart';
 import '../models/user_timetable.dart';
 import '../services/user_timetable_service.dart';
 
@@ -31,7 +30,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   final TextEditingController _rollController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String _selectedCollege = 'aus';
-  String _selectedServer = AttendanceServerPreference.kServer1;
 
   late final AnimationController _glowController;
   _AttendanceViewState _state = _AttendanceViewState.loading;
@@ -53,16 +51,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
     unawaited(_loadSavedCredentials());
-    unawaited(_loadServerPreference());
-  }
-
-  Future<void> _loadServerPreference() async {
-    final server = await AttendanceServerPreference.getServer();
-    if (mounted) {
-      setState(() {
-        _selectedServer = server;
-      });
-    }
   }
 
   @override
@@ -607,111 +595,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Text(
-                        'Server',
-                        style: GoogleFonts.outfit(
-                          color: U.sub,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () async {
-                                    await AttendanceServerPreference.setServer(
-                                      AttendanceServerPreference.kServer1,
-                                    );
-                                    setState(
-                                      () => _selectedServer =
-                                          AttendanceServerPreference.kServer1,
-                                    );
-                                  },
-                                  child: Container(
-                                    height: 32,
-                                    color:
-                                        _selectedServer ==
-                                            AttendanceServerPreference.kServer1
-                                        ? U.primary
-                                        : U.surface,
-                                    child: Center(
-                                      child: Text(
-                                        'In-App',
-                                        style: GoogleFonts.outfit(
-                                          color:
-                                              _selectedServer ==
-                                                  AttendanceServerPreference
-                                                      .kServer1
-                                              ? U.bg
-                                              : U.sub,
-                                          fontSize: 12,
-                                          fontWeight:
-                                              _selectedServer ==
-                                                  AttendanceServerPreference
-                                                      .kServer1
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () async {
-                                    await AttendanceServerPreference.setServer(
-                                      AttendanceServerPreference.kServer2,
-                                    );
-                                    setState(
-                                      () => _selectedServer =
-                                          AttendanceServerPreference.kServer2,
-                                    );
-                                  },
-                                  child: Container(
-                                    height: 32,
-                                    color:
-                                        _selectedServer ==
-                                            AttendanceServerPreference.kServer2
-                                        ? U.primary
-                                        : U.surface,
-                                    child: Center(
-                                      child: Text(
-                                        'Cloud',
-                                        style: GoogleFonts.outfit(
-                                          color:
-                                              _selectedServer ==
-                                                  AttendanceServerPreference
-                                                      .kServer2
-                                              ? U.bg
-                                              : U.sub,
-                                          fontSize: 12,
-                                          fontWeight:
-                                              _selectedServer ==
-                                                  AttendanceServerPreference
-                                                      .kServer2
-                                              ? FontWeight.w700
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
                   _buildField(
                     controller: _rollController,
                     hintText: _selectedCollege == 'aus'
@@ -1022,11 +905,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         Icon(Icons.info_outline_rounded, size: 14, color: U.sub),
                         const SizedBox(width: 6),
                         Text(
-                          'Fetched via ${data['serverUsed'] == 'server2'
-                              ? 'Cloud'
-                              : data['serverUsed'] == 'server1'
-                              ? 'In-App'
-                              : 'Cache'}',
+                          'Fetched via ${data['serverUsed'] ?? 'In-App'}',
                           style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
                         ),
                       ],

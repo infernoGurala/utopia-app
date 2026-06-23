@@ -12,11 +12,8 @@ import 'package:provider/provider.dart';
 import '../main.dart';
 import '../theme/image_overlay_colors.dart';
 import 'habit_tracker_screen.dart';
-import 'reminders_screen.dart';
-import 'calendar_screen.dart';
 import 'rockets_screen.dart';
 import 'attendance_screen.dart';
-import 'scratch_pad_screen.dart';
 import 'delve/delve_shell.dart';
 import '../providers/delve_theme_provider.dart';
 import '../providers/delve_deck_provider.dart';
@@ -25,9 +22,6 @@ import '../providers/delve_session_provider.dart';
 import 'package:intl/intl.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
-import '../widgets/news_brief_dashboard_card.dart';
-import '../services/google_calendar_service.dart';
-import '../services/calendar_cache_service.dart';
 import '../services/cache_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/attendance_cache_service.dart';
@@ -48,9 +42,6 @@ class _FocusScreenState extends State<FocusScreen> {
   int _scheduledHabitsCount = 0;
   int _completedHabitsCount = 0;
   String _dailyNoteInsight = 'Write today';
-  String _remindersInsight = 'No upcoming';
-  String _calendarInsight = 'Connect Google Account';
-  String _scratchPadInsight = 'Write daily offline scratches...';
   String _delveInsight = 'Start learning intelligence words';
 
   String _streakHabitId = '';
@@ -510,43 +501,6 @@ class _FocusScreenState extends State<FocusScreen> {
     }
   }
 
-  DateTime? _getNextOccurrence(FocusReminder r, DateTime now) {
-    final timeParts = r.reminderTime.split(':');
-    if (timeParts.length < 2) return null;
-    final hour = int.tryParse(timeParts[0]) ?? 0;
-    final minute = int.tryParse(timeParts[1]) ?? 0;
-
-    if (r.type == 'one_time') {
-      if (r.remindDate == null) return null;
-      final dateParts = r.remindDate!.split('-');
-      if (dateParts.length < 3) return null;
-      final year = int.tryParse(dateParts[0]) ?? 0;
-      final month = int.tryParse(dateParts[1]) ?? 0;
-      final day = int.tryParse(dateParts[2]) ?? 0;
-      final scheduled = DateTime(year, month, day, hour, minute);
-      if (scheduled.isAfter(now)) return scheduled;
-      return null;
-    } else if (r.type == 'weekly') {
-      if (r.weekdays == null || r.weekdays!.isEmpty) return null;
-      for (int i = 0; i < 8; i++) {
-        final candidateDate = now.add(Duration(days: i));
-        final candidateWeekday = candidateDate.weekday - 1; // 0=Mon...6=Sun
-        if (r.weekdays!.contains(candidateWeekday)) {
-          final scheduled = DateTime(candidateDate.year, candidateDate.month, candidateDate.day, hour, minute);
-          if (scheduled.isAfter(now)) return scheduled;
-        }
-      }
-    } else if (r.type == 'monthly_date') {
-      if (r.monthDay == null) return null;
-      final thisMonthScheduled = DateTime(now.year, now.month, r.monthDay!, hour, minute);
-      if (thisMonthScheduled.isAfter(now)) return thisMonthScheduled;
-      final nextMonth = now.month == 12 ? 1 : now.month + 1;
-      final nextYear = now.month == 12 ? now.year + 1 : now.year;
-      return DateTime(nextYear, nextMonth, r.monthDay!, hour, minute);
-    }
-    return null;
-  }
-
   Future<void> _loadStats() async {
     try {
       int totalHabits = 0;
@@ -662,105 +616,7 @@ class _FocusScreenState extends State<FocusScreen> {
         debugPrint('Error loading cached attendance: $e');
       }
 
-      // 2. Get next upcoming reminder
-      String remindersInsight = 'No reminders';
-      try {
-        final reminders = await _service.getReminders();
-        final activeReminders = reminders.where((r) => r.isActive).toList();
-
-        if (activeReminders.isEmpty) {
-          remindersInsight = 'All clear! No tasks';
-        } else {
-          final now = DateTime.now();
-          final List<MapEntry<FocusReminder, DateTime>> futureReminders = [];
-
-          for (final r in activeReminders) {
-            final nextOccur = _getNextOccurrence(r, now);
-            if (nextOccur != null) {
-              futureReminders.add(MapEntry(r, nextOccur));
-            }
-          }
-
-          if (futureReminders.isEmpty) {
-            remindersInsight = 'All clear for today';
-          } else {
-            // Sort by next occurrence ascending
-            futureReminders.sort((a, b) => a.value.compareTo(b.value));
-            
-            final nextEntry = futureReminders.first;
-            final nextReminder = nextEntry.key;
-            final nextDt = nextEntry.value;
-
-            // Format display
-            final todayDate = DateTime(now.year, now.month, now.day);
-            final occurrenceDate = DateTime(nextDt.year, nextDt.month, nextDt.day);
-            final difference = occurrenceDate.difference(todayDate).inDays;
-
-            final hr = nextDt.hour;
-            final min = nextDt.minute.toString().padLeft(2, '0');
-            final ampm = hr >= 12 ? 'PM' : 'AM';
-            final displayHr = hr == 0 ? 12 : (hr > 12 ? hr - 12 : hr);
-            final formattedTime = '$displayHr:$min $ampm';
-
-            const weekdaysList = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            String dayLabel = '';
-            if (difference == 0) {
-              dayLabel = 'Today, $formattedTime';
-            } else if (difference == 1) {
-              dayLabel = 'Tomorrow, $formattedTime';
-            } else {
-              dayLabel = '${weekdaysList[nextDt.weekday - 1]}, $formattedTime';
-            }
-
-            remindersInsight = '$dayLabel: ${nextReminder.label}';
-          }
-        }
-      } catch (e) {
-        debugPrint('FocusScreen reminders insight load failed: $e');
-      }
-
-      // 3. Get today's Google Calendar events count
-      String calendarInsight = 'Connect Google Account';
-      try {
-        final connected = await GoogleCalendarService.instance.isConnected();
-        if (connected) {
-          final now = DateTime.now();
-          final startOfDay = DateTime(now.year, now.month, now.day);
-          final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-          final events = await CalendarCacheService.instance.getEvents(
-            start: startOfDay,
-            end: endOfDay,
-            includeHidden: false,
-          );
-          if (events.isEmpty) {
-            calendarInsight = 'No events today';
-          } else {
-            calendarInsight = '${events.length} ${events.length == 1 ? "event" : "events"} scheduled today';
-          }
-        } else {
-          calendarInsight = 'Connect Google Account';
-        }
-      } catch (e) {
-        debugPrint('FocusScreen calendar insight load failed: $e');
-      }
-
-      // 4. Get today's scratch pad note snippet
-      String scratchPadInsight = 'Write daily offline scratches...';
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-        final todayScratch = prefs.getString('scratch_pad_$todayStr');
-        if (todayScratch != null && todayScratch.trim().isNotEmpty) {
-          scratchPadInsight = todayScratch.trim().replaceAll('\n', ' ');
-          if (scratchPadInsight.length > 60) {
-            scratchPadInsight = '${scratchPadInsight.substring(0, 60)}...';
-          }
-        }
-      } catch (e) {
-        debugPrint('FocusScreen scratch pad insight load failed: $e');
-      }
-
-      // 5. Get Delve vocabulary learning insight
+      // 2. Get Delve vocabulary learning insight
       String delveInsight = 'Start learning intelligence words';
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -804,9 +660,6 @@ class _FocusScreenState extends State<FocusScreen> {
           _scheduledHabitsCount = totalHabits;
           _completedHabitsCount = completedHabits;
           _dailyNoteInsight = dailyNoteInsight;
-          _remindersInsight = remindersInsight;
-          _calendarInsight = calendarInsight;
-          _scratchPadInsight = scratchPadInsight;
           _delveInsight = delveInsight;
           _attendancePct = attendancePct;
         });
@@ -1223,51 +1076,64 @@ class _FocusScreenState extends State<FocusScreen> {
 
               const SizedBox(height: 16),
 
-              // ── Row 2: Calendar & Stacked (Scratch Pad + Reminders) (Side-by-side) ──
+              const SizedBox(height: 16),
+
+              // ── Rockets & Delve Project Side-by-Side ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Calendar Card
-                    Expanded(
-                      child: PressableCard(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CalendarScreen()),
-                        ).then((_) => _loadData()),
-                        child: Container(
-                          height: 190,
-                          decoration: BoxDecoration(
-                            color: U.card,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: U.border.withValues(alpha: 0.8),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                                spreadRadius: -2,
+                child: SizedBox(
+                  height: 225,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Rockets Reader Card
+                      Expanded(
+                        child: PressableCard(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const RocketsScreen()),
+                          ).then((_) => _loadData()),
+                          child: Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: U.card,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: U.border.withValues(alpha: 0.8),
+                                width: 1.0,
                               ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                  spreadRadius: -2,
+                                ),
+                              ],
+                            ),
                             child: Stack(
                               children: [
-                                // Left accent line
+                                // Accent edge
                                 Positioned(
-                                  left: 0,
                                   top: 0,
-                                  bottom: 0,
-                                  width: 4,
-                                  child: Container(color: U.gold),
+                                  left: 0,
+                                  right: 0,
+                                  height: 2,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          U.peach.withValues(alpha: 0.0),
+                                          U.peach,
+                                          U.peach.withValues(alpha: 0.0),
+                                        ],
+                                        stops: const [0.0, 0.5, 1.0],
+                                      ),
+                                    ),
+                                  ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(18),
+                                  padding: const EdgeInsets.all(16),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -1276,76 +1142,110 @@ class _FocusScreenState extends State<FocusScreen> {
                                           Container(
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(
-                                              color: U.gold.withValues(alpha: 0.1),
+                                              color: U.peach.withValues(alpha: 0.1),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
                                             child: Icon(
-                                              Icons.calendar_today_rounded,
-                                              color: U.gold,
-                                              size: 16,
+                                              Icons.rocket_launch_rounded,
+                                              color: U.peach,
+                                              size: 12,
                                             ),
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(
-                                            'SCHEDULE',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 1.5,
-                                              color: U.gold.withValues(alpha: 0.85),
+                                          Expanded(
+                                            child: Text(
+                                              'READ ALOUD',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 1.0,
+                                                color: U.peach.withValues(alpha: 0.85),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Rockets Reader',
+                                        style: GoogleFonts.newsreader(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle: FontStyle.italic,
+                                          color: U.text,
+                                          letterSpacing: -0.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.auto_awesome_rounded,
+                                            size: 10,
+                                            color: U.peach.withValues(alpha: 0.6),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Text(
+                                              'Neural AI TTS',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 10,
+                                                color: U.sub,
+                                                letterSpacing: 0.2,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ],
                                       ),
                                       const Spacer(),
-                                      Text(
-                                        'Calendar',
-                                        style: GoogleFonts.newsreader(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle: FontStyle.italic,
-                                          color: U.text,
-                                          letterSpacing: -0.3,
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        height: 76,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: U.peach.withValues(alpha: 0.05),
+                                          borderRadius: BorderRadius.circular(16),
                                         ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      (() {
-                                        if (_calendarInsight == 'Connect Google Account') {
-                                          return Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(vertical: 5),
-                                            decoration: BoxDecoration(
-                                              color: U.gold.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: U.gold.withValues(alpha: 0.25),
-                                                width: 0.8,
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const SizedBox(height: 4),
+                                            AnimatedWaveform(color: U.peach),
+                                            const SizedBox(height: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [U.peach, U.peach.withValues(alpha: 0.8)],
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                ),
+                                                borderRadius: BorderRadius.circular(10),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: U.peach.withValues(alpha: 0.25),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                            child: Center(
                                               child: Text(
-                                                'Connect',
+                                                'Listen',
                                                 style: GoogleFonts.plusJakartaSans(
-                                                  fontSize: 11,
+                                                  fontSize: 9,
                                                   fontWeight: FontWeight.w800,
-                                                  color: U.gold.withValues(alpha: 0.95),
+                                                  color: appThemeNotifier.value.isDark
+                                                      ? const Color(0xFF0B0612)
+                                                      : Colors.white,
                                                 ),
                                               ),
                                             ),
-                                          );
-                                        } else {
-                                          return Text(
-                                            _calendarInsight,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              color: U.sub,
-                                              height: 1.35,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          );
-                                        }
-                                      })(),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -1354,449 +1254,265 @@ class _FocusScreenState extends State<FocusScreen> {
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Scratch Pad & Reminders Stacked Column
-                    Expanded(
-                      child: Column(
-                        children: [
-                          // Scratch Pad Block
-                          PressableCard(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const ScratchPadScreen()),
-                            ).then((_) => _loadData()),
-                            child: Container(
-                              height: 87,
-                              decoration: BoxDecoration(
-                                color: U.card,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: U.border.withValues(alpha: 0.8),
-                                  width: 1.0,
+                      const SizedBox(width: 16),
+                      // Delve Project Card
+                      Expanded(
+                        child: PressableCard(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: U.card,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                    spreadRadius: -2,
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Stack(
+                                title: Row(
                                   children: [
-                                    // Left accent line
-                                    Positioned(
-                                      left: 0,
-                                      top: 0,
-                                      bottom: 0,
-                                      width: 4,
-                                      child: Container(color: U.blue),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.edit_note_rounded,
-                                                color: U.blue,
-                                                size: 18,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  'Scratch Pad',
-                                                  style: GoogleFonts.newsreader(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontStyle: FontStyle.italic,
-                                                    color: U.text,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _scratchPadInsight,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 11,
-                                              color: U.sub,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
+                                    Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 22),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'Beta Feature',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        color: U.text,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Reminders Block
-                          PressableCard(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const RemindersScreen()),
-                            ).then((_) => _loadData()),
-                            child: Container(
-                              height: 87,
-                              decoration: BoxDecoration(
-                                color: U.card,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: U.border.withValues(alpha: 0.8),
-                                  width: 1.0,
+                                content: Text(
+                                  'This feature is currently in beta and we do not recommend using it. It may contain bugs, incomplete functionality, or unexpected behavior.',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    color: U.sub,
+                                    height: 1.5,
+                                  ),
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                    spreadRadius: -2,
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: Text(
+                                      'Go Back',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: U.sub,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(ctx);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => MultiProvider(
+                                            providers: [
+                                              ChangeNotifierProvider(create: (_) => DelveThemeProvider()),
+                                              ChangeNotifierProvider(
+                                                create: (_) {
+                                                  final provider = InventoryProvider();
+                                                  final user = FirebaseAuth.instance.currentUser;
+                                                  if (user != null) {
+                                                    provider.initForUser(user.uid);
+                                                  }
+                                                  return provider;
+                                                },
+                                              ),
+                                              ChangeNotifierProvider(
+                                                create: (_) {
+                                                  final provider = DeckProvider();
+                                                  final user = FirebaseAuth.instance.currentUser;
+                                                  if (user != null) {
+                                                    provider.initForUser(user.uid);
+                                                  }
+                                                  return provider;
+                                                },
+                                              ),
+                                              ChangeNotifierProvider(create: (_) => SessionProvider()),
+                                            ],
+                                            child: const DelveShell(),
+                                          ),
+                                        ),
+                                      ).then((_) => _loadData());
+                                    },
+                                    child: Text(
+                                      'Continue Anyway',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.amber,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Stack(
-                                  children: [
-                                    // Left accent line
-                                    Positioned(
-                                      left: 0,
-                                      top: 0,
-                                      bottom: 0,
-                                      width: 4,
-                                      child: Container(color: U.lavender),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.alarm_on_rounded,
-                                                color: U.lavender,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  'Reminders',
-                                                  style: GoogleFonts.newsreader(
-                                                    fontSize: 16,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontStyle: FontStyle.italic,
-                                                    color: U.text,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            _remindersInsight,
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 11,
-                                              color: U.sub,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            );
+                          },
+                          child: Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: U.card,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: U.border.withValues(alpha: 0.8),
+                                width: 1.0,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                  spreadRadius: -2,
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate()
-                  .fadeIn(delay: 300.ms, duration: 500.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOutCubic),
-
-              const SizedBox(height: 16),
-
-              // ── Row 4: Today's Brief Card (News) ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: const NewsBriefDashboardCard(),
-              ).animate()
-                  .fadeIn(delay: 350.ms, duration: 500.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 350.ms, duration: 500.ms, curve: Curves.easeOutCubic),
-
-              const SizedBox(height: 16),
-
-              // ── Row 5: Rockets Visualizer Card (Wide) ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: PressableCard(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RocketsScreen()),
-                  ).then((_) => _loadData()),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: U.card,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: U.border.withValues(alpha: 0.8),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                          spreadRadius: -2,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
+                            child: Stack(
+                              children: [
+                                // Accent edge
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: 2,
+                                  child: Container(
                                     decoration: BoxDecoration(
-                                      color: U.peach.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.rocket_launch_rounded,
-                                      color: U.peach,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'READ ALOUD',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.5,
-                                      color: U.peach.withValues(alpha: 0.85),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          U.teal.withValues(alpha: 0.0),
+                                          U.teal,
+                                          U.teal.withValues(alpha: 0.0),
+                                        ],
+                                        stops: const [0.0, 0.5, 1.0],
+                                      ),
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Rockets Reader',
-                                style: GoogleFonts.newsreader(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  fontStyle: FontStyle.italic,
-                                  color: U.text,
-                                  letterSpacing: -0.4,
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Neural AI TTS.',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: U.sub,
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: U.teal.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              Icons.spa_rounded,
+                                              color: U.teal,
+                                              size: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'DELVE',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 1.0,
+                                                color: U.teal.withValues(alpha: 0.85),
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [U.teal, U.teal.withValues(alpha: 0.7)],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              'BETA',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 7,
+                                                fontWeight: FontWeight.w800,
+                                                color: appThemeNotifier.value.isDark
+                                                    ? const Color(0xFF0B0612)
+                                                    : Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Delve Project',
+                                        style: GoogleFonts.newsreader(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle: FontStyle.italic,
+                                          color: U.text,
+                                          letterSpacing: -0.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Expanded(
+                                        child: Text(
+                                          _delveInsight,
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            color: U.sub,
+                                            letterSpacing: 0.2,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        height: 76,
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          color: U.teal.withValues(alpha: 0.05),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Center(
+                                          child: Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  U.teal.withValues(alpha: 0.15),
+                                                  U.teal.withValues(alpha: 0.08),
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Icon(
+                                              Icons.menu_book_rounded,
+                                              color: U.teal.withValues(alpha: 0.85),
+                                              size: 22,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        Column(
-                          children: [
-                            AnimatedWaveform(color: U.peach),
-                            const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: U.peach,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                'Listen',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: appThemeNotifier.value.isDark
-                                      ? const Color(0xFF0B0612)
-                                      : Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ).animate()
                   .fadeIn(delay: 400.ms, duration: 500.ms)
                   .slideY(begin: 0.1, end: 0, delay: 400.ms, duration: 500.ms, curve: Curves.easeOutCubic),
-
-              const SizedBox(height: 16),
-
-              // ── Row 6: Delve Project (Beta) Card (Wide) ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: PressableCard(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MultiProvider(
-                          providers: [
-                            ChangeNotifierProvider(create: (_) => DelveThemeProvider()),
-                            ChangeNotifierProvider(
-                              create: (_) {
-                                final provider = InventoryProvider();
-                                final user = FirebaseAuth.instance.currentUser;
-                                if (user != null) {
-                                  provider.initForUser(user.uid);
-                                }
-                                return provider;
-                              },
-                            ),
-                            ChangeNotifierProvider(
-                              create: (_) {
-                                final provider = DeckProvider();
-                                final user = FirebaseAuth.instance.currentUser;
-                                if (user != null) {
-                                  provider.initForUser(user.uid);
-                                }
-                                return provider;
-                              },
-                            ),
-                            ChangeNotifierProvider(create: (_) => SessionProvider()),
-                          ],
-                          child: const DelveShell(),
-                        ),
-                      ),
-                    ).then((_) => _loadData());
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: U.card,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: U.border.withValues(alpha: 0.8),
-                        width: 1.0,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                          spreadRadius: -2,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: U.teal.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.spa_rounded,
-                                      color: U.teal,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'INTELLIGENCE',
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.5,
-                                      color: U.teal.withValues(alpha: 0.85),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: U.teal.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      'BETA',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w800,
-                                        color: U.teal,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Delve Project',
-                                style: GoogleFonts.newsreader(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  fontStyle: FontStyle.italic,
-                                  color: U.text,
-                                  letterSpacing: -0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _delveInsight,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: U.sub,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Icon(
-                          Icons.menu_book_rounded,
-                          color: U.teal.withValues(alpha: 0.6),
-                          size: 32,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ).animate()
-                  .fadeIn(delay: 450.ms, duration: 500.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 450.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
               const SizedBox(height: 140),
             ],

@@ -6,7 +6,6 @@ import '../main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/role_service.dart';
 import 'developer_panel_screen.dart';
-import 'legal_policies_screen.dart';
 
 class UtopiaSectionScreen extends StatefulWidget {
   final bool initialIsSuperUser;
@@ -209,13 +208,11 @@ class _UtopiaSectionScreenState extends State<UtopiaSectionScreen> {
                   _groupedTile(
                     icon: Icons.gavel_outlined,
                     label: 'Legal & Policies',
-                    sub: 'Terms, privacy, and academic guidelines',
+                    sub: 'Privacy policy & terms of service',
                     color: U.primary,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const LegalPoliciesScreen(),
-                      ),
+                    onTap: () => launchUrl(
+                      Uri.parse('https://inferalis.space/utopia/policy/'),
+                      mode: LaunchMode.externalApplication,
                     ),
                   ),
 

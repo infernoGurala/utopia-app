@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart';
 import 'university_selection_screen.dart';
@@ -16,7 +17,10 @@ import 'uni_chat_screen.dart';
 import 'docs_screen.dart';
 import 'events_screen.dart';
 import 'timetable_screen.dart';
+import 'event_notifications_screen.dart';
 import '../services/cache_service.dart';
+import '../services/event_service.dart';
+import '../models/event_model.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -29,11 +33,38 @@ class _UniversityScreenState extends State<UniversityScreen> {
   String _universityId = U.cachedUniversityId;
   String _universityName = U.cachedUniversityName;
   bool _isLoading = true;
+  int _notificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadNotificationCount();
+  }
+
+  Future<void> _loadNotificationCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dismissedIds = prefs.getStringList('dismissed_notifications') ?? [];
+
+      final results = await Future.wait([
+        EventService.instance.getEndingSoonEvents(limit: 5),
+        EventService.instance.getUpcomingEvents(limit: 5),
+        EventService.instance.getMyCertificates(),
+      ]);
+
+      final endingSoon = (results[0] as List<EventModel>).where((e) => !dismissedIds.contains(e.id)).toList();
+      final newEvents = (results[1] as List<EventModel>).where((e) => !dismissedIds.contains(e.id)).toList();
+      final certificates = (results[2] as List<EventCertificate>).where((c) => !dismissedIds.contains(c.id)).toList();
+
+      if (mounted) {
+        setState(() {
+          _notificationCount = endingSoon.length + newEvents.length + certificates.length;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading notification count: $e');
+    }
   }
 
   Future<void> _loadData() async {
@@ -248,15 +279,16 @@ class _UniversityScreenState extends State<UniversityScreen> {
                       _HeaderButton(
                         icon: Icons.notifications_none_rounded,
                         tooltip: 'Notifications',
-                        showBadge: true,
-                        badgeText: '1',
-                        onTap: () {
-                          U.showSnackBar(
+                        showBadge: _notificationCount > 0,
+                        badgeText: _notificationCount > 0 ? _notificationCount.toString() : null,
+                        onTap: () async {
+                          await Navigator.push(
                             context,
-                            'Welcome to UTOPIA! Explore your campus network.',
-                            icon: Icons.notifications_active_rounded,
-                            iconColor: theme.primary,
+                            MaterialPageRoute(
+                              builder: (_) => const EventNotificationsScreen(),
+                            ),
                           );
+                          _loadNotificationCount(); // Reload count on return
                         },
                       ),
                     ],

@@ -23,11 +23,64 @@
           }
         },
         {
-          "client_id": "402670858978-m7r6hb5ar51jrk73qal32p44o438v5ur.apps.googleusercontent.com",
+          "client_id": "402670858978-jfvb2u1g17tl0np3atnf6mj6gofsjvac.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.utopia_app",
-            "certificate_hash": "a7306e5c656609eca5299211e7916d1ff0a1c02a"
+            "certificate_hash": "8c9d4eaefd96a3c7bb7b95189d0842e144184edd"
+          }
+        },
+        {
+          "client_id": "402670858978-94eqn0qvvrtv59ijne3hn1g5flr4ahve.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGslt8X1GGuIsqlIhwSxEi7iCNf-N6DN4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "402670858978-94eqn0qvvrtv59ijne3hn1g5flr4ahve.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:402670858978:android:873b9416a7e07734fea4bb",
+        "android_client_info": {
+          "package_name": "com.superwave.utopia"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "402670858978-dji2bhm87e9frv5ti4e43ifp78e7ulp4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superwave.utopia",
+            "certificate_hash": "8c9d4eaefd96a3c7bb7b95189d0842e144184edd"
+          }
+        },
+        {
+          "client_id": "402670858978-jlk0mlghkcsa9q6c6rntvriehpe670kf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superwave.utopia",
+            "certificate_hash": "9ebb0bde2b28e7b2ccdce83b895024fc1996c603"
+          }
+        },
+        {
+          "client_id": "402670858978-rj9uebtsepihlj9olskrp5as3s8kut3o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superwave.utopia",
+            "certificate_hash": "5e8140e2453cbab4f94c8bee5af449d9f51b9cca"
           }
         },
         {

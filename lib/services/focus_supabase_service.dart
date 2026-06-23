@@ -11,7 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/focus_models.dart';
 import 'focus_database_service.dart';
 import 'notification_service.dart';
-import 'reminder_calendar_bridge.dart';
+
 
 /// Manages the dedicated Focus Supabase project.
 ///
@@ -432,7 +432,7 @@ class FocusSupabaseService {
     return _db.getReminders(userId);
   }
 
-  Future<void> saveReminder(FocusReminder reminder, {bool? syncToCalendar}) async {
+  Future<void> saveReminder(FocusReminder reminder) async {
     final reminderWithId = reminder.copyWith(
       id: reminder.id ?? _uuid.v4(),
       syncStatus: 'pending',
@@ -457,9 +457,6 @@ class FocusSupabaseService {
         debugPrint('Focus Supabase reminder sync failed: $e');
       }
     }
-
-    // Trigger Google Calendar sync bridge
-    await ReminderCalendarBridge.instance.onReminderSaved(reminderWithId, syncToCalendar: syncToCalendar);
   }
 
   Future<void> updateReminderGcalIdOnly(String reminderId, String? gcalEventId) async {
@@ -475,8 +472,6 @@ class FocusSupabaseService {
   }
 
   Future<void> deleteReminder(String reminderId) async {
-    final reminder = await _db.getReminder(reminderId);
-
     await _db.deleteReminder(reminderId);
 
     // Cancel any scheduled local notifications
@@ -488,10 +483,6 @@ class FocusSupabaseService {
       } catch (e) {
         debugPrint('Focus Supabase reminder delete failed: $e');
       }
-    }
-
-    if (reminder != null) {
-      await ReminderCalendarBridge.instance.onReminderDeleted(reminder);
     }
   }
 

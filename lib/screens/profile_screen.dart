@@ -600,7 +600,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
-                        'Designed by Humans, Powered by AI',
+                        'Designed by Inferno',
                         style: GoogleFonts.plusJakartaSans(
                           color: U.dim,
                           fontSize: 11,
