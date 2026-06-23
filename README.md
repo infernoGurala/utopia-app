@@ -1,4 +1,4 @@
-# Utopia - Academic life simplified
+# Utopia - Academia life simplified
 
 > *"Simplifed, to only what matters."*
 
