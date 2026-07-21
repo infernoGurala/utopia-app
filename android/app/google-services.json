@@ -60,7 +60,23 @@
       },
       "oauth_client": [
         {
-          "client_id": "402670858978-dji2bhm87e9frv5ti4e43ifp78e7ulp4.apps.googleusercontent.com",
+          "client_id": "402670858978-080hv3jt60pflvtdqofsu7sddnlok76e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superwave.utopia",
+            "certificate_hash": "5e8140e2453cbab4f94c8bee5af449d9f51b9cca"
+          }
+        },
+        {
+          "client_id": "402670858978-18sp290a4qou9m71vc4rf2qg73a94ous.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.superwave.utopia",
+            "certificate_hash": "66fd752b3ec88eae8429679725afb584d0e4aa6d"
+          }
+        },
+        {
+          "client_id": "402670858978-6diu67f9qe4unfspeofafj606b8o89od.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.superwave.utopia",
@@ -76,11 +92,11 @@
           }
         },
         {
-          "client_id": "402670858978-rj9uebtsepihlj9olskrp5as3s8kut3o.apps.googleusercontent.com",
+          "client_id": "402670858978-n9ikii7pn0ib9rh6asa9pkb8mqen2ntb.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.superwave.utopia",
-            "certificate_hash": "5e8140e2453cbab4f94c8bee5af449d9f51b9cca"
+            "certificate_hash": "0ab09d558798cb0c2be61e003f398817143dfac8"
           }
         },
         {
