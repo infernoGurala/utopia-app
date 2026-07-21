@@ -749,6 +749,20 @@ class _ClassesScreenState extends State<ClassesScreen> {
                         final isPinned = _pinnedClassIds.contains(c.classId);
                         
                         return GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ClassDetailScreen(
+                                  classModel: c,
+                                  universityFolderName: _universityId,
+                                ),
+                              ),
+                            );
+                            if (mounted) {
+                              _refreshData();
+                            }
+                          },
                           onLongPress: () => _showClassLongPressMenu(c),
                           child: Stack(
                             clipBehavior: Clip.none,

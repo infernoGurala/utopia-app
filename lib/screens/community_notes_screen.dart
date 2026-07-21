@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import '../widgets/utopia_loader.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import '../services/cache_service.dart';
 import '../services/supabase_global_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -264,6 +266,15 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   /// 0 = root (programs), 1 = inside a program (semesters), 2+ = courses / files.
   int get _depth => _pathHistory.length - 1;
 
+  Set<String> _offlinePrograms = {};
+
+  Future<void> _loadOfflinePrograms() async {
+    final progs = await CacheService().getOfflinePrograms();
+    if (mounted) {
+      setState(() => _offlinePrograms = progs);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -273,6 +284,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     _loadFolderIcons();
     _loadPinnedPrograms();
     _loadIconColors();
+    _loadOfflinePrograms();
   }
 
   /// Strip the `__xxxx` uniqueness suffix from a GitHub folder name for display.
@@ -915,10 +927,37 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       }
     });
 
-    // Capture the path at call time to guard against navigation race conditions
     final requestedPath = _fullPath;
+    _offlinePrograms = await CacheService().getOfflinePrograms();
 
     try {
+      final connectivityResults = await Connectivity().checkConnectivity();
+      final isOffline = connectivityResults.every((r) => r == ConnectivityResult.none);
+
+      if (isOffline) {
+        debugPrint("COMMUNITY: Device is offline. Loading cached content for $requestedPath");
+        final cachedFiles = await CacheService().getFiles(requestedPath);
+
+        List<Map<String, dynamic>> displayList = cachedFiles;
+        if (_depth == 0) {
+          displayList = cachedFiles.where((item) {
+            final pPath = item['path'] as String? ?? '';
+            return _offlinePrograms.contains(pPath);
+          }).toList();
+        }
+
+        if (mounted && _fullPath == requestedPath) {
+          setState(() {
+            _items = displayList;
+            _trashedPaths = {};
+            _sortItems();
+            _syncing = false;
+            _loading = false;
+          });
+        }
+        return;
+      }
+
       final itemsFuture = _github.getDirectoryContents(requestedPath, forceRefresh: forceRefresh);
       final trashFuture = _trashService.getTrashedPaths().catchError((e) {
         debugPrint("COMMUNITY: Trash fetch failed: $e");
@@ -932,10 +971,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       final fetchedItems = results[0] as List<Map<String, dynamic>>;
       final fetchedTrash = results[1] as Set<String>;
 
-      debugPrint(
-        "COMMUNITY: Loaded ${fetchedItems.length} items from GitHub/Supabase",
-      );
-      debugPrint("COMMUNITY: Loaded ${fetchedTrash.length} trashed paths");
+      await CacheService().saveFiles(requestedPath, fetchedItems);
 
       setState(() {
         _items = fetchedItems
@@ -952,7 +988,290 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       }
     } catch (e) {
       debugPrint("COMMUNITY: Load failed: $e");
-      if (mounted) setState(() => _loading = false);
+      final cachedFiles = await CacheService().getFiles(requestedPath);
+      List<Map<String, dynamic>> displayList = cachedFiles;
+      if (_depth == 0) {
+        displayList = cachedFiles.where((item) => _offlinePrograms.contains(item['path'] as String? ?? '')).toList();
+      }
+      if (mounted) {
+        setState(() {
+          _items = displayList;
+          _loading = false;
+          _syncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _downloadProgramOffline(String programPath, String programName) async {
+    final isAlreadyOffline = _offlinePrograms.contains(programPath);
+
+    if (isAlreadyOffline) {
+      final removeConfirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: U.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Remove Offline Access?', style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.bold)),
+          content: Text('Remove "$programName" from offline downloads?', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Remove', style: GoogleFonts.plusJakartaSans(color: U.red)),
+            ),
+          ],
+        ),
+      );
+
+      if (removeConfirm == true) {
+        await CacheService().setOfflineProgram(programPath, false);
+        await _loadOfflinePrograms();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Removed "$programName" from offline list', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.surface))),
+              backgroundColor: U.surface,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: U.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.download_for_offline_rounded, color: U.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Offline Availability',
+                style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Make "$programName" available offline?',
+              style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.w600, fontSize: 15),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: U.peach.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: U.peach.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: U.peach, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Warning: Only text notes and course structure will be downloaded for offline access. External attachment files (PDFs, images) will NOT be downloaded in this operation.',
+                      style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 13, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: U.sub)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: U.primary,
+              foregroundColor: U.getContrastColor(U.primary),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Download All Text', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    await _performOfflineDownloadWithProgress(programPath, programName);
+  }
+
+  Future<void> _performOfflineDownloadWithProgress(String programPath, String programName) async {
+    int totalFound = 0;
+    int downloadedCount = 0;
+    String currentStatus = 'Scanning program structure...';
+
+    StateSetter? setProgressState;
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setBottomSheetState) {
+            setProgressState = setBottomSheetState;
+            final progress = totalFound == 0 ? 0.0 : downloadedCount / totalFound;
+            final percent = (progress * 100).round();
+
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: U.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(Icons.downloading_rounded, color: U.primary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Downloading $programName',
+                              style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.bold, fontSize: 16),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '$downloadedCount of $totalFound notes ($percent%)',
+                              style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: totalFound == 0 ? null : progress,
+                      minHeight: 8,
+                      backgroundColor: U.border,
+                      color: U.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    currentStatus,
+                    style: GoogleFonts.plusJakartaSans(color: U.dim, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final allNotePaths = <String>[];
+    final foldersToProcess = <String>[programPath];
+
+    try {
+      while (foldersToProcess.isNotEmpty) {
+        final currentFolder = foldersToProcess.removeAt(0);
+        final items = await _github.getDirectoryContents(currentFolder, forceRefresh: true);
+
+        await CacheService().saveFiles(currentFolder, items);
+
+        for (final item in items) {
+          final type = item['type'] as String? ?? '';
+          final path = item['path'] as String? ?? '';
+          if (path.isEmpty) continue;
+          if (type == 'dir') {
+            foldersToProcess.add(path);
+          } else {
+            allNotePaths.add(path);
+          }
+        }
+
+        totalFound = allNotePaths.length;
+        if (setProgressState != null) {
+          setProgressState!(() {
+            currentStatus = 'Discovered $totalFound notes across folders...';
+          });
+        }
+      }
+
+      for (int i = 0; i < allNotePaths.length; i++) {
+        final notePath = allNotePaths[i];
+        final noteName = notePath.split('/').last;
+
+        if (setProgressState != null) {
+          setProgressState!(() {
+            currentStatus = 'Downloading text: $noteName';
+            downloadedCount = i + 1;
+          });
+        }
+
+        final content = await _github.getNoteContent(notePath, forceRefresh: true);
+        await CacheService().saveNoteContent(notePath, content);
+      }
+
+      await CacheService().setOfflineProgram(programPath, true);
+      await _loadOfflinePrograms();
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: U.getContrastColor(U.green), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '"$programName" is now available offline!',
+                    style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.green), fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: U.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Offline download failed: $e', style: GoogleFonts.plusJakartaSans(color: U.getContrastColor(U.red))),
+            backgroundColor: U.red,
+          ),
+        );
+      }
     }
   }
 
@@ -3155,6 +3474,30 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                     ),
                   ),
                 ),
+              // Offline download button
+              Positioned(
+                top: 8,
+                right: isEditMode && onEditTap != null ? 36 : 8,
+                child: GestureDetector(
+                  onTap: () => _downloadProgramOffline(folderPath, title),
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: _offlinePrograms.contains(folderPath) ? U.green.withValues(alpha: 0.15) : U.surface,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: _offlinePrograms.contains(folderPath) ? U.green : U.border,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Icon(
+                      _offlinePrograms.contains(folderPath) ? Icons.download_done_rounded : Icons.download_for_offline_outlined,
+                      color: _offlinePrograms.contains(folderPath) ? U.green : U.sub,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ),
               // Edit icon overlay when in edit mode
               if (isEditMode && onEditTap != null)
                 Positioned(

@@ -22,6 +22,8 @@ class DocViewerScreen extends StatefulWidget {
 
 class _DocViewerScreenState extends State<DocViewerScreen> {
   late final WebViewController _webController;
+  final TransformationController _transformationController = TransformationController();
+  double _currentScale = 1.0;
   bool _isLoading = true;
   bool _isDownloading = false;
   double _downloadProgress = 0;
@@ -32,13 +34,66 @@ class _DocViewerScreenState extends State<DocViewerScreen> {
     final previewUrl = DocsService.toPreviewUrl(widget.url);
     _webController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..enableZoom(true)
       ..setBackgroundColor(U.bg)
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) => setState(() => _isLoading = true),
-        onPageFinished: (_) => setState(() => _isLoading = false),
-        onWebResourceError: (_) => setState(() => _isLoading = false),
+        onPageFinished: (_) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _webController.runJavaScript('''
+              try {
+                var meta = document.querySelector('meta[name="viewport"]');
+                if (meta) {
+                  meta.setAttribute('content', 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes');
+                } else {
+                  var newMeta = document.createElement('meta');
+                  newMeta.name = 'viewport';
+                  newMeta.content = 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes';
+                  document.getElementsByTagName('head')[0].appendChild(newMeta);
+                }
+              } catch(e) {}
+            ''');
+          }
+        },
+        onWebResourceError: (_) {
+          if (mounted) setState(() => _isLoading = false);
+        },
       ))
       ..loadRequest(Uri.parse(previewUrl));
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _zoomIn() {
+    final nextScale = (_currentScale + 0.25).clamp(1.0, 4.0);
+    _animateToScale(nextScale);
+  }
+
+  void _zoomOut() {
+    final nextScale = (_currentScale - 0.25).clamp(1.0, 4.0);
+    _animateToScale(nextScale);
+  }
+
+  void _resetZoom() {
+    _animateToScale(1.0);
+  }
+
+  void _animateToScale(double targetScale) {
+    final size = MediaQuery.of(context).size;
+    final double x = -(size.width * (targetScale - 1)) / 2;
+    final double y = -(size.height * (targetScale - 1)) / 2;
+
+    setState(() {
+      _currentScale = targetScale;
+      _transformationController.value = Matrix4.identity()
+        ..translate(x, y)
+        ..scale(targetScale);
+    });
   }
 
   Future<void> _downloadDoc() async {
@@ -185,7 +240,22 @@ class _DocViewerScreenState extends State<DocViewerScreen> {
         ),
         body: Stack(
           children: [
-            WebViewWidget(controller: _webController),
+            InteractiveViewer(
+              transformationController: _transformationController,
+              minScale: 1.0,
+              maxScale: 4.0,
+              panEnabled: _currentScale > 1.01,
+              scaleEnabled: true,
+              onInteractionEnd: (_) {
+                if (mounted) {
+                  final scale = _transformationController.value.getMaxScaleOnAxis();
+                  setState(() {
+                    _currentScale = scale;
+                  });
+                }
+              },
+              child: WebViewWidget(controller: _webController),
+            ),
             if (_isLoading)
               Positioned.fill(
                 child: Container(
@@ -205,9 +275,78 @@ class _DocViewerScreenState extends State<DocViewerScreen> {
                   ).animate().fadeIn(),
                 ),
               ),
+            // Floating zoom controls bar
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                decoration: BoxDecoration(
+                  color: U.surface.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.remove_rounded, color: U.text, size: 20),
+                      onPressed: _currentScale > 1.0 ? _zoomOut : null,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Zoom Out',
+                    ),
+                    GestureDetector(
+                      onTap: _resetZoom,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Text(
+                          '${(_currentScale * 100).round()}%',
+                          style: GoogleFonts.outfit(
+                            color: U.primary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.add_rounded, color: U.text, size: 20),
+                      onPressed: _currentScale < 4.0 ? _zoomIn : null,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Zoom In',
+                    ),
+                    if (_currentScale > 1.01) ...[
+                      Container(
+                        height: 16,
+                        width: 1,
+                        color: U.border,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.restart_alt_rounded, color: U.sub, size: 18),
+                        onPressed: _resetZoom,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        padding: EdgeInsets.zero,
+                        tooltip: 'Reset Zoom',
+                      ),
+                    ],
+                  ],
+                ),
+              ).animate().fadeIn(),
+            ),
           ],
         ),
       ),
     );
   }
 }
+

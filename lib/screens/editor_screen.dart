@@ -10,6 +10,7 @@ import '../services/supabase_notes_service.dart';
 import '../services/supabase_global_service.dart';
 import '../widgets/utopia_loading_overlay.dart';
 import '../services/ai_service.dart';
+import 'appflowy_note_screen.dart';
 
 // ─────────────────────────────────────────────────────────────
 //  Block data model
@@ -950,126 +951,13 @@ class _EditorScreenState extends State<EditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: U.bg,
-      appBar: AppBar(
-        backgroundColor: U.surface,
-        foregroundColor: U.text,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (_hasChanges) {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  backgroundColor: U.card,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  title: Text('Unsaved changes', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
-                  content: Text('Leave without saving?', style: GoogleFonts.outfit(color: U.sub)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('Stay', style: GoogleFonts.outfit(color: U.primary)),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pop(context);
-                      },
-                      child: Text('Leave', style: GoogleFonts.outfit(color: U.red)),
-                    ),
-                  ],
-                ),
-              );
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-        title: Text(
-          widget.title,
-          style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600, fontSize: 16),
-        ),
-        actions: [
-          if (_hasChanges)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilledButton.icon(
-                onPressed: _saving ? null : _save,
-                icon: const Icon(Icons.check_rounded, size: 18),
-                label: Text('Save', style: GoogleFonts.outfit()),
-                style: FilledButton.styleFrom(
-                  backgroundColor: U.green,
-                  foregroundColor: U.bg,
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Column(
-        children: [
-          Expanded(
-            child: _blocks.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.edit_note_outlined, color: U.dim, size: 48),
-                        const SizedBox(height: 12),
-                        Text('No blocks yet', style: GoogleFonts.outfit(color: U.dim, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        Text('Tap + to add content', style: GoogleFonts.outfit(color: U.dim, fontSize: 12)),
-                      ],
-                    ),
-                  )
-                : ReorderableListView.builder(
-                    padding: const EdgeInsets.only(top: 12, bottom: 100),
-              itemCount: _blocks.length,
-              onReorder: (oldIndex, newIndex) {
-                setState(() {
-                  if (newIndex > oldIndex) newIndex--;
-                  final block = _blocks.removeAt(oldIndex);
-                  _blocks.insert(newIndex, block);
-                  _hasChanges = true;
-                });
-              },
-              proxyDecorator: (child, index, animation) {
-                return AnimatedBuilder(
-                  animation: animation,
-                  builder: (ctx, child) => Material(
-                    color: Colors.transparent,
-                    elevation: 6,
-                    shadowColor: Colors.black45,
-                    borderRadius: BorderRadius.circular(16),
-                    child: child,
-                  ),
-                  child: child,
-                );
-              },
-              itemBuilder: (context, index) => _buildBlockCard(index),
-            ),
-          ),
-          if (_activeFormatController != null) _buildMarkdownToolbar(),
-        ],
-      ),
-      ),
-          if (_saving) const UtopiaLoadingOverlay(),
-        ],
-      ),
-      floatingActionButton: _activeFormatController != null
-          ? null
-          : FloatingActionButton(
-              onPressed: _showAddBlockSheet,
-              backgroundColor: U.primary,
-              foregroundColor: appThemeNotifier.value.isDark ? Colors.black : Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.add_rounded),
-            ),
+    return AppFlowyNoteScreen(
+      title: widget.title,
+      filePath: widget.filePath,
+      folderPath: widget.folderPath,
+      overrideContent: widget.initialContent,
+      isEditable: true,
+      useGlobalRepo: widget.useGlobalRepo,
     );
   }
 

@@ -274,6 +274,18 @@ class _TimetableScreenState extends State<TimetableScreen>
     );
   }
 
+  Future<void> _openEditTimetable() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomTimetableScreen(initialTimetable: _userTimetable),
+      ),
+    );
+    if (result == true) {
+      _loadData();
+    }
+  }
+
   Widget _buildSettingsSheet() {
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -299,6 +311,29 @@ class _TimetableScreenState extends State<TimetableScreen>
             ),
           ),
           const SizedBox(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.edit_outlined,
+              color: U.primary,
+            ),
+            title: Text(
+              'Edit Timetable & Timings',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: U.text,
+              ),
+            ),
+            subtitle: Text(
+              'Modify classes and period times',
+              style: GoogleFonts.outfit(fontSize: 13, color: U.sub),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              _openEditTimetable();
+            },
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
@@ -561,7 +596,12 @@ class _TimetableScreenState extends State<TimetableScreen>
           ),
         ),
         actions: [
-          if (_userTimetable != null)
+          if (_userTimetable != null) ...[
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Timetable',
+              onPressed: _openEditTimetable,
+            ),
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               onPressed: () {
@@ -573,6 +613,7 @@ class _TimetableScreenState extends State<TimetableScreen>
                 );
               },
             ),
+          ],
         ],
         bottom: _userTimetable == null
             ? null

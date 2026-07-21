@@ -57,71 +57,6 @@ class _TrashScreenState extends State<TrashScreen> {
     }
   }
 
-  Future<void> _permanentlyDelete(
-    String docId,
-    String path,
-    String name,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: U.surface,
-        title: Text(
-          'Delete Permanently',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Are you sure you want to permanently delete "$name"? This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete', style: TextStyle(color: U.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _processing = true);
-    try {
-      await _trashService.permanentlyDelete(
-        docId: docId,
-        deleteCallback: () async {
-          if (path.endsWith('.md')) {
-            await _github.deleteNote(path);
-          } else {
-            await _github.deleteFolder(path);
-          }
-        },
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Permanently deleted "$name"'),
-            backgroundColor: U.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete: $e'),
-            backgroundColor: U.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _processing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,7 +108,6 @@ class _TrashScreenState extends State<TrashScreen> {
             itemCount: docs.length,
             itemBuilder: (context, index) {
               final data = docs[index].data();
-              final path = data['path'] as String;
               final name = data['name'] as String;
               final type = data['type'] as String;
               final deletedAt = (data['deletedAt'] as Timestamp?)?.toDate();
@@ -223,29 +157,14 @@ class _TrashScreenState extends State<TrashScreen> {
                       ),
                     ],
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.settings_backup_restore_rounded,
-                          color: U.green,
-                        ),
-                        onPressed: _processing
-                            ? null
-                            : () => _restore(docs[index].id, name),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete_forever_rounded, color: U.red),
-                        onPressed: _processing
-                            ? null
-                            : () => _permanentlyDelete(
-                                docs[index].id,
-                                path,
-                                name,
-                              ),
-                      ),
-                    ],
+                  trailing: IconButton(
+                    icon: Icon(
+                      Icons.settings_backup_restore_rounded,
+                      color: U.green,
+                    ),
+                    onPressed: _processing
+                        ? null
+                        : () => _restore(docs[index].id, name),
                   ),
                 ),
               );

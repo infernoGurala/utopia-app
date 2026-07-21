@@ -1012,15 +1012,13 @@ class _FocusScreenState extends State<FocusScreen> {
                   .fadeIn(delay: 250.ms, duration: 500.ms)
                   .slideY(begin: 0.1, end: 0, delay: 250.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 16),
-
-              const SizedBox(height: 16),
+              const SizedBox(height: 48),
 
               // ── Community Notes & Classes Side-by-Side ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SizedBox(
-                  height: 140,
+                  height: 135,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1105,7 +1103,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(15),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -1197,7 +1195,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
                                       Text(
                                         'Community Notes',
                                         style: GoogleFonts.newsreader(
@@ -1207,6 +1205,8 @@ class _FocusScreenState extends State<FocusScreen> {
                                           color: U.text,
                                           letterSpacing: -0.4,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
                                       Expanded(
@@ -1303,7 +1303,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: const EdgeInsets.all(15),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -1395,7 +1395,7 @@ class _FocusScreenState extends State<FocusScreen> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 12),
+                                      const SizedBox(height: 10),
                                       Text(
                                         'My Classes',
                                         style: GoogleFonts.newsreader(
@@ -1405,6 +1405,8 @@ class _FocusScreenState extends State<FocusScreen> {
                                           color: U.text,
                                           letterSpacing: -0.4,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 4),
                                       Expanded(
@@ -1434,7 +1436,187 @@ class _FocusScreenState extends State<FocusScreen> {
                   .fadeIn(delay: 400.ms, duration: 500.ms)
                   .slideY(begin: 0.1, end: 0, delay: 400.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 140),
+              // ── Dynamic Online News Card ──
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('config')
+                    .doc('app_config')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError || !snapshot.hasData || snapshot.data == null || !snapshot.data!.exists) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final data = snapshot.data!.data();
+                  if (data == null) return const SizedBox.shrink();
+
+                  final bool isEnabled = data['news_enabled'] as bool? ?? false;
+                  final String title = (data['news_title'] as String? ?? '').trim();
+                  final String description = (data['news_description'] as String? ?? '').trim();
+
+                  if (!isEnabled || title.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 24, left: 24, right: 24),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDarkTheme
+                              ? [
+                                  U.card.withValues(alpha: 0.95),
+                                  U.card.withValues(alpha: 0.8),
+                                ]
+                              : [
+                                  Colors.white,
+                                  U.card.withValues(alpha: 0.95),
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: isDarkTheme
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.white.withValues(alpha: 0.5),
+                          width: 1.0,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
+                            blurRadius: 16,
+                            offset: const Offset(6, 6),
+                            spreadRadius: -1,
+                          ),
+                          BoxShadow(
+                            color: isDarkTheme
+                                ? Colors.white.withValues(alpha: 0.03)
+                                : Colors.white.withValues(alpha: 0.9),
+                            blurRadius: 16,
+                            offset: const Offset(-6, -6),
+                            spreadRadius: -1,
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          // Accent edge
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 2,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    U.primary.withValues(alpha: 0.0),
+                                    U.primary,
+                                    U.primary.withValues(alpha: 0.0),
+                                  ],
+                                  stops: const [0.0, 0.5, 1.0],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  // Neumorphic pill tag
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: isDarkTheme
+                                            ? [
+                                                U.card,
+                                                U.card.withValues(alpha: 0.7),
+                                              ]
+                                            : [
+                                                Colors.white,
+                                                U.card.withValues(alpha: 0.9),
+                                              ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
+                                          blurRadius: 4,
+                                          offset: const Offset(2, 2),
+                                        ),
+                                        BoxShadow(
+                                          color: isDarkTheme
+                                              ? Colors.white.withValues(alpha: 0.02)
+                                              : Colors.white,
+                                          blurRadius: 4,
+                                          offset: const Offset(-2, -2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.newspaper_rounded,
+                                          size: 12,
+                                          color: U.primary.withValues(alpha: 0.85),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'NEWS',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2,
+                                            color: U.primary.withValues(alpha: 0.85),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                title,
+                                style: GoogleFonts.newsreader(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: U.text,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                              if (description.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  description,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    color: U.sub,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ).animate()
+                        .fadeIn(delay: 500.ms, duration: 500.ms)
+                        .slideY(begin: 0.1, end: 0, delay: 500.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 120),
             ],
           ),
         ),

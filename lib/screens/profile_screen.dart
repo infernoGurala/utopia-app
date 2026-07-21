@@ -1528,22 +1528,34 @@ class _RaiseIssueSheetState extends State<_RaiseIssueSheet> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  TextButton(
+                  FilledButton(
                     onPressed: _submitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: U.primary,
+                      foregroundColor: U.getContrastColor(U.primary),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      minimumSize: const Size(0, 36),
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      elevation: 0,
+                    ),
                     child: _submitting
                         ? SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(U.primary),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                U.getContrastColor(U.primary),
+                              ),
                             ),
                           )
                         : Text(
                             'Submit',
                             style: GoogleFonts.plusJakartaSans(
-                              color: U.primary,
-                              fontSize: 15,
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

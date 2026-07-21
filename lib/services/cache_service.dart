@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -323,6 +324,27 @@ class CacheService {
     await batch.commit(noResult: true);
   }
 
+  Future<Set<String>> getOfflinePrograms() async {
+    final val = await getAppSetting('offline_programs');
+    if (val == null || val.isEmpty) return {};
+    try {
+      final List list = jsonDecode(val);
+      return Set<String>.from(list);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setOfflineProgram(String programPath, bool isOffline) async {
+    final current = await getOfflinePrograms();
+    if (isOffline) {
+      current.add(programPath);
+    } else {
+      current.remove(programPath);
+    }
+    await saveAppSetting('offline_programs', jsonEncode(current.toList()));
+  }
+
   Future<List<Map<String, dynamic>>> getFiles(String folderPath) async {
     final database = await db;
     final rows = await database.query(
@@ -337,6 +359,7 @@ class CacheService {
             'path': r['path'],
             'name': r['name'],
             'sort_index': r['sort_index'],
+            'type': (r['path'] as String).endsWith('.md') ? 'file' : 'dir',
           },
         )
         .toList();
