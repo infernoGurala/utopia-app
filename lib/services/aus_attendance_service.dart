@@ -6,6 +6,8 @@ import 'dart:ui';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart' hide Cookie;
 
+import 'attendance_service.dart';
+
 class AusAttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
   static const String _aesSecret = '8701661282118308';
@@ -78,6 +80,7 @@ class AusAttendanceService {
         databaseEnabled: true,
         thirdPartyCookiesEnabled: true,
         javaScriptCanOpenWindowsAutomatically: true,
+        userAgent: _userAgent,
       ),
       onLoadStart: (controller, url) {
         print('[AusAttendanceService] WebView LoadStart: $url');
@@ -279,11 +282,181 @@ class AusAttendanceService {
   }
 
 
+  static final List<RegExp> _webMethodTokenPatterns = [
+    RegExp(r"var\s+_tkn\s*=\s*'([^']+)'"),
+    RegExp(r'var\s+_tkn\s*=\s*"([^"]+)"'),
+    RegExp(r"""['"]_tkn['"]\s*:\s*'([^']+)'"""),
+    RegExp(r'''['"]_tkn['"]\s*:\s*"([^"]+)"'''),
+  ];
+
+  static final List<RegExp> _genericTokenPatterns = [
+    RegExp(r"var\s+token\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+token\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r'var\s+authToken\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+authToken\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+_token\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+_token\s*=\s*'([^']+)'", caseSensitive: false),
+    RegExp(r'var\s+tkn\s*=\s*"([^"]+)"', caseSensitive: false),
+    RegExp(r"var\s+tkn\s*=\s*'([^']+)'", caseSensitive: false),
+  ];
+
+  static final RegExp _scriptSrcPattern = RegExp(
+    r'''<script[^>]+src\s*=\s*["']([^"']+)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _hiddenInputTokenPattern = RegExp(
+    r'''<input\s+[^>]*type\s*=\s*["']hidden["'][^>]*>''',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+
+  static final RegExp _inputNameAttrPattern = RegExp(
+    r'''name\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _inputIdAttrPattern = RegExp(
+    r'''id\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static final RegExp _inputValueAttrPattern = RegExp(
+    r'''value\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
+
+  static Future<String?> _extractTokenMultiStrategy({
+    required HttpClient client,
+    required Map<String, String> cookies,
+    required String attendancePageHtml,
+  }) async {
+    String? token;
+
+    for (final pattern in _webMethodTokenPatterns) {
+      final match = pattern.firstMatch(attendancePageHtml);
+      final tkn = match?.group(1)?.trim();
+      if (tkn != null && tkn.isNotEmpty) {
+        token = tkn;
+        return token;
+      }
+    }
+
+    final hiddenMatches = _hiddenInputTokenPattern.allMatches(
+      attendancePageHtml,
+    );
+    for (final hiddenMatch in hiddenMatches) {
+      final inputTag = hiddenMatch.group(0) ?? '';
+
+      String? name;
+      final nameMatch = _inputNameAttrPattern.firstMatch(inputTag);
+      if (nameMatch != null) name = nameMatch.group(1);
+
+      String? id;
+      final idMatch = _inputIdAttrPattern.firstMatch(inputTag);
+      if (idMatch != null) id = idMatch.group(1);
+
+      final fieldKey = (name ?? id ?? '').toLowerCase();
+      if (fieldKey.contains('tkn') || fieldKey.contains('token')) {
+        final valueMatch = _inputValueAttrPattern.firstMatch(inputTag);
+        final value = valueMatch?.group(1)?.trim();
+        if (value != null && value.isNotEmpty) {
+          token = value;
+          return token;
+        }
+      }
+    }
+
+    for (final pattern in _genericTokenPatterns) {
+      final match = pattern.firstMatch(attendancePageHtml);
+      final tkn = match?.group(1)?.trim();
+      if (tkn != null && tkn.isNotEmpty) {
+        token = tkn;
+        return token;
+      }
+    }
+
+    final scriptMatches = _scriptSrcPattern.allMatches(attendancePageHtml);
+    final jsPaths = <String>[];
+    for (final match in scriptMatches) {
+      final src = match.group(1) ?? '';
+      if (src.contains('JSFiles') || src.contains('.js')) {
+        jsPaths.add(src.split('?').first);
+      }
+    }
+
+    for (final jsPath in jsPaths) {
+      if (!jsPath.contains(_portalHost)) continue;
+
+      try {
+        final jsPathOnly = jsPath.split('?').first;
+        final jsResponse = await _sendRequest(
+          client,
+          method: 'GET',
+          path: jsPathOnly,
+          cookies: cookies,
+          followRedirects: true,
+        );
+
+        final jsBody = jsResponse.body;
+
+        for (final pattern in _webMethodTokenPatterns) {
+          final match = pattern.firstMatch(jsBody);
+          final tkn = match?.group(1)?.trim();
+          if (tkn != null && tkn.isNotEmpty) {
+            token = tkn;
+            return token;
+          }
+        }
+
+        for (final pattern in _genericTokenPatterns) {
+          final match = pattern.firstMatch(jsBody);
+          final tkn = match?.group(1)?.trim();
+          if (tkn != null && tkn.isNotEmpty) {
+            token = tkn;
+            return token;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  static String _extractDefaultDate(String html, String fieldKey) {
+    final inputPattern = RegExp(
+      r'<input\s+([^>]*?)>',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    final matches = inputPattern.allMatches(html);
+    for (final match in matches) {
+      final tagContent = match.group(1) ?? '';
+      final hasFieldKey = tagContent.toLowerCase().contains(fieldKey.toLowerCase());
+      if (hasFieldKey) {
+        final valuePattern = RegExp(
+          r'''value\s*=\s*["']([^"']*)["']''',
+          caseSensitive: false,
+        );
+        final valMatch = valuePattern.firstMatch(tagContent);
+        if (valMatch != null) {
+          final val = valMatch.group(1)?.trim() ?? '';
+          if (val.isNotEmpty) {
+            return val;
+          }
+        }
+      }
+    }
+    return '';
+  }
+
   static Future<Map<String, dynamic>> fetchAttendance(
     String rollNumber,
     String password, {
     String fromDate = '',
     String toDate = '',
+    AttendanceRangeMode mode = AttendanceRangeMode.period,
   }) async {
     final client = HttpClient()..connectionTimeout = _timeout;
     final cookies = <String, String>{};
@@ -298,42 +471,110 @@ class AusAttendanceService {
         followRedirects: true,
       );
 
-      final profilePath = '$_prefix/Academics/StudentProfile.aspx?scrid=17';
-      final profilePageResponse = await _sendRequest(
+      final attendancePageResponse = await _sendRequest(
         client,
         method: 'GET',
-        path: profilePath,
+        path: _attendancePagePath,
         cookies: cookies,
         followRedirects: true,
       );
 
-      final rollNoMatch = RegExp(
-              r'id="ctl00_CapPlaceHolder_txtRollNo"[^>]*value="([^"]+)"')
-          .firstMatch(profilePageResponse.body);
-      final rollNo = rollNoMatch?.group(1) ?? '';
+      final webMethodToken = await _extractTokenMultiStrategy(
+        client: client,
+        cookies: cookies,
+        attendancePageHtml: attendancePageResponse.body,
+      );
 
-      final authToken = cookies['AuthToken'] ?? cookies['authtoken'] ?? '';
+      await _sendRequest(
+        client,
+        method: 'GET',
+        path: _ajaxJsPath,
+        cookies: cookies,
+        followRedirects: true,
+      );
+
+      String formattedFromDate;
+      String formattedToDate;
+
+      if (mode == AttendanceRangeMode.tillNow) {
+        final defaultFrom = _extractDefaultDate(attendancePageResponse.body, 'txtFromDate');
+        final defaultTo = _extractDefaultDate(attendancePageResponse.body, 'txtToDate');
+
+        if (defaultFrom.isNotEmpty && defaultTo.isNotEmpty) {
+          formattedFromDate = defaultFrom;
+          formattedToDate = defaultTo;
+        } else {
+          formattedFromDate = '';
+          formattedToDate = '';
+        }
+      } else {
+        DateTime fromDt;
+        DateTime toDt;
+
+        if (fromDate.isEmpty || toDate.isEmpty) {
+          fromDt = DateTime.now();
+          toDt = DateTime.now();
+        } else {
+          final parts = fromDate.split('-');
+          final fromDay = int.tryParse(parts[0]) ?? 1;
+          final fromMonth = int.tryParse(parts[1]) ?? 1;
+          final fromYear = int.tryParse(parts[2]) ?? DateTime.now().year;
+          fromDt = DateTime(fromYear, fromMonth, fromDay);
+
+          final toParts = toDate.split('-');
+          final toDay = int.tryParse(toParts[0]) ?? 1;
+          final toMonth = int.tryParse(toParts[1]) ?? 1;
+          final toYear = int.tryParse(toParts[2]) ?? DateTime.now().year;
+          toDt = DateTime(toYear, toMonth, toDay);
+        }
+
+        if (fromDt.isAfter(toDt)) {
+          final temp = fromDt;
+          fromDt = toDt;
+          toDt = temp;
+        }
+
+        final today = DateTime.now();
+        final todayDateOnly = DateTime(today.year, today.month, today.day);
+        if (toDt.isAfter(todayDateOnly)) {
+          toDt = todayDateOnly;
+        }
+
+        final fromDayStr = fromDt.day.toString().padLeft(2, '0');
+        final fromMonthStr = fromDt.month.toString().padLeft(2, '0');
+        formattedFromDate = '$fromDayStr-$fromMonthStr-${fromDt.year}';
+
+        final toDayStr = toDt.day.toString().padLeft(2, '0');
+        final toMonthStr = toDt.month.toString().padLeft(2, '0');
+        formattedToDate = '$toDayStr-$toMonthStr-${toDt.year}';
+      }
+
+      final attendanceBody = jsonEncode({
+        'fromDate': formattedFromDate,
+        'toDate': formattedToDate,
+        'excludeothersubjects': false,
+      });
+
+      final extraHeaders = <String, String>{
+        'Origin': 'https://$_portalHost',
+        HttpHeaders.refererHeader: 'https://$_portalHost$_attendancePagePath',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/javascript, */*',
+      };
+      if (webMethodToken != null && webMethodToken.trim().isNotEmpty) {
+        extraHeaders['X-Auth-Token'] = webMethodToken;
+      }
 
       final showResp = await _sendRequest(
         client,
         method: 'POST',
-        path: '$_prefix/Academics/studentprofile.aspx/ShowStudentProfileNew',
+        path: _attendancePath,
         cookies: cookies,
         followRedirects: false,
         contentType: 'application/json; charset=UTF-8',
-        body: jsonEncode({'RollNo': rollNo, 'isImageDisplay': false}),
-        extraHeaders: {
-          'Origin': 'https://$_portalHost',
-          HttpHeaders.refererHeader: 'https://$_portalHost$profilePath',
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-Auth-Token': authToken,
-          'Accept': 'application/json, text/javascript, */*',
-          'Sec-Fetch-Dest': 'empty',
-          'Sec-Fetch-Mode': 'cors',
-          'Sec-Fetch-Site': 'same-origin'
-        },
+        body: attendanceBody,
+        extraHeaders: extraHeaders,
       );
-      _debugResponse('POST ShowStudentProfileNew', showResp.statusCode, showResp.body);
 
       if (showResp.statusCode == HttpStatus.unauthorized) {
         throw Exception(
@@ -345,51 +586,16 @@ class AusAttendanceService {
         throw Exception('Could not fetch attendance right now');
       }
 
-      String profileHtml;
+      String attendanceHtml;
       try {
         final decoded = jsonDecode(showResp.body) as Map<String, dynamic>;
-        profileHtml = decoded['d'] as String? ?? '';
+        attendanceHtml = decoded['d'] as String? ?? '';
       } catch (_) {
-        profileHtml = showResp.body;
+        attendanceHtml = showResp.body;
       }
 
-      if (profileHtml.isEmpty) {
-        throw Exception('No profile data in response');
-      }
-
-      final profileSectionStart =
-          profileHtml.indexOf("<div id='divProfile_Present'>");
-      if (profileSectionStart == -1) {
-        throw Exception('Profile section not found');
-      }
-      final profileSectionEnd =
-          profileHtml.indexOf("</div>", profileSectionStart);
-      final profileSection =
-          profileHtml.substring(profileSectionStart, profileSectionEnd);
-
-      final tableStart = profileSection.indexOf('<table');
-      if (tableStart == -1) throw Exception('Attendance table not found');
-      final tableEnd = profileSection.indexOf('</table>', tableStart);
-      final tableHtml = profileSection.substring(tableStart, tableEnd + 8);
-
-      final bioDataStart = profileHtml.indexOf('>Name<');
-      String studentNameFromHtml = '';
-      if (bioDataStart != -1) {
-        final afterName = profileHtml.substring(bioDataStart);
-        final nameTdMatch = RegExp(
-          r"<td[^>]*colspan=['" '"' r"]?3['" '"' r"]?[^>]*>([^<]+)</td>",
-          caseSensitive: false,
-        ).firstMatch(afterName);
-        if (nameTdMatch != null) {
-          studentNameFromHtml = _cleanHtmlText(nameTdMatch.group(1) ?? '');
-        }
-      }
-
-      final parsed = _parseAttendanceHtml(tableHtml);
+      final parsed = _parseAttendanceHtml(attendanceHtml);
       final parsedMap = Map<String, dynamic>.from(parsed);
-      if (studentNameFromHtml.isNotEmpty) {
-        parsedMap['studentName'] = studentNameFromHtml;
-      }
 
       final hasReport = parsedMap['hasReport'] as bool? ?? false;
       if ((parsedMap['subjects'] as List).isEmpty && !hasReport) {
@@ -748,14 +954,6 @@ class AusAttendanceService {
       (buffer, data) => buffer..addAll(data),
     );
     return utf8.decode(bytes, allowMalformed: true);
-  }
-
-  static void _debugResponse(String label, int statusCode, String body) {
-    final preview = body.length <= 500 ? body : body.substring(0, 500);
-    // ignore: avoid_print
-    print('$label response code: $statusCode');
-    // ignore: avoid_print
-    print('$label response body preview: $preview');
   }
 }
 

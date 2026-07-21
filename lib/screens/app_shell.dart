@@ -5,7 +5,6 @@ import '../main.dart';
 import '../theme/image_overlay_colors.dart';
 import 'package:flutter/services.dart';
 import 'university_screen.dart';
-import 'library_home_screen.dart';
 import 'focus_screen.dart';
 import 'profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,19 +28,15 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
     const FocusScreen(),
     null,
     null,
-    null,
   ];
 
   Widget _getScreen(int index) {
     if (_screens[index] == null) {
       switch (index) {
         case 1:
-          _screens[index] = const LibraryHomeScreen();
-          break;
-        case 2:
           _screens[index] = const UniversityScreen();
           break;
-        case 3:
+        case 2:
           _screens[index] = const ProfileScreen();
           break;
       }
@@ -328,12 +323,11 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                     setState(() => _index = index);
                   },
                   physics: const ClampingScrollPhysics(),
-                children: [
-                  _KeepAliveWrapper(child: _getScreen(0)),
-                  _KeepAliveWrapper(child: _getScreen(1)),
-                  _KeepAliveWrapper(child: _getScreen(2)),
-                  _KeepAliveWrapper(child: _getScreen(3)),
-                ],
+                  children: [
+                    _KeepAliveWrapper(child: _getScreen(0)),
+                    _KeepAliveWrapper(child: _getScreen(1)),
+                    _KeepAliveWrapper(child: _getScreen(2)),
+                  ],
               ),
               // Floating glassmorphic nav bar
               Positioned(
@@ -411,36 +405,28 @@ class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin
                                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                     children: [
                                       _NavItem(
-                                        icon: Icons.local_fire_department_outlined,
-                                        activeIcon: Icons.local_fire_department_rounded,
+                                        icon: Icons.dashboard_outlined,
+                                        activeIcon: Icons.dashboard_rounded,
                                         isActive: _index == 0,
                                         accent: U.primary,
                                         isDark: isDark,
                                         onTap: () => _setIndex(0),
                                       ),
                                       _NavItem(
-                                        icon: Icons.auto_stories_outlined,
-                                        activeIcon: Icons.auto_stories_rounded,
+                                        icon: Icons.school_outlined,
+                                        activeIcon: Icons.school_rounded,
                                         isActive: _index == 1,
                                         accent: U.primary,
                                         isDark: isDark,
                                         onTap: () => _setIndex(1),
                                       ),
                                       _NavItem(
-                                        icon: Icons.school_outlined,
-                                        activeIcon: Icons.school_rounded,
+                                        icon: Icons.person_outline_rounded,
+                                        activeIcon: Icons.person_rounded,
                                         isActive: _index == 2,
                                         accent: U.primary,
                                         isDark: isDark,
                                         onTap: () => _setIndex(2),
-                                      ),
-                                      _NavItem(
-                                        icon: Icons.person_outline_rounded,
-                                        activeIcon: Icons.person_rounded,
-                                        isActive: _index == 3,
-                                        accent: U.primary,
-                                        isDark: isDark,
-                                        onTap: () => _setIndex(3),
                                       ),
                                     ],
                                   ),

@@ -5,27 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 import '../main.dart';
 import '../theme/image_overlay_colors.dart';
-import 'habit_tracker_screen.dart';
-import 'rockets_screen.dart';
+import 'classes_screen.dart';
+import 'community_notes_screen.dart';
 import 'attendance_screen.dart';
-import 'delve/delve_shell.dart';
-import '../providers/delve_theme_provider.dart';
-import '../providers/delve_deck_provider.dart';
-import '../providers/delve_inventory_provider.dart';
-import '../providers/delve_session_provider.dart';
+import 'timetable_screen.dart';
 import 'package:intl/intl.dart';
 import '../services/focus_supabase_service.dart';
 import '../models/focus_models.dart';
 import '../services/cache_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/attendance_cache_service.dart';
-import '../utils/habit_calculators.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -38,15 +34,11 @@ class _FocusScreenState extends State<FocusScreen> {
   final _service = FocusSupabaseService();
   String _quote = '';
   String _greetingText = '';
-  int _streakDays = 0;
-  int _scheduledHabitsCount = 0;
-  int _completedHabitsCount = 0;
-  String _dailyNoteInsight = 'Write today';
-  String _delveInsight = 'Start learning intelligence words';
-
-  String _streakHabitId = '';
-  String _streakHabitName = '';
   double? _attendancePct;
+  String _studentName = '';
+  int _belowTargetCount = 0;
+  bool _isAttendanceConnected = false;
+  String _universityId = '';
 
   String _weatherCity = '';
   double? _weatherTemp;
@@ -166,25 +158,9 @@ class _FocusScreenState extends State<FocusScreen> {
     final greetingText = _generateRandomGreeting(timeSlot);
     final userNameStr = _userName;
     _greetingText = userNameStr.isEmpty ? greetingText : '$greetingText, $userNameStr';
-    _loadCachedStreakHabit();
     _loadCachedWeather();
     _loadData();
     _loadQuote();
-  }
-
-  Future<void> _loadCachedStreakHabit() async {
-    try {
-      final habitId = await CacheService().getAppSetting('streak_habit_id');
-      final habitName = await CacheService().getAppSetting('streak_habit_name');
-      if (mounted) {
-        setState(() {
-          _streakHabitId = habitId ?? '';
-          _streakHabitName = habitName ?? '';
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading cached streak habit: $e');
-    }
   }
 
   Future<void> _loadCachedWeather() async {
@@ -328,76 +304,6 @@ class _FocusScreenState extends State<FocusScreen> {
     );
   }
 
-  void _showStreakHabitPicker() async {
-    final habits = await _service.getHabits(includeArchived: false);
-    if (habits.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please create a habit first in the Habit Tracker!')),
-        );
-      }
-      return;
-    }
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: U.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Select Habit for Streak',
-              style: GoogleFonts.outfit(
-                color: U.text,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: habits.length,
-                itemBuilder: (context, index) {
-                  final h = habits[index];
-                  final isSelected = h.id == _streakHabitId;
-                  return ListTile(
-                    title: Text(
-                      h.name,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: U.text,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    trailing: isSelected ? Icon(Icons.check, color: U.primary) : null,
-                    onTap: () async {
-                      setState(() {
-                        _streakHabitId = h.id;
-                        _streakHabitName = h.name;
-                      });
-                      Navigator.pop(ctx);
-                      await CacheService().saveAppSetting('streak_habit_id', h.id);
-                      await CacheService().saveAppSetting('streak_habit_name', h.name);
-                      _loadStats();
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _loadData() async {
     try {
       await _service.initialize();
@@ -503,165 +409,50 @@ class _FocusScreenState extends State<FocusScreen> {
 
   Future<void> _loadStats() async {
     try {
-      int totalHabits = 0;
-      int completedHabits = 0;
-
-      // 1. Get today's habits remaining
-      String dailyNoteInsight = 'Track today';
-      try {
-        final today = DateTime.now();
-        final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-        final habits = await _service.getHabits(includeArchived: false);
-        
-        if (habits.isEmpty) {
-          dailyNoteInsight = 'No habits configured';
-        } else {
-          int scheduledCount = 0;
-          int doneCount = 0;
-          
-          for (final h in habits) {
-            bool isScheduled = false;
-            if (h.frequencyType == 'daily') {
-              isScheduled = true;
-            } else if (h.frequencyType == 'days_of_week') {
-              if (h.daysOfWeek != null && h.daysOfWeek!.contains(today.weekday - 1)) {
-                isScheduled = true;
-              }
-            } else {
-              isScheduled = true; // Weekly, monthly, and interval checklists are active
-            }
-            
-            if (isScheduled) {
-              scheduledCount++;
-              final rec = await _service.getRecord(h.id, todayStr);
-              if (rec != null && rec.completed) {
-                doneCount++;
-              }
-            }
-          }
-          
-          totalHabits = scheduledCount;
-          completedHabits = doneCount;
-
-          if (scheduledCount == 0) {
-            dailyNoteInsight = 'No habits today';
-          } else {
-            final left = scheduledCount - doneCount;
-            if (left <= 0) {
-              dailyNoteInsight = 'All habits completed!';
-            } else {
-              dailyNoteInsight = '$left ${left == 1 ? "habit" : "habits"} remaining';
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('FocusScreen daily habits insight load failed: $e');
-      }
-
-      // Calculate streak for chosen habit
-      try {
-        final habits = await _service.getHabits(includeArchived: false);
-        if (habits.isNotEmpty) {
-          String targetHabitId = _streakHabitId;
-          if (targetHabitId.isEmpty) {
-            targetHabitId = habits.first.id;
-            _streakHabitId = targetHabitId;
-            _streakHabitName = habits.first.name;
-            await CacheService().saveAppSetting('streak_habit_id', targetHabitId);
-            await CacheService().saveAppSetting('streak_habit_name', _streakHabitName);
-          }
-
-          final chosenHabit = habits.firstWhere(
-            (h) => h.id == targetHabitId,
-            orElse: () => habits.first,
-          );
-
-          final records = await _service.getRecordsForHabit(chosenHabit.id);
-          final streak = HabitCalculators.calculateCurrentStreak(chosenHabit, records);
-          
-          if (mounted) {
-            setState(() {
-              _streakDays = streak;
-              _streakHabitId = chosenHabit.id;
-              _streakHabitName = chosenHabit.name;
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _streakDays = 0;
-              _streakHabitId = '';
-              _streakHabitName = 'No Habits';
-            });
-          }
-        }
-      } catch (e) {
-        debugPrint('Error calculating custom streak: $e');
-      }
-
-      // Load attendance percentage
       double? attendancePct;
+      String studentName = '';
+      int belowTargetCount = 0;
+      bool isConnected = false;
+      String uniId = U.cachedUniversityId;
+
       try {
         final credentials = await SecureStorageService.getCredentials();
         if (credentials != null) {
+          isConnected = true;
           final roll = credentials['rollNumber'];
           if (roll != null) {
             final cachedAttendance = await AttendanceCacheService.load(roll);
             if (cachedAttendance != null) {
               attendancePct = cachedAttendance.data['overallPercentage'] as double?;
+              studentName = (cachedAttendance.data['studentName'] as String? ?? '').trim();
+              final subjects = (cachedAttendance.data['subjects'] as List<dynamic>? ?? const [])
+                  .cast<Map<String, dynamic>>();
+              belowTargetCount = subjects.where((subject) {
+                final percentage = (subject['percentage'] as num?)?.toDouble() ?? 0;
+                return percentage < 75.0;
+              }).length;
             }
           }
         }
-      } catch (e) {
-        debugPrint('Error loading cached attendance: $e');
-      }
 
-      // 2. Get Delve vocabulary learning insight
-      String delveInsight = 'Start learning intelligence words';
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final deckString = prefs.getString('delve_active_deck');
-        if (deckString != null) {
-          final deckMap = jsonDecode(deckString);
-          final currentDay = deckMap['currentDay'] as int? ?? 1;
-          final lastSessionDateStr = deckMap['lastSessionDate'] as String?;
-          bool completedToday = false;
-          if (lastSessionDateStr != null) {
-            final lastSessionDate = DateTime.parse(lastSessionDateStr);
-            final now = DateTime.now();
-            completedToday = lastSessionDate.year == now.year &&
-                lastSessionDate.month == now.month &&
-                lastSessionDate.day == now.day;
-          }
-          if (completedToday) {
-            delveInsight = 'Day $currentDay completed today!';
-          } else {
-            delveInsight = 'Day $currentDay: Session is waiting';
-          }
-        } else {
-          final inventoryString = prefs.getString('delve_inventory');
-          int wordCount = 0;
-          if (inventoryString != null) {
-            final List<dynamic> jsonList = jsonDecode(inventoryString);
-            wordCount = jsonList.length;
-          }
-          if (wordCount < 15) {
-            delveInsight = 'Need ${15 - wordCount} more words to start deck';
-          } else {
-            delveInsight = '15+ words ready! Begin Day 1';
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          if (userDoc.exists) {
+            uniId = userDoc.data()?['selectedUniversityId'] as String? ?? U.cachedUniversityId;
           }
         }
       } catch (e) {
-        debugPrint('FocusScreen Delve insight load failed: $e');
+        debugPrint('Error loading cached attendance or university: $e');
       }
 
       if (mounted) {
         setState(() {
-          _scheduledHabitsCount = totalHabits;
-          _completedHabitsCount = completedHabits;
-          _dailyNoteInsight = dailyNoteInsight;
-          _delveInsight = delveInsight;
           _attendancePct = attendancePct;
+          _studentName = studentName;
+          _belowTargetCount = belowTargetCount;
+          _isAttendanceConnected = isConnected;
+          _universityId = uniId;
         });
       }
     } catch (_) {}
@@ -786,23 +577,31 @@ class _FocusScreenState extends State<FocusScreen> {
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: U.primary.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: U.primary.withValues(alpha: 0.15),
-                              width: 0.5,
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const TimetableScreen()),
+                            ).then((_) => _loadStats());
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: U.primary.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: U.primary.withValues(alpha: 0.15),
+                                width: 0.5,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            dateStr,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.0,
-                              color: U.primary,
+                            child: Text(
+                              dateStr,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
+                                color: U.primary,
+                              ),
                             ),
                           ),
                         ),
@@ -892,15 +691,6 @@ class _FocusScreenState extends State<FocusScreen> {
                   child: Row(
                     children: [
                       _buildQuickPill(
-                        label: _streakHabitName.isNotEmpty && _streakHabitName != 'No Habits'
-                            ? '$_streakDays Day $_streakHabitName Streak'
-                            : '$_streakDays Day Streak',
-                        icon: Icons.local_fire_department_rounded,
-                        color: U.peach,
-                        onTap: _showStreakHabitPicker,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildQuickPill(
                         label: _attendancePct != null
                             ? '${_attendancePct!.toStringAsFixed(0)}% Attendance'
                             : 'Connect Attendance',
@@ -930,29 +720,51 @@ class _FocusScreenState extends State<FocusScreen> {
 
               const SizedBox(height: 20),
 
-              // ── Habit Progress Hero Card (Wide) ──
+              // ── Attendance Tracker Hero Card (Wide) ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: PressableCard(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const HabitTrackerScreen()),
+                    MaterialPageRoute(builder: (_) => const AttendanceScreen()),
                   ).then((_) => _loadData()),
                   child: Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: U.card,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDarkTheme
+                            ? [
+                                U.card.withValues(alpha: 0.95),
+                                U.card.withValues(alpha: 0.8),
+                              ]
+                            : [
+                                Colors.white,
+                                U.card.withValues(alpha: 0.95),
+                              ],
+                      ),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: U.border.withValues(alpha: 0.8),
+                        color: isDarkTheme
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.white.withValues(alpha: 0.5),
                         width: 1.0,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
                           blurRadius: 16,
-                          offset: const Offset(0, 8),
-                          spreadRadius: -2,
+                          offset: const Offset(6, 6),
+                          spreadRadius: -1,
+                        ),
+                        BoxShadow(
+                          color: isDarkTheme 
+                              ? Colors.white.withValues(alpha: 0.03) 
+                              : Colors.white.withValues(alpha: 0.9),
+                          blurRadius: 16,
+                          offset: const Offset(-6, -6),
+                          spreadRadius: -1,
                         ),
                       ],
                     ),
@@ -964,33 +776,70 @@ class _FocusScreenState extends State<FocusScreen> {
                             children: [
                               Row(
                                 children: [
+                                  // Neumorphic icon container
                                   Container(
-                                    padding: const EdgeInsets.all(6),
+                                    width: 32,
+                                    height: 32,
                                     decoration: BoxDecoration(
-                                      color: U.green.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(8),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: isDarkTheme
+                                            ? [
+                                                U.card,
+                                                U.card.withValues(alpha: 0.7),
+                                              ]
+                                            : [
+                                                Colors.white,
+                                                U.card.withValues(alpha: 0.9),
+                                              ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(2, 2),
+                                        ),
+                                        BoxShadow(
+                                          color: isDarkTheme 
+                                              ? Colors.white.withValues(alpha: 0.02) 
+                                              : Colors.white,
+                                          blurRadius: 4,
+                                          offset: const Offset(-2, -2),
+                                        ),
+                                      ],
                                     ),
                                     child: Icon(
-                                      Icons.event_repeat_rounded,
-                                      color: U.green,
-                                      size: 16,
+                                      Icons.school_rounded,
+                                      color: _attendancePct != null && _attendancePct! >= 75
+                                          ? U.green
+                                          : _attendancePct != null && _attendancePct! >= 65
+                                              ? U.peach
+                                              : U.red,
+                                      size: 15,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Text(
-                                    'DAILY ROUTINES',
+                                    'ACADEMIC PROFILE',
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 1.5,
-                                      color: U.green.withValues(alpha: 0.85),
+                                      color: (_attendancePct != null && _attendancePct! >= 75
+                                              ? U.green
+                                              : _attendancePct != null && _attendancePct! >= 65
+                                                  ? U.peach
+                                                  : U.red)
+                                          .withValues(alpha: 0.85),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Habit Tracker',
+                                _isAttendanceConnected ? 'Attendance Report' : 'Connect Attendance',
                                 style: GoogleFonts.newsreader(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
@@ -1001,22 +850,40 @@ class _FocusScreenState extends State<FocusScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                _dailyNoteInsight,
+                                _isAttendanceConnected
+                                    ? (_attendancePct != null
+                                        ? (_belowTargetCount > 0
+                                            ? '$_studentName • $_belowTargetCount subjects need attention'
+                                            : '$_studentName • All subjects on track')
+                                        : 'Connected')
+                                    : 'Tap to link your college portal & track progress',
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 13,
                                   color: U.sub,
                                 ),
                               ),
                               const SizedBox(height: 16),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value: _scheduledHabitsCount > 0
-                                      ? _completedHabitsCount / _scheduledHabitsCount
-                                      : 0.0,
-                                  backgroundColor: U.surface,
-                                  valueColor: AlwaysStoppedAnimation<Color>(U.green),
-                                  minHeight: 6,
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: U.surface,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: U.border.withValues(alpha: 0.3), width: 0.5),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: _attendancePct != null ? (_attendancePct! / 100).clamp(0.0, 1.0) : 0.0,
+                                    backgroundColor: Colors.transparent,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      _attendancePct != null && _attendancePct! >= 75
+                                          ? U.green
+                                          : _attendancePct != null && _attendancePct! >= 65
+                                              ? U.peach
+                                              : U.red,
+                                    ),
+                                    minHeight: 6,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1024,42 +891,113 @@ class _FocusScreenState extends State<FocusScreen> {
                         ),
                         const SizedBox(width: 24),
                         (() {
-                          final pct = _scheduledHabitsCount > 0
-                              ? _completedHabitsCount / _scheduledHabitsCount
-                              : 0.0;
+                          final pctValue = _attendancePct != null ? _attendancePct! / 100 : 0.0;
                           return SizedBox(
                             width: 76,
                             height: 76,
                             child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                SizedBox(
+                                // Outer Neumorphic circular track/plate (complementary concave depth)
+                                Container(
                                   width: 76,
                                   height: 76,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: isDarkTheme
+                                          ? [
+                                              U.card.withValues(alpha: 0.8),
+                                              U.card,
+                                            ]
+                                          : [
+                                              U.card.withValues(alpha: 0.9),
+                                              Colors.white,
+                                            ],
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.04),
+                                        blurRadius: 6,
+                                        offset: const Offset(3, 3),
+                                      ),
+                                      BoxShadow(
+                                        color: isDarkTheme 
+                                            ? Colors.white.withValues(alpha: 0.02) 
+                                            : Colors.white.withValues(alpha: 0.8),
+                                        blurRadius: 6,
+                                        offset: const Offset(-3, -3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Circular Progress ring
+                                SizedBox(
+                                  width: 70,
+                                  height: 70,
                                   child: CircularProgressIndicator(
-                                    value: pct,
+                                    value: pctValue,
                                     backgroundColor: U.surface,
-                                    color: U.green,
-                                    strokeWidth: 7,
+                                    color: _attendancePct != null && _attendancePct! >= 75
+                                        ? U.green
+                                        : _attendancePct != null && _attendancePct! >= 65
+                                            ? U.peach
+                                            : U.red,
+                                    strokeWidth: 6,
                                     strokeCap: StrokeCap.round,
                                   ),
                                 ),
+                                // Inner Neumorphic raised circular button (raised convex dome)
                                 Container(
-                                  width: 58,
-                                  height: 58,
+                                  width: 50,
+                                  height: 50,
                                   decoration: BoxDecoration(
-                                    color: U.green.withValues(alpha: 0.05),
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: isDarkTheme
+                                          ? [
+                                              U.card,
+                                              U.card.withValues(alpha: 0.7),
+                                            ]
+                                          : [
+                                              Colors.white,
+                                              U.card.withValues(alpha: 0.9),
+                                            ],
+                                    ),
                                     shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.3 : 0.06),
+                                        blurRadius: 5,
+                                        offset: const Offset(2, 2),
+                                      ),
+                                      BoxShadow(
+                                        color: isDarkTheme 
+                                            ? Colors.white.withValues(alpha: 0.03) 
+                                            : Colors.white,
+                                        blurRadius: 5,
+                                        offset: const Offset(-2, -2),
+                                      ),
+                                    ],
                                   ),
                                   child: Center(
-                                    child: Text(
-                                      '${(pct * 100).toInt()}%',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: U.text,
-                                      ),
-                                    ),
+                                    child: _isAttendanceConnected
+                                        ? Text(
+                                            '${(pctValue * 100).toInt()}%',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w800,
+                                              color: U.text,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.sync_lock_rounded,
+                                            color: U.sub,
+                                            size: 16,
+                                          ),
                                   ),
                                 ),
                               ],
@@ -1078,36 +1016,268 @@ class _FocusScreenState extends State<FocusScreen> {
 
               const SizedBox(height: 16),
 
-              // ── Rockets & Delve Project Side-by-Side ──
+              // ── Community Notes & Classes Side-by-Side ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SizedBox(
-                  height: 225,
+                  height: 140,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Rockets Reader Card
+                      // Community Notes Card
                       Expanded(
                         child: PressableCard(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const RocketsScreen()),
-                          ).then((_) => _loadData()),
+                          onTap: () {
+                            if (_universityId.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CommunityNotesScreen(
+                                    universityFolderName: _universityId,
+                                  ),
+                                ),
+                              ).then((_) => _loadData());
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select a university in your profile first.')),
+                              );
+                            }
+                          },
                           child: Container(
                             clipBehavior: Clip.antiAlias,
                             decoration: BoxDecoration(
-                              color: U.card,
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: isDarkTheme
+                                    ? [
+                                        U.card.withValues(alpha: 0.95),
+                                        U.card.withValues(alpha: 0.8),
+                                      ]
+                                    : [
+                                        Colors.white,
+                                        U.card.withValues(alpha: 0.95),
+                                      ],
+                              ),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: U.border.withValues(alpha: 0.8),
+                                color: isDarkTheme
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : Colors.white.withValues(alpha: 0.5),
                                 width: 1.0,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
+                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
                                   blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                  spreadRadius: -2,
+                                  offset: const Offset(6, 6),
+                                  spreadRadius: -1,
+                                ),
+                                BoxShadow(
+                                  color: isDarkTheme 
+                                      ? Colors.white.withValues(alpha: 0.03) 
+                                      : Colors.white.withValues(alpha: 0.9),
+                                  blurRadius: 16,
+                                  offset: const Offset(-6, -6),
+                                  spreadRadius: -1,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                // Accent edge
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: 2,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          U.blue.withValues(alpha: 0.0),
+                                          U.blue,
+                                          U.blue.withValues(alpha: 0.0),
+                                        ],
+                                        stops: const [0.0, 0.5, 1.0],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          // Neumorphic pill tag
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: isDarkTheme
+                                                    ? [
+                                                        U.card,
+                                                        U.card.withValues(alpha: 0.7),
+                                                      ]
+                                                    : [
+                                                        Colors.white,
+                                                        U.card.withValues(alpha: 0.9),
+                                                      ],
+                                              ),
+                                              borderRadius: BorderRadius.circular(10),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(2, 2),
+                                                ),
+                                                BoxShadow(
+                                                  color: isDarkTheme 
+                                                      ? Colors.white.withValues(alpha: 0.02) 
+                                                      : Colors.white,
+                                                  blurRadius: 4,
+                                                  offset: const Offset(-2, -2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Text(
+                                              'RESOURCES',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 1.0,
+                                                color: U.blue.withValues(alpha: 0.85),
+                                              ),
+                                            ),
+                                          ),
+                                          // Neumorphic circular icon button
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: isDarkTheme
+                                                    ? [
+                                                        U.card,
+                                                        U.card.withValues(alpha: 0.7),
+                                                      ]
+                                                    : [
+                                                        Colors.white,
+                                                        U.card.withValues(alpha: 0.9),
+                                                      ],
+                                              ),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(2, 2),
+                                                ),
+                                                BoxShadow(
+                                                  color: isDarkTheme 
+                                                      ? Colors.white.withValues(alpha: 0.02) 
+                                                      : Colors.white,
+                                                  blurRadius: 4,
+                                                  offset: const Offset(-2, -2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Icon(
+                                              Icons.collections_bookmark_rounded,
+                                              color: U.blue.withValues(alpha: 0.6),
+                                              size: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Community Notes',
+                                        style: GoogleFonts.newsreader(
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle: FontStyle.italic,
+                                          color: U.text,
+                                          letterSpacing: -0.4,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Expanded(
+                                        child: Text(
+                                          'Shared study notes and materials',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            color: U.sub,
+                                            height: 1.3,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Classes Card
+                      Expanded(
+                        child: PressableCard(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ClassesScreen(),
+                              ),
+                            ).then((_) => _loadData());
+                          },
+                          child: Container(
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: isDarkTheme
+                                    ? [
+                                        U.card.withValues(alpha: 0.95),
+                                        U.card.withValues(alpha: 0.8),
+                                      ]
+                                    : [
+                                        Colors.white,
+                                        U.card.withValues(alpha: 0.95),
+                                      ],
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: isDarkTheme
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : Colors.white.withValues(alpha: 0.5),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
+                                  blurRadius: 16,
+                                  offset: const Offset(6, 6),
+                                  spreadRadius: -1,
+                                ),
+                                BoxShadow(
+                                  color: isDarkTheme 
+                                      ? Colors.white.withValues(alpha: 0.03) 
+                                      : Colors.white.withValues(alpha: 0.9),
+                                  blurRadius: 16,
+                                  offset: const Offset(-6, -6),
+                                  spreadRadius: -1,
                                 ),
                               ],
                             ),
@@ -1138,365 +1308,115 @@ class _FocusScreenState extends State<FocusScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
+                                          // Neumorphic pill tag
                                           Container(
-                                            padding: const EdgeInsets.all(6),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                             decoration: BoxDecoration(
-                                              color: U.peach.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: isDarkTheme
+                                                    ? [
+                                                        U.card,
+                                                        U.card.withValues(alpha: 0.7),
+                                                      ]
+                                                    : [
+                                                        Colors.white,
+                                                        U.card.withValues(alpha: 0.9),
+                                                      ],
+                                              ),
+                                              borderRadius: BorderRadius.circular(10),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(2, 2),
+                                                ),
+                                                BoxShadow(
+                                                  color: isDarkTheme 
+                                                      ? Colors.white.withValues(alpha: 0.02) 
+                                                      : Colors.white,
+                                                  blurRadius: 4,
+                                                  offset: const Offset(-2, -2),
+                                                ),
+                                              ],
                                             ),
-                                            child: Icon(
-                                              Icons.rocket_launch_rounded,
-                                              color: U.peach,
-                                              size: 12,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
                                             child: Text(
-                                              'READ ALOUD',
+                                              'CLASSES',
                                               style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 9,
+                                                fontSize: 8,
                                                 fontWeight: FontWeight.w800,
                                                 letterSpacing: 1.0,
                                                 color: U.peach.withValues(alpha: 0.85),
                                               ),
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        'Rockets Reader',
-                                        style: GoogleFonts.newsreader(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle: FontStyle.italic,
-                                          color: U.text,
-                                          letterSpacing: -0.4,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.auto_awesome_rounded,
-                                            size: 10,
-                                            color: U.peach.withValues(alpha: 0.6),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              'Neural AI TTS',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 10,
-                                                color: U.sub,
-                                                letterSpacing: 0.2,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const Spacer(),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        height: 76,
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: U.peach.withValues(alpha: 0.05),
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            const SizedBox(height: 4),
-                                            AnimatedWaveform(color: U.peach),
-                                            const SizedBox(height: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [U.peach, U.peach.withValues(alpha: 0.8)],
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                ),
-                                                borderRadius: BorderRadius.circular(10),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: U.peach.withValues(alpha: 0.25),
-                                                    blurRadius: 6,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ],
-                                              ),
-                                              child: Text(
-                                                'Listen',
-                                                style: GoogleFonts.plusJakartaSans(
-                                                  fontSize: 9,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: appThemeNotifier.value.isDark
-                                                      ? const Color(0xFF0B0612)
-                                                      : Colors.white,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Delve Project Card
-                      Expanded(
-                        child: PressableCard(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                backgroundColor: U.card,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                title: Row(
-                                  children: [
-                                    Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 22),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Beta Feature',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: U.text,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                content: Text(
-                                  'This feature is currently in beta and we do not recommend using it. It may contain bugs, incomplete functionality, or unexpected behavior.',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 14,
-                                    color: U.sub,
-                                    height: 1.5,
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx),
-                                    child: Text(
-                                      'Go Back',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: U.sub,
-                                      ),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () {
-                                      Navigator.pop(ctx);
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => MultiProvider(
-                                            providers: [
-                                              ChangeNotifierProvider(create: (_) => DelveThemeProvider()),
-                                              ChangeNotifierProvider(
-                                                create: (_) {
-                                                  final provider = InventoryProvider();
-                                                  final user = FirebaseAuth.instance.currentUser;
-                                                  if (user != null) {
-                                                    provider.initForUser(user.uid);
-                                                  }
-                                                  return provider;
-                                                },
-                                              ),
-                                              ChangeNotifierProvider(
-                                                create: (_) {
-                                                  final provider = DeckProvider();
-                                                  final user = FirebaseAuth.instance.currentUser;
-                                                  if (user != null) {
-                                                    provider.initForUser(user.uid);
-                                                  }
-                                                  return provider;
-                                                },
-                                              ),
-                                              ChangeNotifierProvider(create: (_) => SessionProvider()),
-                                            ],
-                                            child: const DelveShell(),
-                                          ),
-                                        ),
-                                      ).then((_) => _loadData());
-                                    },
-                                    child: Text(
-                                      'Continue Anyway',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.amber,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          child: Container(
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: U.card,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: U.border.withValues(alpha: 0.8),
-                                width: 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.2 : 0.03),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 8),
-                                  spreadRadius: -2,
-                                ),
-                              ],
-                            ),
-                            child: Stack(
-                              children: [
-                                // Accent edge
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: 2,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          U.teal.withValues(alpha: 0.0),
-                                          U.teal,
-                                          U.teal.withValues(alpha: 0.0),
-                                        ],
-                                        stops: const [0.0, 0.5, 1.0],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
+                                          // Neumorphic circular icon button
                                           Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: U.teal.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              Icons.spa_rounded,
-                                              color: U.teal,
-                                              size: 12,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              'DELVE',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 1.0,
-                                                color: U.teal.withValues(alpha: 0.85),
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            width: 28,
+                                            height: 28,
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
-                                                colors: [U.teal, U.teal.withValues(alpha: 0.7)],
                                                 begin: Alignment.topLeft,
                                                 end: Alignment.bottomRight,
+                                                colors: isDarkTheme
+                                                    ? [
+                                                        U.card,
+                                                        U.card.withValues(alpha: 0.7),
+                                                      ]
+                                                    : [
+                                                        Colors.white,
+                                                        U.card.withValues(alpha: 0.9),
+                                                      ],
                                               ),
-                                              borderRadius: BorderRadius.circular(4),
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(2, 2),
+                                                ),
+                                                BoxShadow(
+                                                  color: isDarkTheme 
+                                                      ? Colors.white.withValues(alpha: 0.02) 
+                                                      : Colors.white,
+                                                  blurRadius: 4,
+                                                  offset: const Offset(-2, -2),
+                                                ),
+                                              ],
                                             ),
-                                            child: Text(
-                                              'BETA',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 7,
-                                                fontWeight: FontWeight.w800,
-                                                color: appThemeNotifier.value.isDark
-                                                    ? const Color(0xFF0B0612)
-                                                    : Colors.white,
-                                              ),
+                                            child: Icon(
+                                              Icons.group_work_rounded,
+                                              color: U.peach.withValues(alpha: 0.6),
+                                              size: 13,
                                             ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 12),
                                       Text(
-                                        'Delve Project',
+                                        'My Classes',
                                         style: GoogleFonts.newsreader(
-                                          fontSize: 18,
+                                          fontSize: 16.5,
                                           fontWeight: FontWeight.bold,
                                           fontStyle: FontStyle.italic,
                                           color: U.text,
                                           letterSpacing: -0.4,
                                         ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 4),
                                       Expanded(
                                         child: Text(
-                                          _delveInsight,
+                                          'Study groups & shared classroom folders',
                                           style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             color: U.sub,
-                                            letterSpacing: 0.2,
+                                            height: 1.3,
                                           ),
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        height: 76,
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: U.teal.withValues(alpha: 0.05),
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        child: Center(
-                                          child: Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                colors: [
-                                                  U.teal.withValues(alpha: 0.15),
-                                                  U.teal.withValues(alpha: 0.08),
-                                                ],
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                              ),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Icon(
-                                              Icons.menu_book_rounded,
-                                              color: U.teal.withValues(alpha: 0.85),
-                                              size: 22,
-                                            ),
-                                          ),
                                         ),
                                       ),
                                     ],

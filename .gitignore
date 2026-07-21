@@ -69,3 +69,4 @@ key.properties
 supabase-migration/.env
 SECRETS_FOR_AI.md
 utopia_secrets.md
+*.tar.gz

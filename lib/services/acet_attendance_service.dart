@@ -907,6 +907,7 @@ class AcetAttendanceService {
         databaseEnabled: true,
         thirdPartyCookiesEnabled: true,
         javaScriptCanOpenWindowsAutomatically: true,
+        userAgent: _userAgent,
       ),
       onLoadStart: (controller, url) {
         print('[AcetAttendanceService] WebView LoadStart: $url');
@@ -1266,12 +1267,20 @@ class AcetAttendanceService {
       String formattedToDate;
 
       if (mode == AttendanceRangeMode.tillNow) {
-        formattedFromDate = '';
-        formattedToDate = '';
+        final defaultFrom = _extractDefaultDate(attendancePageResponse.body, 'txtFromDate');
+        final defaultTo = _extractDefaultDate(attendancePageResponse.body, 'txtToDate');
+
+        if (defaultFrom.isNotEmpty && defaultTo.isNotEmpty) {
+          formattedFromDate = defaultFrom;
+          formattedToDate = defaultTo;
+        } else {
+          formattedFromDate = '';
+          formattedToDate = '';
+        }
 
         if (!_isReleaseBuild) {
           // ignore: avoid_print
-          print('[$traceId][MODE] mode=tillNow from= to= (empty for till now)');
+          print('[$traceId][MODE] mode=tillNow from=$formattedFromDate to=$formattedToDate');
         }
       } else {
         DateTime fromDt;
@@ -2112,6 +2121,33 @@ class AcetAttendanceService {
       'has_hiddenTkn=${html.toLowerCase().contains('hidden') && html.toLowerCase().contains('tkn')} '
       'scriptSrcs=[${scriptSrcs.join(', ')}]',
     );
+  }
+
+  static String _extractDefaultDate(String html, String fieldKey) {
+    final inputPattern = RegExp(
+      r'<input\s+([^>]*?)>',
+      caseSensitive: false,
+      dotAll: true,
+    );
+    final matches = inputPattern.allMatches(html);
+    for (final match in matches) {
+      final tagContent = match.group(1) ?? '';
+      final hasFieldKey = tagContent.toLowerCase().contains(fieldKey.toLowerCase());
+      if (hasFieldKey) {
+        final valuePattern = RegExp(
+          r'''value\s*=\s*["']([^"']*)["']''',
+          caseSensitive: false,
+        );
+        final valMatch = valuePattern.firstMatch(tagContent);
+        if (valMatch != null) {
+          final val = valMatch.group(1)?.trim() ?? '';
+          if (val.isNotEmpty) {
+            return val;
+          }
+        }
+      }
+    }
+    return '';
   }
 
   static bool _looksLikeLoginPage(String body) {

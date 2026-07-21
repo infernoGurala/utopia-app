@@ -16,6 +16,9 @@ import '../services/platform_support.dart';
 import '../services/role_service.dart';
 import 'university_selection_screen.dart';
 import 'utopia_section_screen.dart';
+import '../services/email_service.dart';
+import '../services/file_upload_service.dart';
+import 'dart:io';
 
 
 class ProfileScreen extends StatefulWidget {
@@ -244,6 +247,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         ],
       ),
+    );
+  }
+
+  void _openRaiseIssueSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _RaiseIssueSheet(),
     );
   }
 
@@ -567,6 +579,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 ),
                               ),
                             ),
+                          ),
+                          Divider(
+                            height: 1,
+                            thickness: 0.5,
+                            color: U.border.withValues(alpha: 0.5),
+                          ),
+                          _groupedTile(
+                            icon: Icons.chat_bubble_outline_rounded,
+                            label: 'Raise Issue / Contact',
+                            sub: 'Send support request or feedback',
+                            color: theme.teal,
+                            onTap: _openRaiseIssueSheet,
                           ),
                         ],
                       ),
@@ -1321,6 +1345,378 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RaiseIssueSheet extends StatefulWidget {
+  const _RaiseIssueSheet();
+
+  @override
+  State<_RaiseIssueSheet> createState() => _RaiseIssueSheetState();
+}
+
+class _RaiseIssueSheetState extends State<_RaiseIssueSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  
+  File? _selectedFile;
+  String? _selectedFilename;
+  bool _submitting = false;
+  String _loadingMessage = '';
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FileUploadService().pickFile();
+      if (result != null) {
+        final size = await result.$1.length();
+        if (size > 5 * 1024 * 1024) {
+          throw Exception('Image size must be less than 5 MB.');
+        }
+        setState(() {
+          _selectedFile = result.$1;
+          _selectedFilename = result.$2;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: U.red,
+          content: Text(e.toString(), style: GoogleFonts.plusJakartaSans(color: U.bg)),
+        ),
+      );
+    }
+  }
+
+  void _clearImage() {
+    setState(() {
+      _selectedFile = null;
+      _selectedFilename = null;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    setState(() {
+      _submitting = true;
+      _loadingMessage = _selectedFile != null ? 'Uploading image...' : 'Sending email...';
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final userName = user?.displayName ?? 'Student';
+      final userEmail = user?.email ?? 'anonymous';
+
+      String imageUrl = '';
+      if (_selectedFile != null) {
+        final univId = U.cachedUniversityId.isNotEmpty ? U.cachedUniversityId : 'support';
+        imageUrl = await FileUploadService().uploadFile(
+          file: _selectedFile!,
+          originalFilename: _selectedFilename ?? 'image.png',
+          universityId: univId,
+        );
+      }
+
+      setState(() {
+        _loadingMessage = 'Sending report...';
+      });
+
+      final success = await EmailService().sendIssueReport(
+        userName: userName,
+        userEmail: userEmail,
+        title: _titleController.text.trim(),
+        description: _descController.text.trim(),
+        imageUrls: imageUrl,
+      );
+
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: U.green,
+              content: Text('Report submitted successfully!', style: GoogleFonts.plusJakartaSans(color: U.bg)),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        throw Exception('Failed to send email. Please try again.');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: U.red,
+            content: Text(e.toString(), style: GoogleFonts.plusJakartaSans(color: U.bg)),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _submitting = false;
+          _loadingMessage = '';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: U.card,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(top: BorderSide(color: U.border, width: 0.5)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: U.border.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Header Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: _submitting ? null : () => Navigator.pop(context),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.sub,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Raise Issue / Contact',
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _submitting ? null : _submit,
+                    child: _submitting
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(U.primary),
+                            ),
+                          )
+                        : Text(
+                            'Submit',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: U.primary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+              if (_submitting) ...[
+                const SizedBox(height: 10),
+                Center(
+                  child: Text(
+                    _loadingMessage,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: U.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              
+              // Issue Title Input
+              Text(
+                'ISSUE TITLE',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _titleController,
+                enabled: !_submitting,
+                style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
+                cursorColor: U.primary,
+                decoration: InputDecoration(
+                  hintText: 'e.g. App crashes when syncing',
+                  hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
+                  filled: true,
+                  fillColor: U.bg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty ? 'Please enter a title' : null,
+              ),
+              const SizedBox(height: 20),
+
+              // Description Input
+              Text(
+                'DESCRIPTION',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _descController,
+                enabled: !_submitting,
+                maxLines: 5,
+                style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
+                cursorColor: U.primary,
+                decoration: InputDecoration(
+                  hintText: 'Describe the issue or contact reason in detail...',
+                  hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
+                  filled: true,
+                  fillColor: U.bg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                validator: (val) => val == null || val.trim().isEmpty ? 'Please enter a description' : null,
+              ),
+              const SizedBox(height: 24),
+
+              // Image Attachment
+              Text(
+                'ATTACHMENT',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (_selectedFile == null)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _submitting ? null : _pickImage,
+                    icon: Icon(Icons.add_a_photo_outlined, size: 18, color: U.primary),
+                    label: Text(
+                      'Attach Screenshot / Image (Optional)',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: U.primary.withValues(alpha: 0.4)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    color: U.bg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: U.border.withValues(alpha: 0.5)),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: Image.file(
+                            _selectedFile!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedFilename ?? 'screenshot.png',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.text,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Ready to upload',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: U.sub,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _submitting ? null : _clearImage,
+                        icon: Icon(Icons.close_rounded, color: U.red, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

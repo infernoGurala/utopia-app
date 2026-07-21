@@ -122,10 +122,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     try {
-      final serviceMode = college == 'acet'
-          ? (mode == _AttendanceRangeMode.tillNow
-                ? AttendanceRangeMode.tillNow
-                : AttendanceRangeMode.period)
+      final serviceMode = mode == _AttendanceRangeMode.tillNow
+          ? AttendanceRangeMode.tillNow
           : AttendanceRangeMode.period;
 
       final result = await AttendanceService.fetchAttendance(
