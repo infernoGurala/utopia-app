@@ -10,24 +10,24 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:utopia_app/firebase_options.dart';
-import 'package:utopia_app/main.dart';
-import 'package:utopia_app/services/platform_support.dart';
-import 'package:utopia_app/screens/chat_screen.dart';
-import 'package:utopia_app/screens/event_certificates_screen.dart';
-import 'package:utopia_app/screens/timetable_screen.dart';
-import 'package:utopia_app/widgets/app_motion.dart';
-import 'package:utopia_app/widgets/utopia_snackbar.dart';
+import '../firebase_options.dart';
+import '../main.dart';
+import 'platform_support.dart';
+import '../screens/chat_screen.dart';
+import '../screens/event_certificates_screen.dart';
+import '../screens/timetable_screen.dart';
+import '../widgets/app_motion.dart';
+import '../widgets/utopia_snackbar.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import 'package:utopia_app/models/focus_models.dart';
-import 'package:utopia_app/services/user_timetable_service.dart';
-import 'package:utopia_app/models/user_timetable.dart';
-import 'package:utopia_app/services/focus_database_service.dart';
-import 'package:utopia_app/services/focus_supabase_service.dart';
+import '../models/focus_models.dart';
+import 'user_timetable_service.dart';
+import '../models/user_timetable.dart';
+import 'focus_database_service.dart';
+import 'focus_supabase_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
