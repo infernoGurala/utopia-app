@@ -256,7 +256,7 @@ class _UserRowState extends State<_UserRow> {
         }
 
         final data = snap.data?.data() ?? {};
-        final displayName = (data['displayName'] ?? 'Student').toString();
+        final displayName = UtopiaApp.sanitizeDisplayName((data['displayName'] ?? 'Student').toString());
         final email = (data['email'] ?? '').toString();
         final photoUrl = data['photoUrl']?.toString();
         final bio = (data['bio'] ?? '').toString().trim();
@@ -323,13 +323,13 @@ class _UserRowState extends State<_UserRow> {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        bio.isNotEmpty ? bio : email,
-                        style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (bio.isNotEmpty)
+                        Text(
+                          bio,
+                          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),

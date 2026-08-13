@@ -1,24 +1,45 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../main.dart';
 import '../services/cache_service.dart';
-import '../services/platform_support.dart';
-import '../services/role_service.dart';
-import 'university_selection_screen.dart';
-import 'utopia_section_screen.dart';
 import '../services/email_service.dart';
 import '../services/file_upload_service.dart';
-import 'dart:io';
+import '../services/platform_support.dart';
+import '../services/role_service.dart';
+import '../widgets/instagram_badge.dart';
+import 'app_shell.dart';
+import 'university_selection_screen.dart';
+import 'utopia_section_screen.dart';
+
+const List<String> kBTechBranches = [
+  'Agri Engg',
+  'CSE (AI & ML)',
+  'CSE (AI & ML - Microsoft)',
+  'CSE (AI & ML - Google)',
+  'Civil Engg',
+  'CSE',
+  'CSE (Data Science)',
+  'CSE (Data Science - Google)',
+  'CSE (Google Cloud)',
+  'CSE (SAP)',
+  'EEE',
+  'ECE',
+  'Mechanical Engg',
+  'Mining Engg',
+  'Petroleum Tech',
+];
 
 
 class ProfileScreen extends StatefulWidget {
@@ -145,56 +166,42 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       return;
     }
 
+    final initialThemeKey = U.currentThemeKey;
+
     final selectedKey = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _ThemeStyleSheet(currentKey: U.currentThemeKey),
+      builder: (context) => _ThemeStyleSheet(currentKey: initialThemeKey),
     );
 
-    if (selectedKey == null || selectedKey == U.currentThemeKey) {
-      return;
-    }
+    if (selectedKey != null && selectedKey != initialThemeKey) {
+      setState(() => _updatingTheme = true);
+      U.applyTheme(selectedKey);
+      await CacheService().saveAppSetting('theme_accent', selectedKey);
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'themeAccent': selectedKey,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error saving theme: $e');
+      }
 
-    setState(() => _updatingTheme = true);
-    final previousKey = U.currentThemeKey;
-    U.applyTheme(selectedKey);
-    unawaited(CacheService().saveAppSetting('theme_accent', selectedKey));
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'themeAccent': selectedKey,
-      }, SetOptions(merge: true));
-      _restartApp();
-    } catch (e) {
-      U.applyTheme(previousKey);
-      unawaited(CacheService().saveAppSetting('theme_accent', previousKey));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: U.red,
-            content: Text(
-              'Could not update theme style',
-              style: GoogleFonts.plusJakartaSans(color: U.bg),
-            ),
-          ),
+        // Immediate clean app restart upon coming back from theme selection page!
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AppShell()),
+          (route) => false,
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() => _updatingTheme = false);
-      }
+    } else if (selectedKey == null && U.currentThemeKey != initialThemeKey) {
+      // Revert if sheet dismissed without selecting
+      U.applyTheme(initialThemeKey);
     }
   }
 
 
-  void _restartApp() async {
-    try {
-      const platform = MethodChannel('utopia_app/app_update');
-      await platform.invokeMethod('restartApp');
-    } catch (e) {
-      SystemNavigator.pop();
-    }
-  }
+
 
   @override
   void initState() {
@@ -352,7 +359,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     // Premium Profile Header Card
                     Builder(
                       builder: (context) {
-                        final bio = (snapshot.data?.data()?['bio'] ?? '').toString().trim();
+                        final userData = snapshot.data?.data() ?? {};
+                        final bio = (userData['bio'] ?? '').toString().trim();
+                        final branch = (userData['branch'] ?? '').toString().trim();
+                        final instagramId = (userData['instagramId'] ?? '').toString().trim();
                         return Container(
                           decoration: BoxDecoration(
                             color: U.card,
@@ -429,7 +439,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      user?.displayName ?? 'Student',
+                                      UtopiaApp.sanitizeDisplayName(user?.displayName),
                                       style: GoogleFonts.outfit(
                                         color: U.text,
                                         fontSize: 22,
@@ -445,14 +455,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     const Icon(Icons.verified_rounded, color: Color(0xFF1D9BF0), size: 18),
                                   ],
                                 ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                user?.email ?? '',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: U.sub,
-                                  fontSize: 13,
-                                ),
                               ),
                               if (bio.isNotEmpty) ...[
                                 const SizedBox(height: 16),
@@ -470,6 +472,45 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
+                              if (branch.isNotEmpty || instagramId.isNotEmpty) ...[
+                                const SizedBox(height: 14),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 8,
+                                  runSpacing: 6,
+                                  children: [
+                                    if (branch.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: theme.primary.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: theme.primary.withValues(alpha: 0.25),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.school_rounded, size: 13, color: theme.primary),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              branch,
+                                              style: GoogleFonts.plusJakartaSans(
+                                                color: theme.primary,
+                                                fontSize: 11.5,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    if (instagramId.isNotEmpty)
+                                      InstagramBadge(handle: instagramId),
+                                  ],
+                                ),
+                              ],
                               const SizedBox(height: 20),
                               OutlinedButton.icon(
                                 onPressed: () async {
@@ -480,6 +521,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     builder: (context) => _EditProfileSheet(
                                       initialName: user?.displayName ?? 'Student',
                                       initialBio: bio,
+                                      initialInstagram: instagramId,
+                                      initialBranch: branch,
                                     ),
                                   );
                                   if (updated == true && mounted) {
@@ -754,26 +797,47 @@ class _HeaderButton extends StatelessWidget {
 }
 
 
-class _ThemeStyleSheet extends StatelessWidget {
+class _ThemeStyleSheet extends StatefulWidget {
   const _ThemeStyleSheet({required this.currentKey});
 
   final String currentKey;
 
   @override
+  State<_ThemeStyleSheet> createState() => _ThemeStyleSheetState();
+}
+
+class _ThemeStyleSheetState extends State<_ThemeStyleSheet> {
+  late bool _isDarkSelected;
+
+  @override
+  void initState() {
+    super.initState();
+    final activeTheme = appThemes.firstWhere(
+      (t) => t.key == widget.currentKey,
+      orElse: () => appThemes.first,
+    );
+    _isDarkSelected = activeTheme.isDark;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final filteredThemes = appThemes.where((t) => t.isDark == _isDarkSelected).toList();
+    final lightCount = appThemes.where((t) => !t.isDark).length;
+    final darkCount = appThemes.where((t) => t.isDark).length;
+
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
-      minChildSize: 0.45,
-      maxChildSize: 0.90,
+      minChildSize: 0.50,
+      maxChildSize: 0.92,
       expand: false,
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
             color: U.card,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border.all(color: U.border),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: U.border.withValues(alpha: 0.5)),
           ),
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: SafeArea(
             top: false,
             child: Column(
@@ -781,7 +845,7 @@ class _ThemeStyleSheet extends StatelessWidget {
               children: [
                 Center(
                   child: Container(
-                    width: 42,
+                    width: 38,
                     height: 4,
                     decoration: BoxDecoration(
                       color: U.border,
@@ -789,40 +853,92 @@ class _ThemeStyleSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'Theme',
-                  style: GoogleFonts.inter(
-                    color: U.text,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'App Themes & Colors',
+                          style: GoogleFonts.outfit(
+                            color: U.text,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Choose your preferred theme palette',
+                          style: GoogleFonts.plusJakartaSans(color: U.sub, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: U.sub, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // ── Mode Toggle Buttons ──
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: U.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: U.border.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildModeButton(
+                          label: 'Light ($lightCount)',
+                          icon: Icons.wb_sunny_rounded,
+                          isSelected: !_isDarkSelected,
+                          onTap: () {
+                            setState(() => _isDarkSelected = false);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: _buildModeButton(
+                          label: 'Dark ($darkCount)',
+                          icon: Icons.dark_mode_rounded,
+                          isSelected: _isDarkSelected,
+                          onTap: () {
+                            setState(() => _isDarkSelected = true);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Choose your vibe',
-                  style: GoogleFonts.inter(color: U.sub, fontSize: 13),
-                ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
+                // ── Grid of Themes with UI Previews ──
                 Expanded(
                   child: GridView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.only(bottom: 24),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-                      crossAxisSpacing: 14,
-                      mainAxisSpacing: 14,
-                      childAspectRatio: 0.78,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.95,
                     ),
-                    itemCount: appThemes.length,
+                    itemCount: filteredThemes.length,
                     itemBuilder: (context, index) {
-                      final theme = appThemes[index];
-                      final selected = theme.key == currentKey;
-                      return _ThemePreviewCard(
+                      final theme = filteredThemes[index];
+                      final selected = theme.key == appThemeNotifier.value.key;
+                      return _CompactThemeCard(
                         theme: theme,
                         selected: selected,
-                        onTap: () => Navigator.pop(context, theme.key),
+                        onTap: () {
+                          appThemeNotifier.value = theme;
+                          Navigator.pop(context, theme.key);
+                        },
                       );
                     },
                   ),
@@ -834,11 +950,53 @@ class _ThemeStyleSheet extends StatelessWidget {
       },
     );
   }
+
+  Widget _buildModeButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? U.primary.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? U.primary.withValues(alpha: 0.4) : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: isSelected ? U.primary : U.sub,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                color: isSelected ? U.primary : U.sub,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-/// A mini preview card that renders a realistic miniature of the theme.
-class _ThemePreviewCard extends StatelessWidget {
-  const _ThemePreviewCard({
+class _CompactThemeCard extends StatelessWidget {
+  const _CompactThemeCard({
     required this.theme,
     required this.selected,
     required this.onTap,
@@ -853,286 +1011,238 @@ class _ThemePreviewCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.bg,
-          borderRadius: BorderRadius.circular(20),
+          color: U.card,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: selected ? theme.primary : theme.border,
+            color: selected ? theme.primary : U.border.withValues(alpha: 0.6),
             width: selected ? 2.0 : 1.0,
           ),
+          boxShadow: [
+            if (selected)
+              BoxShadow(
+                color: theme.primary.withValues(alpha: 0.25),
+                blurRadius: 12,
+                spreadRadius: 1,
+                offset: const Offset(0, 4),
+              ),
+          ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(19),
-          child: Stack(
-            children: [
-              // ── Mini UI mockup ──
-              Padding(
-                padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row: Title & Checkmark
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    theme.label,
+                    style: GoogleFonts.outfit(
+                      color: U.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: selected ? theme.primary : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? theme.primary : U.sub.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: selected
+                      ? Icon(Icons.check_rounded, size: 12, color: theme.bg)
+                      : null,
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              theme.description,
+              style: GoogleFonts.plusJakartaSans(
+                color: U.sub,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+
+            // Mini App Preview Screen Box
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.bg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.border.withValues(alpha: 0.7),
+                    width: 0.8,
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top bar (mock app bar)
+                    // Mini Navbar row
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          width: 8,
-                          height: 8,
+                          width: 28,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: theme.text.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                        Container(
+                          width: 10,
+                          height: 5,
                           decoration: BoxDecoration(
                             color: theme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Container(
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: theme.text.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Container(
-                          width: 14,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: theme.dim.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    // Mock card 1
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: theme.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: theme.border.withValues(alpha: 0.5),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 5,
-                            width: 50,
-                            decoration: BoxDecoration(
-                              color: theme.text.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Container(
-                            height: 4,
-                            width: 80,
-                            decoration: BoxDecoration(
-                              color: theme.sub.withValues(alpha: 0.4),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          // Accent color dots row
-                          Row(
-                            children: [
-                              _dot(theme.primary, 8),
-                              const SizedBox(width: 4),
-                              _dot(theme.teal, 8),
-                              const SizedBox(width: 4),
-                              _dot(theme.peach, 8),
-                              const SizedBox(width: 4),
-                              _dot(theme.blue, 8),
-                              const SizedBox(width: 4),
-                              _dot(theme.green, 8),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 8),
-                    // Mock card 2 — mini list items
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: theme.card,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: theme.border.withValues(alpha: 0.5),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          _mockListItem(theme, theme.primary),
-                          const SizedBox(height: 5),
-                          _mockListItem(theme, theme.teal),
-                          const SizedBox(height: 5),
-                          _mockListItem(theme, theme.peach),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Mock button
-                    Container(
-                      width: double.infinity,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: theme.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Container(
-                          height: 4,
-                          width: 30,
-                          decoration: BoxDecoration(
-                            color: theme.bg.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(2),
+
+                    // Mini Card Box inside preview
+                    Expanded(
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: theme.card,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.border.withValues(alpha: 0.5),
+                            width: 0.5,
                           ),
                         ),
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-              // ── Theme name label at bottom ──
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        theme.bg.withValues(alpha: 0.0),
-                        theme.bg.withValues(alpha: 0.85),
-                        theme.bg,
-                      ],
-                      stops: const [0.0, 0.45, 1.0],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                        child: Row(
                           children: [
-                            Text(
-                              theme.label,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: theme.text,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                            Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: theme.primary.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: theme.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 1),
-                            Text(
-                              theme.description,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: theme.sub,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w400,
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 44,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: theme.text,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Container(
+                                    width: 28,
+                                    height: 3,
+                                    decoration: BoxDecoration(
+                                      color: theme.sub.withValues(alpha: 0.7),
+                                      borderRadius: BorderRadius.circular(1.5),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      if (selected)
-                        Icon(
-                          Icons.check_circle_rounded,
-                          color: theme.primary,
-                          size: 18,
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 8),
+
+            // Color Swatches Row
+            Row(
+              children: [
+                _SwatchBlock(color: theme.bg),
+                const SizedBox(width: 4),
+                _SwatchBlock(color: theme.card),
+                const SizedBox(width: 4),
+                _SwatchBlock(color: theme.primary),
+                const SizedBox(width: 4),
+                _SwatchBlock(color: theme.teal),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _dot(Color color, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+class _SwatchBlock extends StatelessWidget {
+  const _SwatchBlock({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
+        ),
       ),
-    );
-  }
-
-  Widget _mockListItem(AppTheme t, Color accent) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Center(
-            child: Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: t.text.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Container(
-          width: 8,
-          height: 4,
-          decoration: BoxDecoration(
-            color: t.dim.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ],
     );
   }
 }
 
 class _EditProfileSheet extends StatefulWidget {
-  final String initialName;
-  final String initialBio;
-
   const _EditProfileSheet({
     required this.initialName,
     required this.initialBio,
+    this.initialInstagram = '',
+    this.initialBranch = '',
   });
+
+  final String initialName;
+  final String initialBio;
+  final String initialInstagram;
+  final String initialBranch;
 
   @override
   State<_EditProfileSheet> createState() => _EditProfileSheetState();
@@ -1141,6 +1251,8 @@ class _EditProfileSheet extends StatefulWidget {
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _bioController;
+  late final TextEditingController _instagramController;
+  String? _selectedBranch;
   bool _saving = false;
 
   @override
@@ -1148,18 +1260,24 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
     _bioController = TextEditingController(text: widget.initialBio);
+    _instagramController = TextEditingController(text: widget.initialInstagram);
+    _selectedBranch = widget.initialBranch.isNotEmpty && kBTechBranches.contains(widget.initialBranch)
+        ? widget.initialBranch
+        : null;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _instagramController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final nextName = _nameController.text.trim();
     final nextBio = _bioController.text.trim();
+    final nextInstagram = _instagramController.text.trim().replaceAll('@', '');
 
     if (nextName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1182,6 +1300,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'displayName': nextName,
           'bio': nextBio,
+          'instagramId': nextInstagram,
+          'branch': _selectedBranch ?? '',
           'email': user.email ?? '',
           'photoUrl': user.photoURL,
           'lastSeen': FieldValue.serverTimestamp(),
@@ -1328,7 +1448,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             const SizedBox(height: 8),
             TextField(
               controller: _bioController,
-              maxLines: 3,
+              maxLines: 2,
               maxLength: 150,
               style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
               cursorColor: U.primary,
@@ -1343,6 +1463,81 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   borderSide: BorderSide.none,
                 ),
               ),
+            ),
+            const SizedBox(height: 20),
+            // Instagram User ID Field
+            Text(
+              'INSTAGRAM USER ID',
+              style: GoogleFonts.plusJakartaSans(
+                color: U.sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _instagramController,
+              maxLength: 30,
+              style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 15),
+              cursorColor: U.primary,
+              decoration: InputDecoration(
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: RealInstagramIcon(size: 18),
+                ),
+                hintText: 'e.g. john_doe',
+                hintStyle: GoogleFonts.plusJakartaSans(color: U.dim),
+                counterText: '',
+                filled: true,
+                fillColor: U.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Branch Name Dropdown Field
+            Text(
+              'BRANCH NAME',
+              style: GoogleFonts.plusJakartaSans(
+                color: U.sub,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _selectedBranch,
+              isExpanded: true,
+              dropdownColor: U.card,
+              style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 14),
+              icon: Icon(Icons.keyboard_arrow_down_rounded, color: U.sub),
+              decoration: InputDecoration(
+                hintText: 'Select B.Tech branch...',
+                hintStyle: GoogleFonts.plusJakartaSans(color: U.dim, fontSize: 14),
+                filled: true,
+                fillColor: U.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              items: kBTechBranches.map((branch) {
+                return DropdownMenuItem<String>(
+                  value: branch,
+                  child: Text(
+                    branch,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.plusJakartaSans(color: U.text, fontSize: 14),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) => setState(() => _selectedBranch = val),
             ),
           ],
         ),
@@ -1507,7 +1702,6 @@ class _RaiseIssueSheetState extends State<_RaiseIssueSheet> {
               const SizedBox(height: 20),
               // Header Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
                     onPressed: _submitting ? null : () => Navigator.pop(context),
@@ -1520,12 +1714,17 @@ class _RaiseIssueSheetState extends State<_RaiseIssueSheet> {
                       ),
                     ),
                   ),
-                  Text(
-                    'Raise Issue / Contact',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: U.text,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Text(
+                      'Raise Issue / Contact',
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: U.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   FilledButton(
@@ -1533,7 +1732,7 @@ class _RaiseIssueSheetState extends State<_RaiseIssueSheet> {
                     style: FilledButton.styleFrom(
                       backgroundColor: U.primary,
                       foregroundColor: U.getContrastColor(U.primary),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       minimumSize: const Size(0, 36),
                       visualDensity: VisualDensity.compact,
                       shape: RoundedRectangleBorder(

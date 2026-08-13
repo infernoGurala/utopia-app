@@ -158,15 +158,20 @@ class _HabitDetailScreenState extends State<HabitDetailScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          _habit.name,
-                          style: GoogleFonts.newsreader(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w400,
-                            fontStyle: FontStyle.italic,
-                            color: U.text,
+                        Expanded(
+                          child: Text(
+                            _habit.name,
+                            style: GoogleFonts.newsreader(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.italic,
+                              color: U.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '${date.day}/${date.month}/${date.year}',
                           style: GoogleFonts.plusJakartaSans(

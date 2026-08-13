@@ -1,8 +1,10 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'cache_service.dart';
 
 class SupabaseNotesService {
   SupabaseClient get _supabase => Supabase.instance.client;
+  static final Map<String, String> _noteCache = {};
 
   String _slug(String name) {
     return name.toLowerCase().replaceAll(' ', '-');
@@ -35,8 +37,20 @@ class SupabaseNotesService {
     }
   }
 
-  Future<String> getNoteContent(String notePath) async {
+  Future<String> getNoteContent(String notePath, {bool forceRefresh = false}) async {
     try {
+      if (!forceRefresh && _noteCache.containsKey(notePath)) {
+        return _noteCache[notePath]!;
+      }
+
+      if (!forceRefresh) {
+        final cached = await CacheService().getNoteContent(notePath);
+        if (cached != null && cached.isNotEmpty) {
+          _noteCache[notePath] = cached;
+          return cached;
+        }
+      }
+
       final response = await _supabase
           .from('notes')
           .select('content')
@@ -44,8 +58,14 @@ class SupabaseNotesService {
           .maybeSingle();
 
       if (response == null) return '';
-      return (response['content'] as String?) ?? '';
+      final content = (response['content'] as String?) ?? '';
+      _noteCache[notePath] = content;
+      await CacheService().saveNoteContent(notePath, content);
+      return content;
     } catch (e) {
+      // Fallback to cache if network fails
+      final cached = await CacheService().getNoteContent(notePath);
+      if (cached != null) return cached;
       throw Exception('Failed to get note content for $notePath: $e');
     }
   }
@@ -125,6 +145,9 @@ class SupabaseNotesService {
         'updated_by': updatedByUid,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('path', notePath);
+
+      _noteCache[notePath] = content;
+      await CacheService().saveNoteContent(notePath, content);
     } catch (e) {
       throw Exception('Failed to update note $notePath: $e');
     }

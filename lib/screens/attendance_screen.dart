@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -7,10 +8,13 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
 import '../services/attendance_cache_service.dart';
+import '../services/attendance_history_service.dart';
 import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
 import '../widgets/utopia_loader.dart';
+import '../widgets/hamster_loader.dart';
+import '../widgets/minecraft_world_loader.dart';
 import '../models/user_timetable.dart';
 import '../services/user_timetable_service.dart';
 
@@ -43,6 +47,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   int _currentTabIndex = 0;
   DateTime _selectedCalendarDate = DateTime.now();
 
+  // ── Minecraft loader progress ──
+  double _fetchProgress = 0.0;
+  Timer? _progressTimer;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +63,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
     _glowController.dispose();
     _rollController.dispose();
     _passwordController.dispose();
@@ -119,11 +128,28 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     setState(() {
       _errorMessage = null;
       _state = _AttendanceViewState.loading;
+      _fetchProgress = 0.0;
+    });
+
+    // ── Start simulated progress timer ──
+    _progressTimer?.cancel();
+    final rng = math.Random();
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      setState(() {
+        // Slow down as we approach 0.92 (never reach 1.0 until fetch completes)
+        final remaining = 0.92 - _fetchProgress;
+        if (remaining <= 0.005) { timer.cancel(); return; }
+        final step = remaining * (0.02 + rng.nextDouble() * 0.06);
+        _fetchProgress = (_fetchProgress + step).clamp(0.0, 0.92);
+      });
     });
 
     try {
-      final serviceMode = mode == _AttendanceRangeMode.tillNow
-          ? AttendanceRangeMode.tillNow
+      final serviceMode = college == 'aec'
+          ? (mode == _AttendanceRangeMode.tillNow
+                ? AttendanceRangeMode.tillNow
+                : AttendanceRangeMode.period)
           : AttendanceRangeMode.period;
 
       final result = await AttendanceService.fetchAttendance(
@@ -144,9 +170,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         'password': password,
         'college': college,
       };
+      unawaited(AttendanceHistoryService.recordSnapshot(trimmedRoll, result));
       if (!mounted) {
         return;
       }
+      // ── Snap progress to 100%, pause briefly to show full map, then show data ──
+      _progressTimer?.cancel();
+      if (mounted) setState(() => _fetchProgress = 1.0);
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
       setState(() {
         _attendanceData = result;
         _isFromCache = result['fromCache'] as bool? ?? false;
@@ -154,6 +186,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         _state = _AttendanceViewState.loaded;
       });
     } catch (e) {
+      _progressTimer?.cancel();
       final message = _friendlyErrorMessage(e);
       if (!mounted) {
         return;
@@ -238,6 +271,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final roll = _savedCredentials?['rollNumber'] ?? '';
     if (roll.isNotEmpty) {
       unawaited(AttendanceCacheService.clear(roll));
+      unawaited(AttendanceHistoryService.clearHistory(roll));
     }
     if (!mounted) {
       return;
@@ -426,11 +460,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
               ),
             ),
             Text(
-              _currentTabIndex == 1
-                  ? 'Calendar'
-                  : _currentTabIndex == 2
-                      ? 'Insights'
-                      : 'Overview',
+              _currentTabIndex == 2
+                  ? 'Insights'
+                  : 'Overview',
               style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
             ),
           ],
@@ -566,21 +598,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () =>
-                                setState(() => _selectedCollege = 'acet'),
+                                setState(() => _selectedCollege = 'aec'),
                             child: Container(
                               height: 44,
-                              color: _selectedCollege == 'acet'
+                              color: _selectedCollege == 'aec'
                                   ? U.primary
                                   : U.surface,
                               child: Center(
                                 child: Text(
-                                  'ACET',
+                                  'AEC',
                                   style: GoogleFonts.outfit(
-                                    color: _selectedCollege == 'acet'
+                                    color: _selectedCollege == 'aec'
                                         ? U.bg
                                         : U.sub,
                                     fontSize: 14,
-                                    fontWeight: _selectedCollege == 'acet'
+                                    fontWeight: _selectedCollege == 'aec'
                                         ? FontWeight.w700
                                         : FontWeight.w500,
                                   ),
@@ -662,26 +694,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildLoadingState() {
     return Center(
       key: const ValueKey('attendance_loading'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const UtopiaLoader(scale: 0.8),
-          const SizedBox(height: 24),
-          Text(
-            'Fetching live attendance...',
-            style: GoogleFonts.outfit(
-              color: U.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Syncing your report',
-            style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-          ),
-        ],
-      ),
+      child: MinecraftWorldLoader(scale: 1.0, progress: _fetchProgress),
     );
   }
 
@@ -693,8 +706,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         duration: const Duration(milliseconds: 240),
         child: () {
           switch (_currentTabIndex) {
-            case 1:
-              return _buildCalendarTab();
             case 2:
               return _buildInsightsTab();
             case 0:
@@ -742,7 +753,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildNavItem(0, Icons.donut_large_rounded, 'Overview'),
-                  _buildNavItem(1, Icons.calendar_month_rounded, 'Calendar'),
                   _buildNavItem(2, Icons.bar_chart_rounded, 'Insights'),
                 ],
               ),
@@ -939,7 +949,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     final portalDate = _formatPortalDateForPortal(_selectedCalendarDate);
-    final serviceMode = credentials['college'] == 'acet'
+    final serviceMode = credentials['college'] == 'aec'
         ? AttendanceRangeMode.period
         : AttendanceRangeMode.period;
 
@@ -1688,161 +1698,747 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
       children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              colors: [U.card, color.withValues(alpha: 0.14)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        // ── 1. Attendance Progress (Brought to VERY TOP!) ──
+        _buildAttendanceTrendCard(data),
+
+        const SizedBox(height: 16),
+
+        // ── 2. Tomorrow's Predictor (Positioned right after Attendance Progress) ──
+        _buildTomorrowPredictor(),
+
+        const SizedBox(height: 16),
+
+        // ── 3. Merged Overall Attendance Hero Card (Includes Held / Attended / Missed metrics) ──
+        _buildOverallHeroCard(
+          overall: overall,
+          totalClasses: totalClasses,
+          totalAttended: totalAttended,
+          studentName: studentName,
+          color: color,
+          statusLabel: statusLabel,
+        ),
+
+        const SizedBox(height: 24),
+
+        // ── 4. Insight Tip Banner ──
+        _buildInsightTipBanner(overall: overall, attended: totalAttended, held: totalClasses),
+      ],
+    );
+  }
+
+  Widget _buildOverallHeroCard({
+    required double overall,
+    required int totalClasses,
+    required int totalAttended,
+    required String studentName,
+    required Color color,
+    required String statusLabel,
+  }) {
+    final missedClasses = (totalClasses - totalAttended).clamp(0, 9999);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          colors: [U.card, color.withValues(alpha: 0.14)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.8),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03,
             ),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  Icons.bar_chart_rounded,
+                  color: color,
+                  size: 26,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: GoogleFonts.outfit(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Overall Attendance',
+            style: GoogleFonts.outfit(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${overall.toStringAsFixed(1)}%',
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 48,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              backgroundColor: U.surface,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
+              value: (overall / 100).clamp(0.0, 1.0),
+            ),
+          ),
+          if (studentName.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Icon(
+                  Icons.person_outline_rounded,
+                  color: U.sub,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    studentName,
+                    style: GoogleFonts.outfit(
+                      color: U.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          // ── Merged Class Totals (Classes Held, Attended, Missed inside card) ──
+          Container(
+            margin: const EdgeInsets.only(top: 18),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            decoration: BoxDecoration(
+              color: U.surface.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: U.border.withValues(alpha: 0.5),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildMergedStatCol(
+                    label: 'Classes Held',
+                    value: '$totalClasses',
+                    icon: Icons.event_note_rounded,
+                    color: U.primary,
+                  ),
+                ),
+                Container(width: 1, height: 28, color: U.border.withValues(alpha: 0.5)),
+                Expanded(
+                  child: _buildMergedStatCol(
+                    label: 'Attended',
+                    value: '$totalAttended',
+                    icon: Icons.check_circle_outline_rounded,
+                    color: color,
+                  ),
+                ),
+                Container(width: 1, height: 28, color: U.border.withValues(alpha: 0.5)),
+                Expanded(
+                  child: _buildMergedStatCol(
+                    label: 'Missed',
+                    value: '$missedClasses',
+                    icon: Icons.cancel_outlined,
+                    color: U.red,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMergedStatCol({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: GoogleFonts.outfit(
+                color: U.text,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: U.sub,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAttendanceTrendCard(Map<String, dynamic> data) {
+    final roll = _savedCredentials?['rollNumber'] ?? '';
+    if (roll.isEmpty) return const SizedBox.shrink();
+
+    return FutureBuilder<AttendanceComparison>(
+      future: AttendanceHistoryService.getComparison(roll, data),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        final comp = snapshot.data!;
+
+        final Color badgeColor;
+        final IconData trendIcon;
+        final String deltaText;
+
+        if (comp.overallDelta > 0.005) {
+          badgeColor = U.green;
+          trendIcon = Icons.trending_up_rounded;
+          deltaText = '+${comp.overallDelta.toStringAsFixed(1)}%';
+        } else if (comp.overallDelta < -0.005) {
+          badgeColor = U.red;
+          trendIcon = Icons.trending_down_rounded;
+          deltaText = '${comp.overallDelta.toStringAsFixed(1)}%';
+        } else {
+          badgeColor = U.primary;
+          trendIcon = Icons.trending_flat_rounded;
+          deltaText = '0.0%';
+        }
+
+        final prevDateLabel = comp.hasPrevious && comp.previousTimestamp != null
+            ? _formatShortTime(comp.previousTimestamp)
+            : 'Baseline';
+
+        return Container(
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: U.border.withValues(alpha: 0.8),
+              color: U.border.withValues(alpha: 0.7),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: appThemeNotifier.value.isDark ? 0.2 : 0.03),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-                spreadRadius: -2,
+                color: Colors.black.withValues(
+                  alpha: appThemeNotifier.value.isDark ? 0.25 : 0.04,
+                ),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Icon(
-                      Icons.bar_chart_rounded,
-                      color: color,
-                      size: 26,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: GoogleFonts.outfit(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Overall Attendance',
-                style: GoogleFonts.outfit(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${overall.toStringAsFixed(1)}%',
-                style: GoogleFonts.outfit(
-                  color: U.text,
-                  fontSize: 48,
-                  fontWeight: FontWeight.w800,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  minHeight: 6,
-                  backgroundColor: U.surface,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                  value: (overall / 100).clamp(0.0, 1.0),
-                ),
-              ),
-              if (studentName.isNotEmpty) ...[
-                const SizedBox(height: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Header Row ──
                 Row(
                   children: [
-                    Icon(
-                      Icons.person_outline_rounded,
-                      color: U.sub,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        studentName,
-                        style: GoogleFonts.outfit(
-                          color: U.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: badgeColor.withValues(alpha: 0.25),
+                          width: 0.8,
                         ),
-                        overflow: TextOverflow.ellipsis,
+                      ),
+                      child: Icon(trendIcon, color: badgeColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Attendance Progress',
+                            style: GoogleFonts.outfit(
+                              color: U.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            comp.hasPrevious
+                                ? 'Compared with $prevDateLabel'
+                                : 'Baseline recorded',
+                            style: GoogleFonts.outfit(
+                              color: U.sub,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    if (comp.hasPrevious)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: badgeColor.withValues(alpha: 0.3),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(trendIcon, color: badgeColor, size: 13),
+                            const SizedBox(width: 4),
+                            Text(
+                              deltaText,
+                              style: GoogleFonts.outfit(
+                                color: badgeColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
+
+                if (comp.hasPrevious) ...[
+                  const SizedBox(height: 16),
+
+                  // ── Clean 3-Card Metrics Row ──
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDeltaCard(
+                          label: 'Overall %',
+                          currVal: '${comp.currentOverall.toStringAsFixed(1)}%',
+                          prevVal: '${comp.previousOverall.toStringAsFixed(1)}%',
+                          deltaVal: comp.overallDelta,
+                          isPercentage: true,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDeltaCard(
+                          label: 'Classes Held',
+                          currVal: '${comp.currentHeld}',
+                          prevVal: '${comp.previousHeld}',
+                          deltaVal: comp.heldDelta.toDouble(),
+                          unit: 'held',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDeltaCard(
+                          label: 'Attended',
+                          currVal: '${comp.currentAttended}',
+                          prevVal: '${comp.previousAttended}',
+                          deltaVal: comp.attendedDelta.toDouble(),
+                          unit: 'attended',
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ── Every Subject Positive / Negative Breakdown ──
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'PER-SUBJECT BREAKDOWN',
+                        style: GoogleFonts.outfit(
+                          color: U.sub,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      Text(
+                        '${comp.subjectDeltas.length} subjects',
+                        style: GoogleFonts.outfit(
+                          color: U.sub,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Column(
+                    children: comp.subjectDeltas
+                        .map((sub) => _buildSubjectDeltaItem(sub))
+                        .toList(),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'First snapshot recorded! Future refreshes will compare against this data to show your attendance progress over time.',
+                    style: GoogleFonts.outfit(
+                      color: U.sub,
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (data['subjects'] != null && (data['subjects'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'SUBJECT STATUS',
+                      style: GoogleFonts.outfit(
+                        color: U.sub,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Column(
+                      children: (data['subjects'] as List).map((s) {
+                        final map = s as Map<String, dynamic>;
+                        final name = (map['subject'] ?? '').toString();
+                        final pct = (map['percentage'] as num?)?.toDouble() ?? 0;
+                        final attended = (map['attendedClasses'] as num?)?.toInt() ?? 0;
+                        final total = (map['totalClasses'] as num?)?.toInt() ?? 0;
+                        final isOk = pct >= 75;
+                        final color = isOk ? U.green : U.red;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: U.surface,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: U.border.withValues(alpha: 0.6)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: GoogleFonts.outfit(
+                                        color: U.text,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '$attended/$total classes attended • ${pct.toStringAsFixed(1)}%',
+                                      style: GoogleFonts.outfit(color: U.sub, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: color.withValues(alpha: 0.25), width: 0.8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(isOk ? Icons.trending_up_rounded : Icons.trending_down_rounded, color: color, size: 12),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isOk ? 'On Track' : 'Needs Attention',
+                                      style: GoogleFonts.outfit(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
               ],
-            ],
+            ),
           ),
+        );
+      },
+    );
+  }
+
+  static String _formatShortTime(DateTime? dt) {
+    if (dt == null) return 'Baseline';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final targetDate = DateTime(dt.year, dt.month, dt.day);
+    final diffDays = today.difference(targetDate).inDays;
+
+    final hour12 = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final hourStr = hour12.toString().padLeft(2, '0');
+    final minStr = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final timeStr = '$hourStr:$minStr $ampm';
+
+    if (diffDays == 0) {
+      return 'Today, $timeStr';
+    } else if (diffDays == 1) {
+      return 'Yesterday, $timeStr';
+    }
+
+    final day = dt.day.toString().padLeft(2, '0');
+    final monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final month = monthNames[dt.month - 1];
+    return '$day $month, $timeStr';
+  }
+
+  Widget _buildDeltaCard({
+    required String label,
+    required String currVal,
+    required String prevVal,
+    required double deltaVal,
+    bool isPercentage = false,
+    String unit = '',
+  }) {
+    final bool hasChanged = deltaVal.abs() > 0.001;
+    final bool isPositive = deltaVal > 0;
+    final Color color = !hasChanged
+        ? U.sub
+        : (isPositive ? U.green : U.red);
+
+    String changeSubtitle;
+    if (!hasChanged) {
+      changeSubtitle = 'No change';
+    } else if (isPercentage) {
+      final sign = isPositive ? '+' : '';
+      changeSubtitle = '$sign${deltaVal.toStringAsFixed(1)}%';
+    } else {
+      final intDelta = deltaVal.toInt();
+      final sign = isPositive ? '+' : '';
+      changeSubtitle = '$sign$intDelta $unit';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: U.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: U.border.withValues(alpha: 0.6),
+          width: 0.8,
         ),
-        const SizedBox(height: 20),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: U.sub,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            currVal,
+            style: GoogleFonts.outfit(
+              color: U.text,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
             children: [
-              Expanded(
-                child: _buildInsightStatCard(
-                  label: 'Classes Held',
-                  value: totalClasses.toString(),
-                  icon: Icons.event_note_rounded,
-                  color: U.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildInsightStatCard(
-                  label: 'Classes Attended',
-                  value: totalAttended.toString(),
-                  icon: Icons.check_circle_outline_rounded,
+              if (hasChanged) ...[
+                Icon(
+                  isPositive ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  size: 11,
                   color: color,
                 ),
+                const SizedBox(width: 2),
+              ],
+              Expanded(
+                child: Text(
+                  changeSubtitle,
+                  style: GoogleFonts.outfit(
+                    color: hasChanged ? color : U.sub.withValues(alpha: 0.65),
+                    fontSize: 10,
+                    fontWeight: hasChanged ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        _buildInsightStatCard(
-          label: 'Classes Missed',
-          value: (totalClasses - totalAttended).clamp(0, 9999).toString(),
-          icon: Icons.cancel_outlined,
-          color: U.red,
-          wide: true,
-        ),
-        _buildTomorrowPredictor(),
-        const SizedBox(height: 24),
-        _buildInsightTipBanner(overall: overall, attended: totalAttended, held: totalClasses),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubjectDeltaItem(SubjectDelta sub) {
+    final double delta = sub.deltaPercentage;
+    final bool isPositive = delta > 0.005;
+    final bool isNegative = delta < -0.005;
+
+    final Color color = isPositive
+        ? U.green
+        : isNegative
+            ? U.red
+            : U.sub;
+    final IconData icon = isPositive
+        ? Icons.trending_up_rounded
+        : isNegative
+            ? Icons.trending_down_rounded
+            : Icons.trending_flat_rounded;
+
+    String badgeLabel;
+    if (isPositive) {
+      badgeLabel = '+${delta.toStringAsFixed(1)}%';
+    } else if (isNegative) {
+      badgeLabel = '${delta.toStringAsFixed(1)}%';
+    } else {
+      badgeLabel = '0.0%';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: U.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: U.border.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  sub.subjectName,
+                  style: GoogleFonts.outfit(
+                    color: U.text,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${sub.currentAttended}/${sub.currentHeld} classes attended • ${sub.currentPercentage.toStringAsFixed(1)}%',
+                  style: GoogleFonts.outfit(color: U.sub, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: color.withValues(alpha: 0.25),
+                width: 0.8,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  badgeLabel,
+                  style: GoogleFonts.outfit(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2564,7 +3160,7 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
       '[DEBUG][Sheet] _loadData: title=${widget.title}, portalDate=$portalDate, mode=${widget.mode}',
     );
 
-    final serviceMode = widget.credentials['college'] == 'acet'
+    final serviceMode = widget.credentials['college'] == 'aec'
         ? (widget.mode == _AttendanceRangeMode.tillNow
               ? AttendanceRangeMode.tillNow
               : AttendanceRangeMode.period)

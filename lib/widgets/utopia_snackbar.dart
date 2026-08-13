@@ -13,7 +13,7 @@ void showUtopiaSnackBar(
   VoidCallback? onActionPressed,
 }) {
   final messenger = ScaffoldMessenger.of(context);
-  messenger.hideCurrentSnackBar();
+  messenger.clearSnackBars();
 
   final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -86,7 +86,7 @@ void showUtopiaSnackBar(
                   const SizedBox(width: 12),
                   TextButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).clearSnackBars();
                       onActionPressed();
                     },
                     style: TextButton.styleFrom(

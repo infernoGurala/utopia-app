@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'acet_attendance_service.dart';
+import 'aec_attendance_service.dart';
 import 'attendance_cache_service.dart';
 import 'aus_attendance_service.dart';
 
@@ -34,8 +34,8 @@ class AttendanceService {
       Map<String, dynamic> result;
 
       debugPrint('[AttendanceService] Scraping via In-App service…');
-      if (college == 'acet') {
-        result = await AcetAttendanceService.fetchAttendance(
+      if (college == 'aec') {
+        result = await AecAttendanceService.fetchAttendance(
           rollNumber,
           password,
           fromDate: fromDate,

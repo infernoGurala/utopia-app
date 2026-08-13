@@ -349,7 +349,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? 'Online'
                             : _lastSeenLabel(
                                 lastSeen,
-                                fallback: widget.email,
+                                fallback: 'Offline',
                               ));
 
                           return GestureDetector(
@@ -404,7 +404,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                         children: [
                                           Flexible(
                                             child: Text(
-                                              widget.displayName,
+                                              UtopiaApp.sanitizeDisplayName(widget.displayName),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: GoogleFonts.outfit(

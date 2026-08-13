@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../main.dart';
+import '../services/cache_service.dart';
 import '../services/file_upload_service.dart';
 import '../services/supabase_notes_service.dart';
 import '../utils/appflowy_markdown_converter.dart';
@@ -61,12 +62,33 @@ class _AppFlowyNoteScreenState extends State<AppFlowyNoteScreen> {
   }
 
   Future<void> _loadContent() async {
-    setState(() => _loading = true);
     try {
       if (widget.overrideContent != null) {
         _rawMarkdown = widget.overrideContent!;
       } else {
-        _rawMarkdown = await _notesService.getNoteContent(widget.filePath);
+        final cached = await CacheService().getNoteContent(widget.filePath);
+        if (cached != null && cached.isNotEmpty) {
+          _rawMarkdown = cached;
+          final doc = AppFlowyMarkdownConverter.markdownToDocument(_rawMarkdown);
+          _editorState = EditorState(document: doc);
+          _editorState.editable = _isEditing;
+          _editorState.transactionStream.listen((_) {
+            if (!_hasChanges && mounted) {
+              setState(() => _hasChanges = true);
+            }
+          });
+          if (mounted) {
+            setState(() => _loading = false);
+          }
+        } else {
+          setState(() => _loading = true);
+        }
+
+        final remote = await _notesService.getNoteContent(widget.filePath, forceRefresh: _rawMarkdown.isEmpty);
+        if (remote.isNotEmpty && remote != _rawMarkdown) {
+          _rawMarkdown = remote;
+          await CacheService().saveNoteContent(widget.filePath, remote);
+        }
       }
 
       final doc = AppFlowyMarkdownConverter.markdownToDocument(_rawMarkdown);
@@ -79,8 +101,10 @@ class _AppFlowyNoteScreenState extends State<AppFlowyNoteScreen> {
       });
     } catch (e) {
       debugPrint('AppFlowyNoteScreen: Error loading content: $e');
-      _editorState = EditorState.blank();
-      _editorState.editable = _isEditing;
+      if (_rawMarkdown.isEmpty) {
+        _editorState = EditorState.blank();
+        _editorState.editable = _isEditing;
+      }
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -96,7 +120,7 @@ class _AppFlowyNoteScreenState extends State<AppFlowyNoteScreen> {
       final updatedMarkdown = AppFlowyMarkdownConverter.documentToMarkdown(_editorState.document);
       final user = FirebaseAuth.instance.currentUser;
       final uid = user?.uid ?? 'unknown';
-      final name = user?.displayName ?? user?.email ?? 'User';
+      final name = user?.displayName ?? 'User';
 
       await _notesService.updateNote(
         widget.filePath,

@@ -383,11 +383,6 @@ class _AccountSection extends StatelessWidget {
                       style: TextStyle(color: theme.text, fontSize: 18, fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Text(
-                      email,
-                      style: TextStyle(color: theme.textSecondary, fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
-                    ),
                     const SizedBox(height: 6),
                     Row(
                       children: [

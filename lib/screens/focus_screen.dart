@@ -8,17 +8,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:provider/provider.dart';
 
 import '../main.dart';
+import '../widgets/utopia_snackbar.dart';
 import '../theme/image_overlay_colors.dart';
-import 'classes_screen.dart';
-import 'community_notes_screen.dart';
 import 'attendance_screen.dart';
-import 'timetable_screen.dart';
-import 'package:intl/intl.dart';
+import 'people_screen.dart';
+import 'uni_chat_screen.dart';
+import '../widgets/minimal_news_pill.dart';
 import '../services/focus_supabase_service.dart';
-import '../models/focus_models.dart';
 import '../services/cache_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/attendance_cache_service.dart';
@@ -38,7 +36,6 @@ class _FocusScreenState extends State<FocusScreen> {
   String _studentName = '';
   int _belowTargetCount = 0;
   bool _isAttendanceConnected = false;
-  String _universityId = '';
 
   String _weatherCity = '';
   double? _weatherTemp;
@@ -413,8 +410,6 @@ class _FocusScreenState extends State<FocusScreen> {
       String studentName = '';
       int belowTargetCount = 0;
       bool isConnected = false;
-      String uniId = U.cachedUniversityId;
-
       try {
         final credentials = await SecureStorageService.getCredentials();
         if (credentials != null) {
@@ -434,16 +429,8 @@ class _FocusScreenState extends State<FocusScreen> {
             }
           }
         }
-
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-          if (userDoc.exists) {
-            uniId = userDoc.data()?['selectedUniversityId'] as String? ?? U.cachedUniversityId;
-          }
-        }
       } catch (e) {
-        debugPrint('Error loading cached attendance or university: $e');
+        debugPrint('Error loading cached attendance: $e');
       }
 
       if (mounted) {
@@ -452,7 +439,6 @@ class _FocusScreenState extends State<FocusScreen> {
           _studentName = studentName;
           _belowTargetCount = belowTargetCount;
           _isAttendanceConnected = isConnected;
-          _universityId = uniId;
         });
       }
     } catch (_) {}
@@ -579,10 +565,11 @@ class _FocusScreenState extends State<FocusScreen> {
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.push(
+                            showUtopiaSnackBar(
                               context,
-                              MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                            ).then((_) => _loadStats());
+                              message: 'Timetable feature is currently muted & disabled.',
+                              tone: UtopiaSnackBarTone.info,
+                            );
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -690,18 +677,7 @@ class _FocusScreenState extends State<FocusScreen> {
                   physics: const BouncingScrollPhysics(),
                   child: Row(
                     children: [
-                      _buildQuickPill(
-                        label: _attendancePct != null
-                            ? '${_attendancePct!.toStringAsFixed(0)}% Attendance'
-                            : 'Connect Attendance',
-                        icon: Icons.bar_chart_rounded,
-                        color: U.green,
-                        onTap: () {
-                          navigatorKey.currentState?.push(
-                            MaterialPageRoute(builder: (_) => const AttendanceScreen()),
-                          ).then((_) => _loadStats());
-                        },
-                      ),
+                      const MinimalNewsPill(),
                       const SizedBox(width: 8),
                       _buildQuickPill(
                         label: _weatherTemp != null
@@ -753,18 +729,20 @@ class _FocusScreenState extends State<FocusScreen> {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
-                          blurRadius: 16,
-                          offset: const Offset(6, 6),
-                          spreadRadius: -1,
+                          color: Colors.black.withValues(
+                            alpha: isDarkTheme ? 0.45 : 0.12,
+                          ),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
+                          spreadRadius: -2,
                         ),
                         BoxShadow(
-                          color: isDarkTheme 
-                              ? Colors.white.withValues(alpha: 0.03) 
-                              : Colors.white.withValues(alpha: 0.9),
-                          blurRadius: 16,
-                          offset: const Offset(-6, -6),
-                          spreadRadius: -1,
+                          color: isDarkTheme
+                              ? Colors.white.withValues(alpha: 0.03)
+                              : Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                          spreadRadius: 0,
                         ),
                       ],
                     ),
@@ -849,19 +827,48 @@ class _FocusScreenState extends State<FocusScreen> {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                _isAttendanceConnected
-                                    ? (_attendancePct != null
-                                        ? (_belowTargetCount > 0
-                                            ? '$_studentName • $_belowTargetCount subjects need attention'
-                                            : '$_studentName • All subjects on track')
-                                        : 'Connected')
-                                    : 'Tap to link your college portal & track progress',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 13,
-                                  color: U.sub,
+                              if (!_isAttendanceConnected)
+                                Text(
+                                  'Tap to link your college portal & track progress',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    color: U.sub,
+                                  ),
+                                )
+                              else if (_attendancePct == null)
+                                Text(
+                                  'Connected',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    color: U.sub,
+                                  ),
+                                )
+                              else ...[
+                                if (_studentName.isNotEmpty) ...[
+                                  Text(
+                                    _studentName.toUpperCase(),
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.8,
+                                      color: U.sub,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                ],
+                                Text(
+                                  _belowTargetCount > 0
+                                      ? '$_belowTargetCount subject${_belowTargetCount == 1 ? '' : 's'} need attention'
+                                      : 'All subjects on track',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: U.sub,
+                                  ),
                                 ),
-                              ),
+                              ],
                               const SizedBox(height: 16),
                               Container(
                                 padding: const EdgeInsets.all(2),
@@ -1003,438 +1010,335 @@ class _FocusScreenState extends State<FocusScreen> {
                               ],
                             ),
                           );
-                        })(),
-                      ],
-                    ),
+                      })(),
+                    ],
                   ),
                 ),
-              ).animate()
-                  .fadeIn(delay: 250.ms, duration: 500.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 250.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+              ),
+            ).animate()
+                .fadeIn(delay: 250.ms, duration: 500.ms)
+                .slideY(begin: 0.1, end: 0, delay: 250.ms, duration: 500.ms, curve: Curves.easeOutCubic),
 
-              const SizedBox(height: 48),
+            const SizedBox(height: 16),
 
-              // ── Community Notes & Classes Side-by-Side ──
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: SizedBox(
-                  height: 135,
+            // ── People Card (Below Attendance) ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: PressableCard(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PeopleScreen()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDarkTheme
+                          ? [
+                              U.card.withValues(alpha: 0.95),
+                              U.card.withValues(alpha: 0.8),
+                            ]
+                          : [
+                              Colors.white,
+                              U.card.withValues(alpha: 0.95),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDarkTheme
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.white.withValues(alpha: 0.5),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDarkTheme ? 0.45 : 0.12,
+                        ),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                        spreadRadius: -2,
+                      ),
+                      BoxShadow(
+                        color: isDarkTheme
+                            ? Colors.white.withValues(alpha: 0.03)
+                            : Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Community Notes Card
-                      Expanded(
-                        child: PressableCard(
-                          onTap: () {
-                            if (_universityId.isNotEmpty) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => CommunityNotesScreen(
-                                    universityFolderName: _universityId,
-                                  ),
-                                ),
-                              ).then((_) => _loadData());
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Please select a university in your profile first.')),
-                              );
-                            }
-                          },
-                          child: Container(
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: isDarkTheme
-                                    ? [
-                                        U.card.withValues(alpha: 0.95),
-                                        U.card.withValues(alpha: 0.8),
-                                      ]
-                                    : [
-                                        Colors.white,
-                                        U.card.withValues(alpha: 0.95),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: isDarkTheme
-                                    ? Colors.white.withValues(alpha: 0.05)
-                                    : Colors.white.withValues(alpha: 0.5),
-                                width: 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
-                                  blurRadius: 16,
-                                  offset: const Offset(6, 6),
-                                  spreadRadius: -1,
-                                ),
-                                BoxShadow(
-                                  color: isDarkTheme 
-                                      ? Colors.white.withValues(alpha: 0.03) 
-                                      : Colors.white.withValues(alpha: 0.9),
-                                  blurRadius: 16,
-                                  offset: const Offset(-6, -6),
-                                  spreadRadius: -1,
-                                ),
-                              ],
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDarkTheme
+                                ? [
+                                    U.card,
+                                    U.card.withValues(alpha: 0.7),
+                                  ]
+                                : [
+                                    Colors.white,
+                                    U.card.withValues(alpha: 0.9),
+                                  ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.08),
+                              blurRadius: 6,
+                              offset: const Offset(2, 3),
                             ),
-                            child: Stack(
-                              children: [
-                                // Accent edge
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: 2,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          U.blue.withValues(alpha: 0.0),
-                                          U.blue,
-                                          U.blue.withValues(alpha: 0.0),
-                                        ],
-                                        stops: const [0.0, 0.5, 1.0],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(15),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Neumorphic pill tag
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: isDarkTheme
-                                                    ? [
-                                                        U.card,
-                                                        U.card.withValues(alpha: 0.7),
-                                                      ]
-                                                    : [
-                                                        Colors.white,
-                                                        U.card.withValues(alpha: 0.9),
-                                                      ],
-                                              ),
-                                              borderRadius: BorderRadius.circular(10),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(2, 2),
-                                                ),
-                                                BoxShadow(
-                                                  color: isDarkTheme 
-                                                      ? Colors.white.withValues(alpha: 0.02) 
-                                                      : Colors.white,
-                                                  blurRadius: 4,
-                                                  offset: const Offset(-2, -2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Text(
-                                              'RESOURCES',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 1.0,
-                                                color: U.blue.withValues(alpha: 0.85),
-                                              ),
-                                            ),
-                                          ),
-                                          // Neumorphic circular icon button
-                                          Container(
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: isDarkTheme
-                                                    ? [
-                                                        U.card,
-                                                        U.card.withValues(alpha: 0.7),
-                                                      ]
-                                                    : [
-                                                        Colors.white,
-                                                        U.card.withValues(alpha: 0.9),
-                                                      ],
-                                              ),
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(2, 2),
-                                                ),
-                                                BoxShadow(
-                                                  color: isDarkTheme 
-                                                      ? Colors.white.withValues(alpha: 0.02) 
-                                                      : Colors.white,
-                                                  blurRadius: 4,
-                                                  offset: const Offset(-2, -2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(
-                                              Icons.collections_bookmark_rounded,
-                                              color: U.blue.withValues(alpha: 0.6),
-                                              size: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'Community Notes',
-                                        style: GoogleFonts.newsreader(
-                                          fontSize: 16.5,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle: FontStyle.italic,
-                                          color: U.text,
-                                          letterSpacing: -0.4,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Expanded(
-                                        child: Text(
-                                          'Shared study notes and materials',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 11,
-                                            color: U.sub,
-                                            height: 1.3,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                            BoxShadow(
+                              color: isDarkTheme
+                                  ? Colors.white.withValues(alpha: 0.02)
+                                  : Colors.white,
+                              blurRadius: 4,
+                              offset: const Offset(-2, -2),
                             ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.groups_rounded,
+                            color: U.primary,
+                            size: 20,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      // Classes Card
+                      const SizedBox(width: 14),
                       Expanded(
-                        child: PressableCard(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ClassesScreen(),
-                              ),
-                            ).then((_) => _loadData());
-                          },
-                          child: Container(
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: isDarkTheme
-                                    ? [
-                                        U.card.withValues(alpha: 0.95),
-                                        U.card.withValues(alpha: 0.8),
-                                      ]
-                                    : [
-                                        Colors.white,
-                                        U.card.withValues(alpha: 0.95),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: isDarkTheme
-                                    ? Colors.white.withValues(alpha: 0.05)
-                                    : Colors.white.withValues(alpha: 0.5),
-                                width: 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
-                                  blurRadius: 16,
-                                  offset: const Offset(6, 6),
-                                  spreadRadius: -1,
-                                ),
-                                BoxShadow(
-                                  color: isDarkTheme 
-                                      ? Colors.white.withValues(alpha: 0.03) 
-                                      : Colors.white.withValues(alpha: 0.9),
-                                  blurRadius: 16,
-                                  offset: const Offset(-6, -6),
-                                  spreadRadius: -1,
-                                ),
-                              ],
-                            ),
-                            child: Stack(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                // Accent edge
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: 2,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          U.peach.withValues(alpha: 0.0),
-                                          U.peach,
-                                          U.peach.withValues(alpha: 0.0),
-                                        ],
-                                        stops: const [0.0, 0.5, 1.0],
-                                      ),
+                                Text(
+                                  'People',
+                                  style: GoogleFonts.outfit(
+                                    color: U.text,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: U.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Community',
+                                    style: GoogleFonts.outfit(
+                                      color: U.primary,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.all(15),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Neumorphic pill tag
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: isDarkTheme
-                                                    ? [
-                                                        U.card,
-                                                        U.card.withValues(alpha: 0.7),
-                                                      ]
-                                                    : [
-                                                        Colors.white,
-                                                        U.card.withValues(alpha: 0.9),
-                                                      ],
-                                              ),
-                                              borderRadius: BorderRadius.circular(10),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(2, 2),
-                                                ),
-                                                BoxShadow(
-                                                  color: isDarkTheme 
-                                                      ? Colors.white.withValues(alpha: 0.02) 
-                                                      : Colors.white,
-                                                  blurRadius: 4,
-                                                  offset: const Offset(-2, -2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Text(
-                                              'CLASSES',
-                                              style: GoogleFonts.plusJakartaSans(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 1.0,
-                                                color: U.peach.withValues(alpha: 0.85),
-                                              ),
-                                            ),
-                                          ),
-                                          // Neumorphic circular icon button
-                                          Container(
-                                            width: 28,
-                                            height: 28,
-                                            decoration: BoxDecoration(
-                                              gradient: LinearGradient(
-                                                begin: Alignment.topLeft,
-                                                end: Alignment.bottomRight,
-                                                colors: isDarkTheme
-                                                    ? [
-                                                        U.card,
-                                                        U.card.withValues(alpha: 0.7),
-                                                      ]
-                                                    : [
-                                                        Colors.white,
-                                                        U.card.withValues(alpha: 0.9),
-                                                      ],
-                                              ),
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withValues(alpha: isDarkTheme ? 0.20 : 0.04),
-                                                  blurRadius: 4,
-                                                  offset: const Offset(2, 2),
-                                                ),
-                                                BoxShadow(
-                                                  color: isDarkTheme 
-                                                      ? Colors.white.withValues(alpha: 0.02) 
-                                                      : Colors.white,
-                                                  blurRadius: 4,
-                                                  offset: const Offset(-2, -2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(
-                                              Icons.group_work_rounded,
-                                              color: U.peach.withValues(alpha: 0.6),
-                                              size: 13,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'My Classes',
-                                        style: GoogleFonts.newsreader(
-                                          fontSize: 16.5,
-                                          fontWeight: FontWeight.bold,
-                                          fontStyle: FontStyle.italic,
-                                          color: U.text,
-                                          letterSpacing: -0.4,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Expanded(
-                                        child: Text(
-                                          'Study groups & shared classroom folders',
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 11,
-                                            color: U.sub,
-                                            height: 1.3,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Discover & connect with students',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: U.sub,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: U.sub,
+                        size: 16,
                       ),
                     ],
                   ),
                 ),
-              ).animate()
-                  .fadeIn(delay: 400.ms, duration: 500.ms)
-                  .slideY(begin: 0.1, end: 0, delay: 400.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+              ),
+            ).animate()
+                .fadeIn(delay: 300.ms, duration: 500.ms)
+                .slideY(begin: 0.1, end: 0, delay: 300.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+
+            const SizedBox(height: 16),
+
+            // ── Chat to Utopia Card (Uni Chat) ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: PressableCard(
+                onTap: () {
+                  final uniId = U.cachedUniversityId.isNotEmpty ? U.cachedUniversityId : 'support';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => UniChatScreen(universityId: uniId)),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDarkTheme
+                          ? [
+                              U.card.withValues(alpha: 0.95),
+                              U.card.withValues(alpha: 0.8),
+                            ]
+                          : [
+                              Colors.white,
+                              U.card.withValues(alpha: 0.95),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDarkTheme
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.white.withValues(alpha: 0.5),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDarkTheme ? 0.45 : 0.12,
+                        ),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                        spreadRadius: -2,
+                      ),
+                      BoxShadow(
+                        color: isDarkTheme
+                            ? Colors.white.withValues(alpha: 0.03)
+                            : Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: isDarkTheme
+                                ? [
+                                    U.card,
+                                    U.card.withValues(alpha: 0.7),
+                                  ]
+                                : [
+                                    Colors.white,
+                                    U.card.withValues(alpha: 0.9),
+                                  ],
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.08),
+                              blurRadius: 6,
+                              offset: const Offset(2, 3),
+                            ),
+                            BoxShadow(
+                              color: isDarkTheme
+                                  ? Colors.white.withValues(alpha: 0.02)
+                                  : Colors.white,
+                              blurRadius: 4,
+                              offset: const Offset(-2, -2),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.forum_rounded,
+                            color: U.primary,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Chat to Utopia',
+                                  style: GoogleFonts.outfit(
+                                    color: U.text,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: U.teal.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Global',
+                                    style: GoogleFonts.outfit(
+                                      color: U.teal,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Chat with your campus',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 12,
+                                color: U.sub,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: U.sub,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ).animate()
+                .fadeIn(delay: 350.ms, duration: 500.ms)
+                .slideY(begin: 0.1, end: 0, delay: 350.ms, duration: 500.ms, curve: Curves.easeOutCubic),
+
+              // ── Community Notes & Classes cards hidden ──
 
               // ── Dynamic Online News Card ──
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -1486,18 +1390,20 @@ class _FocusScreenState extends State<FocusScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: isDarkTheme ? 0.45 : 0.06),
-                            blurRadius: 16,
-                            offset: const Offset(6, 6),
-                            spreadRadius: -1,
+                            color: Colors.black.withValues(
+                              alpha: isDarkTheme ? 0.45 : 0.12,
+                            ),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                            spreadRadius: -2,
                           ),
                           BoxShadow(
                             color: isDarkTheme
                                 ? Colors.white.withValues(alpha: 0.03)
-                                : Colors.white.withValues(alpha: 0.9),
-                            blurRadius: 16,
-                            offset: const Offset(-6, -6),
-                            spreadRadius: -1,
+                                : Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                            spreadRadius: 0,
                           ),
                         ],
                       ),

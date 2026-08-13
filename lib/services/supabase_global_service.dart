@@ -69,8 +69,9 @@ class SupabaseGlobalService {
         notesQuery = notesQuery.eq('folder_path', cleanPath);
       }
 
-      final folderResponse = await folderQuery;
-      final notesResponse = await notesQuery;
+      final results = await Future.wait([folderQuery, notesQuery]);
+      final folderResponse = results[0];
+      final notesResponse = results[1];
 
       final folders = List<Map<String, dynamic>>.from(
         folderResponse,

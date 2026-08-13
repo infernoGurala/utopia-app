@@ -92,8 +92,6 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       return;
     }
 
-    String raw = '';
-
     final allCandidates = <String>[widget.filePath];
     if (widget.wikiCandidates != null) {
       for (final c in widget.wikiCandidates!) {
@@ -101,34 +99,58 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
       }
     }
 
+    // Phase 1: Instant Cache-First Loading
+    String cachedRaw = '';
+    for (final candidate in allCandidates) {
+      final cached = await CacheService().getNoteContent(candidate);
+      if (cached != null && cached.isNotEmpty) {
+        cachedRaw = cached;
+        break;
+      }
+    }
+
+    if (cachedRaw.isNotEmpty) {
+      _rawContent = cachedRaw;
+      _parse(cachedRaw);
+    }
+
+    // Phase 2: Network Sync in background
+    String raw = '';
     final isCommunityNote = widget.filePath.contains('/Community/') || widget.useGlobalRepo;
     final globalService = SupabaseGlobalService.instance;
 
     for (final candidate in allCandidates) {
       try {
         if (isCommunityNote) {
-          raw = await globalService.getNoteContent(candidate);
+          raw = await globalService.getNoteContent(candidate, forceRefresh: cachedRaw.isEmpty);
         } else {
-          raw = await _notes.getNoteContent(candidate);
+          raw = await _notes.getNoteContent(candidate, forceRefresh: cachedRaw.isEmpty);
         }
-        if (raw.isNotEmpty) break;
+        if (raw.isNotEmpty) {
+          await CacheService().saveNoteContent(candidate, raw);
+          break;
+        }
       } catch (e, stack) {
         debugPrint('Error loading note content: $e\n$stack');
       }
     }
 
-    if (raw.isEmpty && mounted) {
-      setState(() {
-        _segments = _parseSegments(
-          '_Note not found. Open this note directly from the library._',
-        );
-        _loading = false;
-      });
+    if (raw.isEmpty) {
+      if (cachedRaw.isEmpty && mounted) {
+        setState(() {
+          _segments = _parseSegments(
+            '_Note not found. Open this note directly from the library._',
+          );
+          _loading = false;
+        });
+      }
       return;
     }
 
-    _rawContent = raw;
-    _parse(raw);
+    if (raw != _rawContent) {
+      _rawContent = raw;
+      _parse(raw);
+    }
   }
 
   String _applyHighlight(String content) {
@@ -1266,13 +1288,6 @@ class _ShareNoteSheetState extends State<_ShareNoteSheet> {
                                 color: U.text,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              email,
-                              style: GoogleFonts.outfit(
-                                color: U.sub,
-                                fontSize: 12,
                               ),
                             ),
                             trailing: Icon(

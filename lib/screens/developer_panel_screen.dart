@@ -153,30 +153,7 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
     }
   }
 
-  Future<void> _triggerWebPopupEvent() async {
-    try {
-      final newEventId = DateTime.now().millisecondsSinceEpoch.toString();
-      final data = await WriterFirestoreService.fetchConfig('app_config');
-      final currentData = data is Map<String, dynamic> ? Map<String, dynamic>.from(data) : <String, dynamic>{};
-      currentData['web_popup_event_id'] = newEventId;
-      await WriterFirestoreService.updateConfig('app_config', currentData);
-      if (mounted) {
-        showUtopiaSnackBar(
-          context,
-          message: 'Web Pop-up event triggered',
-          tone: UtopiaSnackBarTone.success,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        showUtopiaSnackBar(
-          context,
-          message: 'Could not trigger web pop-up event',
-          tone: UtopiaSnackBarTone.error,
-        );
-      }
-    }
-  }
+
 
   // ──────────────────────────────────────────────────────────────────
   // UI Helpers
@@ -389,12 +366,6 @@ class _DeveloperPanelScreenState extends State<DeveloperPanelScreen> {
                 title: 'Trigger Share Pop-up',
                 subtitle: 'Show share pop-up on next launch',
                 onTap: _triggerPopupEvent,
-              ),
-              _actionTile(
-                icon: Icons.web_rounded,
-                title: 'Trigger Web Pop-up',
-                subtitle: 'Show web version pop-up to all users',
-                onTap: _triggerWebPopupEvent,
               ),
             ],
           ),

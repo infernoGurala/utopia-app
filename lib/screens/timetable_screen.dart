@@ -585,6 +585,22 @@ class _TimetableScreenState extends State<TimetableScreen>
         backgroundColor: U.bg,
         foregroundColor: U.text,
         elevation: 0,
+        leadingWidth: 70,
+        leading: Center(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: U.border, width: 0.5),
+              ),
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+            ),
+          ),
+        ),
         title: Text(
           'Timetable',
           style: GoogleFonts.playfairDisplay(
@@ -595,78 +611,45 @@ class _TimetableScreenState extends State<TimetableScreen>
             letterSpacing: -0.5,
           ),
         ),
-        actions: [
-          if (_userTimetable != null) ...[
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Edit Timetable',
-              onPressed: _openEditTimetable,
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.transparent,
-                  isScrollControlled: true,
-                  builder: (context) => _buildSettingsSheet(),
-                );
-              },
-            ),
-          ],
-        ],
-        bottom: _userTimetable == null
-            ? null
-            : PreferredSize(
-                preferredSize: const Size.fromHeight(74),
-                child: Container(
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: U.card,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: U.border.withValues(alpha: 0.5)),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      labelColor: U.bg,
-                      unselectedLabelColor: U.sub,
-                      indicator: BoxDecoration(
-                        color: U.primary,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      splashBorderRadius: BorderRadius.circular(999),
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                      labelStyle: GoogleFonts.outfit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      unselectedLabelStyle: GoogleFonts.outfit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      tabs: _dayLabels
-                          .map((label) => Tab(text: label))
-                          .toList(),
-                    ),
-                  ),
-                ),
-              ),
       ),
-      body: _loading
-          ? const Center(child: UtopiaLoader(scale: 0.7))
-          : _userTimetable == null
-          ? _buildEmptyState()
-          : TabBarView(
-              controller: _tabController,
-              children: _dayLabels.map(_buildDayView).toList(),
-            ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.calendar_month_rounded, color: U.dim, size: 48),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Feature Currently Disabled',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'The Timetable feature is currently muted and disabled by administration.',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

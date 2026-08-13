@@ -564,7 +564,7 @@ class _EditorScreenState extends State<EditorScreen> {
     try {
       final useGlobal = widget.useGlobalRepo || widget.filePath.contains('/Community/');
       final uid = user.uid;
-      final name = user.displayName ?? user.email ?? 'UTOPIA user';
+      final name = user.displayName ?? 'UTOPIA user';
 
       if (useGlobal) {
         await SupabaseGlobalService.instance.updateNote(

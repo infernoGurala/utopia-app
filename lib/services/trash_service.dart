@@ -80,6 +80,7 @@ class TrashService {
         'restored': false,
         'universityId': universityId,
       });
+      invalidateCache();
       debugPrint("TRASH: Successfully moved to trash: $path");
     } catch (e) {
       debugPrint("TRASH: Failed to move to trash: $e");
@@ -97,10 +98,26 @@ class TrashService {
     return snap.docs.isNotEmpty;
   }
 
+  static final Map<String, (Set<String>, DateTime)> _trashedPathsCache = {};
+
+  /// Invalidate cache when trash modifications occur
+  void invalidateCache() {
+    _trashedPathsCache.remove(universityId);
+  }
+
   /// Get all trashed item paths (for filtering display).
-  Future<Set<String>> getTrashedPaths() async {
+  Future<Set<String>> getTrashedPaths({bool forceRefresh = false}) async {
+    if (!forceRefresh && _trashedPathsCache.containsKey(universityId)) {
+      final (cachedPaths, timestamp) = _trashedPathsCache[universityId]!;
+      if (DateTime.now().difference(timestamp) < const Duration(seconds: 60)) {
+        return cachedPaths;
+      }
+    }
+
     final snap = await _trashCol.where('restored', isEqualTo: false).get();
-    return snap.docs.map((d) => d.data()['path'] as String).toSet();
+    final set = snap.docs.map((d) => d.data()['path'] as String).toSet();
+    _trashedPathsCache[universityId] = (set, DateTime.now());
+    return set;
   }
 
   /// Stream of all trashed items (for trash view).
@@ -133,6 +150,7 @@ class TrashService {
       'restoredAt': FieldValue.serverTimestamp(),
       'restoredBy': FirebaseAuth.instance.currentUser?.uid,
     });
+    invalidateCache();
   }
 
   /// Request permanent deletion. Actually deletes the file/folder
@@ -143,6 +161,7 @@ class TrashService {
   }) async {
     await deleteCallback();
     await _trashCol.doc(docId).delete();
+    invalidateCache();
   }
 
   /// Get days remaining until permanent auto-deletion.

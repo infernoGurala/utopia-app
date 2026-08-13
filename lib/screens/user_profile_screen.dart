@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../main.dart';
 import '../services/follow_service.dart';
 import '../widgets/app_motion.dart';
+import '../widgets/instagram_badge.dart';
 import 'chat_screen.dart';
 import 'followers_following_screen.dart';
 
@@ -100,12 +101,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         builder: (context, userSnap) {
           final userData = userSnap.data?.data() ?? {};
           final displayName =
-              (userData['displayName'] ?? widget.displayName).toString();
+              UtopiaApp.sanitizeDisplayName((userData['displayName'] ?? widget.displayName).toString());
           final photoUrl =
               (userData['photoUrl'] ?? widget.photoUrl)?.toString();
           final bio = (userData['bio'] ?? '').toString().trim();
           final university =
               (userData['selectedUniversityId'] ?? '').toString();
+          final branch = (userData['branch'] ?? '').toString().trim();
+          final instagramId = (userData['instagramId'] ?? '').toString().trim();
 
           return CustomScrollView(
             slivers: [
@@ -202,8 +205,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                             return StreamBuilder<FollowStatus>(
                                               stream: _followService.followStatusStream(_currentUid, widget.uid),
                                               builder: (context, statusSnap) {
-                                                final status = statusSnap.data ?? FollowStatus.notFollowing;
-                                                final hasAccess = _isOwnProfile || (status == FollowStatus.following);
                                                 return Row(
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.spaceAround,
@@ -267,17 +268,55 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                       ),
                                     ),
                                   ],
-                                  if (bio.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      bio,
-                                      style: GoogleFonts.outfit(
-                                        color: U.text,
-                                        fontSize: 13,
-                                        height: 1.5,
-                                      ),
-                                    ),
-                                  ],
+                                   if (bio.isNotEmpty) ...[
+                                     const SizedBox(height: 8),
+                                     Text(
+                                       bio,
+                                       style: GoogleFonts.outfit(
+                                         color: U.text,
+                                         fontSize: 13,
+                                         height: 1.5,
+                                       ),
+                                     ),
+                                   ],
+                                   if (branch.isNotEmpty || instagramId.isNotEmpty) ...[
+                                     const SizedBox(height: 10),
+                                     Wrap(
+                                       spacing: 8,
+                                       runSpacing: 6,
+                                       children: [
+                                         if (branch.isNotEmpty)
+                                           Container(
+                                             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                             decoration: BoxDecoration(
+                                               color: U.primary.withValues(alpha: 0.12),
+                                               borderRadius: BorderRadius.circular(16),
+                                               border: Border.all(
+                                                 color: U.primary.withValues(alpha: 0.25),
+                                                 width: 0.8,
+                                               ),
+                                             ),
+                                             child: Row(
+                                               mainAxisSize: MainAxisSize.min,
+                                               children: [
+                                                 Icon(Icons.school_rounded, size: 12, color: U.primary),
+                                                 const SizedBox(width: 4),
+                                                 Text(
+                                                   branch,
+                                                   style: GoogleFonts.outfit(
+                                                     color: U.primary,
+                                                     fontSize: 11,
+                                                     fontWeight: FontWeight.w600,
+                                                   ),
+                                                 ),
+                                               ],
+                                             ),
+                                           ),
+                                         if (instagramId.isNotEmpty)
+                                           InstagramBadge(handle: instagramId),
+                                       ],
+                                     ),
+                                   ],
                                 ],
                               ),
                             ),

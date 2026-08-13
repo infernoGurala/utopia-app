@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../widgets/utopia_snackbar.dart';
 import '../models/class_model.dart';
 import '../widgets/utopia_loader.dart';
 import '../services/class_service.dart';
@@ -204,15 +205,19 @@ class _LibraryHomeScreenState extends State<LibraryHomeScreen> {
                 children: [
                   const SizedBox(width: 44),
                   const SizedBox(width: 18),
-                  _HeaderButton(
-                    icon: Icons.calendar_month_rounded,
-                    tooltip: 'Timetable',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const TimetableScreen()),
-                      );
-                    },
+                  Opacity(
+                    opacity: 0.4,
+                    child: _HeaderButton(
+                      icon: Icons.calendar_month_rounded,
+                      tooltip: 'Timetable (Disabled)',
+                      onTap: () {
+                        showUtopiaSnackBar(
+                          context,
+                          message: 'Timetable feature is currently muted & disabled.',
+                          tone: UtopiaSnackBarTone.info,
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),

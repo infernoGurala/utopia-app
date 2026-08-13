@@ -56,7 +56,7 @@ class _MapScreenState extends State<MapScreen> {
   String get _uid => _user?.uid ?? '';
   String get _displayName => (_user?.displayName?.trim().isNotEmpty ?? false)
       ? _user!.displayName!.trim()
-      : (_user?.email?.split('@').first ?? 'UTOPIA Student');
+      : 'UTOPIA Student';
 
   @override
   void initState() {
@@ -606,65 +606,80 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!PlatformSupport.supportsCampusMap) {
-      return Scaffold(
+    return Scaffold(
+      backgroundColor: U.bg,
+      appBar: AppBar(
         backgroundColor: U.bg,
-        appBar: AppBar(
-          backgroundColor: U.bg,
-          elevation: 0,
-          leadingWidth: 70,
-          leading: Center(
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: U.surface,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: U.border, width: 0.5),
-                ),
-                child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
+        elevation: 0,
+        leadingWidth: 70,
+        leading: Center(
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: U.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: U.border, width: 0.5),
               ),
-            ),
-          ),
-          title: Text(
-            'Campus Map',
-            style: GoogleFonts.newsreader(
-              color: U.text,
-              fontSize: 24,
-              fontWeight: FontWeight.w400,
-              fontStyle: FontStyle.italic,
+              child: Icon(Icons.arrow_back_rounded, color: U.primary, size: 18),
             ),
           ),
         ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: U.card,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: U.border, width: 0.5),
-                ),
-                child: Text(
-                  'Campus map depends on Google Maps and mobile location APIs that are not enabled for Windows in this app yet.',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: U.sub,
-                    fontSize: 13.5,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            ),
+        title: Text(
+          'Campus Map',
+          style: GoogleFonts.newsreader(
+            color: U.text,
+            fontSize: 24,
+            fontWeight: FontWeight.w400,
+            fontStyle: FontStyle.italic,
           ),
         ),
-      );
-    }
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.map_outlined, color: U.dim, size: 48),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Feature Currently Disabled',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.text,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'The Campus Map feature is currently muted and disabled by administration.',
+                style: GoogleFonts.plusJakartaSans(
+                  color: U.sub,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
+  @override
+  Widget buildFullMap(BuildContext context) {
     final isDarkTheme = appThemeNotifier.value.isDark;
 
     return Scaffold(

@@ -419,7 +419,7 @@ class _FriendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = (user['displayName'] ?? 'Friend').toString();
+    final displayName = UtopiaApp.sanitizeDisplayName((user['displayName'] ?? 'Friend').toString());
     final email = (user['email'] ?? '').toString();
     final photoUrl = user['photoUrl']?.toString();
     final lastSeen = user['lastSeen'];
@@ -520,7 +520,7 @@ class _FriendRow extends StatelessWidget {
                               ? lastMessagePreview
                               : bio.isNotEmpty
                                   ? bio
-                                  : email,
+                                  : '',
                           style: GoogleFonts.outfit(
                               color: U.sub, fontSize: 12),
                           maxLines: 1,

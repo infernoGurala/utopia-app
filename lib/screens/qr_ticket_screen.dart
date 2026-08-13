@@ -172,17 +172,7 @@ class QRTicketScreen extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // Add to Calendar button
-              OutlinedButton.icon(
-                onPressed: _addToCalendar,
-                icon: Icon(Icons.calendar_today_rounded, color: U.bg),
-                label: Text('Add to Calendar', style: GoogleFonts.outfit(color: U.bg, fontWeight: FontWeight.w600)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: U.bg.withValues(alpha: 0.5)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ).animate().fadeIn(delay: 300.ms),
+
 
               const SizedBox(height: 12),
 

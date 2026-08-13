@@ -760,7 +760,22 @@ class U {
       return;
     }
     appThemeNotifier.value = next;
-    _applySystemUiForTheme(next);
+  }
+
+  static String sanitizeDisplayName(String? name) {
+    final clean = (name ?? '').trim();
+    if (clean.isEmpty) return 'Student';
+    if (clean.contains('@')) {
+      final prefix = clean.split('@').first.trim();
+      if (prefix.isEmpty) return 'Student';
+      final formatted = prefix.replaceAll('.', ' ').replaceAll('_', ' ');
+      final parts = formatted.split(' ').where((w) => w.isNotEmpty).toList();
+      if (parts.isEmpty) return 'Student';
+      return parts.map((word) {
+        return word[0].toUpperCase() + word.substring(1);
+      }).join(' ');
+    }
+    return clean;
   }
 
   static void showSnackBar(
@@ -771,7 +786,7 @@ class U {
     Duration duration = const Duration(seconds: 2),
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: Colors.transparent,
@@ -825,8 +840,12 @@ class U {
   }
 }
 
+String sanitizeDisplayName(String? name) => U.sanitizeDisplayName(name);
+
 class UtopiaApp extends StatelessWidget {
   const UtopiaApp({super.key});
+
+  static String sanitizeDisplayName(String? name) => U.sanitizeDisplayName(name);
 
   @override
   Widget build(BuildContext context) {

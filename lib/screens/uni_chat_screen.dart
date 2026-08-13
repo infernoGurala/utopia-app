@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../widgets/utopia_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,6 +22,8 @@ class _UniChatScreenState extends State<UniChatScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _sending = false;
   DateTime? _lastSent;
+  String? _editingMessageId;
+  Map<String, dynamic>? _replyingToMessage;
 
   String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   String get _currentName => FirebaseAuth.instance.currentUser?.displayName ?? 'Student';
@@ -29,6 +32,39 @@ class _UniChatScreenState extends State<UniChatScreen> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
+
+    if (_editingMessageId != null) {
+      final msgId = _editingMessageId!;
+      setState(() => _sending = true);
+      try {
+        await FirebaseFirestore.instance
+            .collection('uni_chats')
+            .doc(widget.universityId)
+            .collection('messages')
+            .doc(msgId)
+            .update({
+          'text': text,
+          'isEdited': true,
+          'editedAt': FieldValue.serverTimestamp(),
+        });
+        _controller.clear();
+        setState(() {
+          _editingMessageId = null;
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to edit message', style: GoogleFonts.outfit(color: U.bg)),
+              backgroundColor: U.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _sending = false);
+      }
+      return;
+    }
 
     if (_lastSent != null && DateTime.now().difference(_lastSent!).inSeconds < 3) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -42,19 +78,33 @@ class _UniChatScreenState extends State<UniChatScreen> {
 
     setState(() => _sending = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('uni_chats')
-          .doc(widget.universityId)
-          .collection('messages')
-          .add({
+      final payload = <String, dynamic>{
         'text': text,
         'senderId': _currentUid,
         'senderName': _currentName,
         'senderEmail': _currentEmail,
         'timestamp': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (_replyingToMessage != null) {
+        payload['replyTo'] = {
+          'id': _replyingToMessage!['id'],
+          'text': _replyingToMessage!['text'],
+          'senderName': _replyingToMessage!['senderName'],
+        };
+      }
+
+      await FirebaseFirestore.instance
+          .collection('uni_chats')
+          .doc(widget.universityId)
+          .collection('messages')
+          .add(payload);
+
       _controller.clear();
       _lastSent = DateTime.now();
+      setState(() {
+        _replyingToMessage = null;
+      });
       if (_scrollController.hasClients) {
         _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }
@@ -70,6 +120,146 @@ class _UniChatScreenState extends State<UniChatScreen> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  void _startEditing(String messageId, String currentText) {
+    setState(() {
+      _replyingToMessage = null;
+      _editingMessageId = messageId;
+      _controller.text = currentText;
+      _controller.selection = TextSelection.collapsed(offset: currentText.length);
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessageId = null;
+      _controller.clear();
+    });
+  }
+
+  void _startReply(Map<String, dynamic> data, String messageId) {
+    setState(() {
+      _editingMessageId = null;
+      _replyingToMessage = {
+        'id': messageId,
+        'text': data['text'] ?? '',
+        'senderName': data['senderName'] ?? 'Student',
+      };
+    });
+  }
+
+  void _cancelReply() {
+    setState(() {
+      _replyingToMessage = null;
+    });
+  }
+
+  Future<void> _unsendMessage(String messageId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('uni_chats')
+          .doc(widget.universityId)
+          .collection('messages')
+          .doc(messageId)
+          .delete();
+      if (_editingMessageId == messageId) {
+        _cancelEditing();
+      }
+      if (_replyingToMessage != null && _replyingToMessage!['id'] == messageId) {
+        _cancelReply();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Message unsent', style: GoogleFonts.outfit(color: U.bg)),
+            duration: const Duration(milliseconds: 900),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to unsend message', style: GoogleFonts.outfit(color: U.bg)),
+            backgroundColor: U.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMessageOptions(String messageId, Map<String, dynamic> data, bool isMe) {
+    final text = (data['text'] ?? '').toString();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: U.border,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: Icon(Icons.reply_rounded, color: U.primary),
+                  title: Text('Reply', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _startReply(data, messageId);
+                  },
+                ),
+                if (isMe) ...[
+                  ListTile(
+                    leading: Icon(Icons.edit_rounded, color: U.primary),
+                    title: Text('Edit message', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _startEditing(messageId, text);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.undo_rounded, color: U.red),
+                    title: Text('Unsend message', style: GoogleFonts.outfit(color: U.red, fontWeight: FontWeight.w600)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _unsendMessage(messageId);
+                    },
+                  ),
+                ],
+                ListTile(
+                  leading: Icon(Icons.copy_rounded, color: U.sub),
+                  title: Text('Copy text', style: GoogleFonts.outfit(color: U.text)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Clipboard.setData(ClipboardData(text: text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Copied to clipboard', style: GoogleFonts.outfit(color: U.bg)),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -140,7 +330,7 @@ class _UniChatScreenState extends State<UniChatScreen> {
       backgroundColor: U.bg,
       appBar: AppBar(
         backgroundColor: U.bg,
-        title: Text('Uni Chat', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
+        title: Text('Chat to Utopia', style: GoogleFonts.outfit(color: U.text, fontWeight: FontWeight.w600)),
         foregroundColor: U.text,
       ),
       body: Column(
@@ -200,69 +390,185 @@ class _UniChatScreenState extends State<UniChatScreen> {
                           ),
                         Align(
                           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isMe ? U.primary : U.card,
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(16),
-                                topRight: const Radius.circular(16),
-                                bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                bottomRight: Radius.circular(isMe ? 4 : 16),
+                          child: _SwipeToReplyBubble(
+                            onReply: () => _startReply(data, docs[index].id),
+                            child: GestureDetector(
+                              onLongPress: () => _showMessageOptions(docs[index].id, data, isMe),
+                              onDoubleTap: () => _startReply(data, docs[index].id),
+                              child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isMe ? U.primary : U.card,
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                                ),
                               ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                              children: [
-                                if (!isMe)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 2),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        if (data['senderId'] != null) {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) => UserProfileScreen(
-                                                uid: data['senderId'],
-                                                displayName: data['senderName'] ?? 'Student',
-                                                email: data['senderEmail'] ?? '',
+                              child: Column(
+                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                children: [
+                                  if (!isMe)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          if (data['senderId'] != null) {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => UserProfileScreen(
+                                                  uid: data['senderId'],
+                                                  displayName: data['senderName'] ?? 'Student',
+                                                  email: data['senderEmail'] ?? '',
+                                                ),
                                               ),
-                                            ),
-                                          );
-                                        }
-                                      },
-                                      child: Text(
-                                        data['senderName'] ?? 'Student',
-                                        style: GoogleFonts.outfit(color: isMe ? U.bg.withValues(alpha: 0.7) : U.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                                            );
+                                          }
+                                        },
+                                        child: Text(
+                                          data['senderName'] ?? 'Student',
+                                          style: GoogleFonts.outfit(color: isMe ? U.bg.withValues(alpha: 0.7) : U.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                                        ),
                                       ),
                                     ),
+                                  if (data['replyTo'] != null) ...[
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isMe
+                                            ? Colors.black.withValues(alpha: 0.15)
+                                            : U.surface.withValues(alpha: 0.7),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border(
+                                          left: BorderSide(
+                                            color: isMe ? Colors.white : U.primary,
+                                            width: 3,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            data['replyTo']['senderName'] ?? 'Student',
+                                            style: GoogleFonts.outfit(
+                                              color: isMe ? Colors.white.withValues(alpha: 0.9) : U.primary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          Text(
+                                            data['replyTo']['text'] ?? '',
+                                            style: GoogleFonts.outfit(
+                                              color: isMe ? Colors.white.withValues(alpha: 0.75) : U.sub,
+                                              fontSize: 12,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  Text(
+                                    data['text'] ?? '',
+                                    style: GoogleFonts.outfit(color: isMe ? U.bg : U.text, fontSize: 15),
                                   ),
-                                Text(
-                                  data['text'] ?? '',
-                                  style: GoogleFonts.outfit(color: isMe ? U.bg : U.text, fontSize: 15),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _formatTime(ts),
-                                  style: GoogleFonts.outfit(
-                                    color: isMe ? U.bg.withValues(alpha: 0.5) : U.dim,
-                                    fontSize: 10,
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_formatTime(ts)}${data['isEdited'] == true ? ' • edited' : ''}',
+                                    style: GoogleFonts.outfit(
+                                      color: isMe ? U.bg.withValues(alpha: 0.55) : U.dim,
+                                      fontSize: 10,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ],
                     );
                   },
                 );
               },
             ),
           ),
+          if (_replyingToMessage != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: U.card,
+                border: Border(top: BorderSide(color: U.border.withValues(alpha: 0.5))),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 3,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: U.primary,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Replying to ${_replyingToMessage!['senderName']}',
+                          style: GoogleFonts.outfit(
+                            color: U.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _replyingToMessage!['text'] ?? '',
+                          style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _cancelReply,
+                    child: Icon(Icons.close_rounded, size: 18, color: U.sub),
+                  ),
+                ],
+              ),
+            ),
+          if (_editingMessageId != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: U.card,
+              child: Row(
+                children: [
+                  Icon(Icons.edit_rounded, size: 16, color: U.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Editing message',
+                      style: GoogleFonts.outfit(color: U.primary, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _cancelEditing,
+                    child: Icon(Icons.close_rounded, size: 18, color: U.sub),
+                  ),
+                ],
+              ),
+            ),
           Container(
             color: U.bg,
             padding: EdgeInsets.fromLTRB(
@@ -287,11 +593,15 @@ class _UniChatScreenState extends State<UniChatScreen> {
                       maxLines: 5,
                       style: GoogleFonts.outfit(color: U.text, fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Message everyone...',
+                        hintText: _editingMessageId != null ? 'Edit message...' : 'Message everyone...',
                         hintStyle: GoogleFonts.outfit(color: U.sub, fontSize: 14),
                         filled: true,
                         fillColor: Colors.transparent,
-                        prefixIcon: Icon(Icons.forum_outlined, color: U.teal, size: 20),
+                        prefixIcon: Icon(
+                          _editingMessageId != null ? Icons.edit_note_rounded : Icons.forum_outlined,
+                          color: U.teal,
+                          size: 20,
+                        ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 12,
@@ -332,8 +642,8 @@ class _UniChatScreenState extends State<UniChatScreen> {
                                 strokeWidth: 2,
                               ),
                             )
-                          : const Icon(
-                              Icons.send_rounded,
+                          : Icon(
+                              _editingMessageId != null ? Icons.check_rounded : Icons.send_rounded,
                               color: Colors.white,
                               size: 20,
                             ),
@@ -342,6 +652,92 @@ class _UniChatScreenState extends State<UniChatScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwipeToReplyBubble extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onReply;
+
+  const _SwipeToReplyBubble({
+    required this.child,
+    required this.onReply,
+  });
+
+  @override
+  State<_SwipeToReplyBubble> createState() => _SwipeToReplyBubbleState();
+}
+
+class _SwipeToReplyBubbleState extends State<_SwipeToReplyBubble> {
+  double _dragOffset = 0.0;
+  bool _triggeredHaptic = false;
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (details.delta.dx > 0 || _dragOffset > 0) {
+      setState(() {
+        _dragOffset = (_dragOffset + details.delta.dx).clamp(0.0, 70.0);
+        if (_dragOffset >= 45.0 && !_triggeredHaptic) {
+          _triggeredHaptic = true;
+          HapticFeedback.lightImpact();
+        }
+      });
+    }
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (_dragOffset >= 45.0) {
+      widget.onReply();
+    }
+    setState(() {
+      _dragOffset = 0.0;
+      _triggeredHaptic = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+      onHorizontalDragEnd: _onHorizontalDragEnd,
+      onHorizontalDragCancel: () {
+        setState(() {
+          _dragOffset = 0.0;
+          _triggeredHaptic = false;
+        });
+      },
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          if (_dragOffset > 0)
+            Positioned(
+              left: 8,
+              child: Opacity(
+                opacity: (_dragOffset / 45.0).clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: (_dragOffset / 45.0).clamp(0.5, 1.0),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: U.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.reply_rounded,
+                      color: U.primary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: widget.child,
           ),
         ],
       ),

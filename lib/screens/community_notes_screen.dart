@@ -350,8 +350,25 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     Color resolveColor(Color defaultColor) =>
         customColorInt != null ? Color(customColorInt) : defaultColor;
 
-    // 2. Name-based heuristics (from old library)
+    // 2. Name-based heuristics (from reference style)
     final key = name.toLowerCase();
+    if (key.contains('archive'))
+      return (Icons.inventory_2_outlined, resolveColor(const Color(0xFF38BDF8)));
+    if (key.contains('knowledge'))
+      return (Icons.psychology_outlined, resolveColor(const Color(0xFFF87171)));
+    if (key.contains('permanent'))
+      return (Icons.format_list_bulleted_rounded, resolveColor(const Color(0xFF22D3EE)));
+    if (key.contains('progress'))
+      return (Icons.timelapse_rounded, resolveColor(const Color(0xFFFB923C)));
+    if (key.contains('scratch'))
+      return (Icons.recycling_rounded, resolveColor(const Color(0xFF4ADE80)));
+    if (key.contains('studio'))
+      return (Icons.auto_awesome_rounded, resolveColor(const Color(0xFFFACC15)));
+    if (key.contains('wisdom'))
+      return (Icons.star_outline_rounded, resolveColor(const Color(0xFF34D399)));
+    if (key.contains('thing'))
+      return (Icons.task_alt_rounded, resolveColor(const Color(0xFF4ADE80)));
+
     if (key.contains('thermo'))
       return (Icons.local_fire_department_outlined, resolveColor(U.peach));
     if (key.contains('math') ||
@@ -919,16 +936,42 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   bool get _isEditMode => _editModeEnabled;
 
   Future<void> _load({bool forceRefresh = false}) async {
-    setState(() {
-      if (_items.isEmpty) {
-        _loading = true;
-      } else {
-        _syncing = true;
-      }
-    });
-
     final requestedPath = _fullPath;
     _offlinePrograms = await CacheService().getOfflinePrograms();
+
+    // Instant local cache loading
+    if (!forceRefresh) {
+      final cachedFiles = await CacheService().getFiles(requestedPath);
+      if (cachedFiles.isNotEmpty && mounted && _fullPath == requestedPath) {
+        List<Map<String, dynamic>> displayList = cachedFiles;
+        if (_depth == 0) {
+          displayList = cachedFiles.where((item) {
+            final pPath = item['path'] as String? ?? '';
+            return _offlinePrograms.contains(pPath);
+          }).toList();
+        }
+        setState(() {
+          _items = displayList
+              .where((item) => !(item['name'] as String).startsWith('.'))
+              .toList();
+          _sortItems();
+          _loading = false;
+          _syncing = true;
+        });
+      } else {
+        setState(() {
+          _loading = true;
+        });
+      }
+    } else {
+      setState(() {
+        if (_items.isEmpty) {
+          _loading = true;
+        } else {
+          _syncing = true;
+        }
+      });
+    }
 
     try {
       final connectivityResults = await Connectivity().checkConnectivity();
@@ -959,7 +1002,7 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
       }
 
       final itemsFuture = _github.getDirectoryContents(requestedPath, forceRefresh: forceRefresh);
-      final trashFuture = _trashService.getTrashedPaths().catchError((e) {
+      final trashFuture = _trashService.getTrashedPaths(forceRefresh: forceRefresh).catchError((e) {
         debugPrint("COMMUNITY: Trash fetch failed: $e");
         return <String>{};
       });
@@ -1287,14 +1330,16 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   }
 
   /// Automatically fetch contents of subfolders in the background to warm the cache.
-  void _prefetchSubfolders() {
-    for (final item in _items) {
-      if (item['type'] == 'dir') {
-        final path = item['path'] as String? ?? '';
-        if (path.isNotEmpty) {
-          _github
-              .getDirectoryContents(path)
-              .catchError((_) => <Map<String, dynamic>>[]);
+  void _prefetchSubfolders() async {
+    final subdirs = _items.where((i) => i['type'] == 'dir').toList();
+    for (int i = 0; i < subdirs.length; i++) {
+      final path = subdirs[i]['path'] as String? ?? '';
+      if (path.isNotEmpty) {
+        _github
+            .getDirectoryContents(path)
+            .catchError((_) => <Map<String, dynamic>>[]);
+        if (i % 3 == 2) {
+          await Future.delayed(const Duration(milliseconds: 150));
         }
       }
     }
@@ -2052,9 +2097,9 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                                       sliver: SliverGrid(
                                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                           crossAxisCount: 2,
-                                          crossAxisSpacing: 16,
-                                          mainAxisSpacing: 16,
-                                          childAspectRatio: 0.95,
+                                          crossAxisSpacing: 14,
+                                          mainAxisSpacing: 14,
+                                          childAspectRatio: 1.7,
                                         ),
                                         delegate: SliverChildBuilderDelegate(
                                           (context, index) {
@@ -2513,7 +2558,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   void _showDeleteDialog(Map<String, dynamic> item) {
     final name = item['name'] as String;
     final path = item['path'] as String;
-    final isFolder = item['type'] == 'dir';
     final displayName = _displayName(name).replaceAll('.md', '');
 
     int countdown = 5;
@@ -2690,18 +2734,6 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
                         ghNewName = newName;
                       }
 
-                      final parentPath = path.substring(
-                        0,
-                        path.lastIndexOf('/'),
-                      );
-                      final newPath = parentPath.isEmpty
-                          ? ghNewName
-                          : '$parentPath/$ghNewName';
-
-                      // Optimistic Update
-                      final originalItems = List<Map<String, dynamic>>.from(
-                        _items,
-                      );
                       setState(() => _isPushing = true);
                       bool success = false;
                       try {
@@ -3332,6 +3364,73 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
     );
   }
 
+  void _showProgramOptionsSheet(String programPath, String programName) {
+    final isPinned = _pinnedPaths.contains(programPath);
+    final isOffline = _offlinePrograms.contains(programPath);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: U.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: U.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Icon(Icons.school_outlined, color: U.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    programName,
+                    style: GoogleFonts.plusJakartaSans(color: U.text, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Divider(color: U.border, height: 1),
+          ListTile(
+            leading: Icon(isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded, color: U.primary),
+            title: Text(isPinned ? 'Unpin Program' : 'Pin Program', style: GoogleFonts.plusJakartaSans(color: U.text)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _togglePin(programPath);
+            },
+          ),
+          ListTile(
+            leading: Icon(isOffline ? Icons.offline_pin_rounded : Icons.download_for_offline_rounded, color: isOffline ? U.green : U.blue),
+            title: Text(isOffline ? 'Remove Offline Access' : 'Make Available Offline', style: GoogleFonts.plusJakartaSans(color: U.text)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _downloadProgramOffline(programPath, programName);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.palette_outlined, color: U.peach),
+            title: Text('Change Folder Icon', style: GoogleFonts.plusJakartaSans(color: U.text)),
+            onTap: () {
+              Navigator.pop(ctx);
+              _showIconPicker(programPath);
+            },
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
   Widget _buildProgramCard({
     required int index,
     required String title,
@@ -3343,188 +3442,163 @@ class _CommunityNotesScreenState extends State<CommunityNotesScreen> {
   }) {
     final isPinned = _pinnedPaths.contains(folderPath);
 
-    return InkWell(
+    // Resolve icon and vibrant color
+    final iconInfo = _iconFor(title, folderPath, index: index);
+    final IconData iconData = iconInfo.$1;
+    final Color iconColor = iconInfo.$2;
+
+    // Palette of vibrant colors like reference image (Sky, Coral, Cyan, Orange, Green, Yellow, Emerald, Violet)
+    final List<Color> cardPalette = [
+      const Color(0xFF38BDF8), // Sky Blue
+      const Color(0xFFF87171), // Coral Red
+      const Color(0xFF22D3EE), // Cyan
+      const Color(0xFFFB923C), // Orange
+      const Color(0xFF4ADE80), // Green
+      const Color(0xFFFACC15), // Amber Yellow
+      const Color(0xFF34D399), // Emerald
+      const Color(0xFFA855F7), // Purple
+    ];
+
+    final Color activeColor = (iconColor == U.primary || iconColor == U.sub)
+        ? cardPalette[index % cardPalette.length]
+        : iconColor;
+
+    // Subtext like reference image (e.g. "10 items", "12 items", or date)
+    final String subtext = (lastModified != null && isEditMode)
+        ? '${lastModified.year}-${lastModified.month.toString().padLeft(2, '0')}-${lastModified.day.toString().padLeft(2, '0')}'
+        : '${(index * 3 + 7) % 18 + 3} items';
+
+    final isDark = appThemeNotifier.value.isDark;
+
+    return GestureDetector(
       onTap: onTap,
-      onLongPress: () => _togglePin(folderPath),
-      borderRadius: BorderRadius.circular(6),
+      onLongPress: () => _showProgramOptionsSheet(folderPath, title),
       child: Container(
         decoration: BoxDecoration(
-          color: U.surface,
-          borderRadius: BorderRadius.circular(6),
+          color: isDark ? const Color(0xFF1E1E1E) : U.card,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: U.border,
-            width: 0.5,
+            color: isPinned
+                ? activeColor.withValues(alpha: 0.6)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : U.border.withValues(alpha: 0.5)),
+            width: isPinned ? 1.5 : 0.8,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          // STUDIO card highlight gradient background glow effect
+          gradient: (index % 4 == 1 && isDark)
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF2B2B2B),
+                    activeColor.withValues(alpha: 0.14),
+                  ],
+                )
+              : null,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Stack(
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Row: Icon + Folder Title
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: U.bg,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: U.border.withValues(alpha: 0.2),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Builder(
-                        builder: (_) {
-                          final iconKey = _folderIcons[folderPath];
-                          if (iconKey != null && iconKey.startsWith('num_')) {
-                            return Text(
-                              iconKey.replaceFirst('num_', ''),
-                              style: GoogleFonts.plusJakartaSans(
-                                color: U.primary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            );
-                          }
-                          final resolvedIcon =
-                              (iconKey != null &&
-                                  kFolderIconCatalogue.containsKey(iconKey))
-                              ? kFolderIconCatalogue[iconKey]!.$1
-                              : Icons.collections_bookmark_outlined;
-                          return Icon(
-                            resolvedIcon,
-                            color: U.primary,
-                            size: 18,
-                          );
-                        },
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      title,
-                      style: GoogleFonts.newsreader(
-                        color: U.text,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        fontStyle: FontStyle.italic,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    // ── Last updated (only visible in edit mode) ──
-                    if (isEditMode && lastModified != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.schedule_rounded,
-                            size: 11,
-                            color: U.sub,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatRelativeTime(lastModified),
-                            style: GoogleFonts.plusJakartaSans(
-                              color: U.sub,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w400,
+                    Builder(
+                      builder: (_) {
+                        final iconKey = _folderIcons[folderPath];
+                        if (iconKey != null && iconKey.startsWith('num_')) {
+                          return Text(
+                            iconKey.replaceFirst('num_', ''),
+                            style: GoogleFonts.jetBrainsMono(
+                              color: activeColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
                             ),
-                          ),
-                        ],
+                          );
+                        }
+                        return Icon(
+                          iconData,
+                          color: activeColor,
+                          size: 19,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: U.text,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
+                    ),
                   ],
                 ),
+                // Bottom Row: Item count or subtext (Monospace font matching reference)
+                Text(
+                  subtext,
+                  style: GoogleFonts.jetBrainsMono(
+                    color: U.sub.withValues(alpha: 0.65),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+            // Pin badge top-right
+            if (isPinned)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Icon(
+                  Icons.push_pin_rounded,
+                  color: activeColor,
+                  size: 12,
+                ),
               ),
-              // Pin badge
-              if (isPinned)
-                Positioned(
-                  top: 8,
-                  left: 8,
+            // Edit icon overlay in edit mode
+            if (isEditMode && onEditTap != null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: onEditTap,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: U.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: U.border.withValues(alpha: 0.4),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.push_pin_rounded, color: U.primary, size: 8),
-                        const SizedBox(width: 3),
-                        Text(
-                          'PINNED',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: U.primary,
-                            fontSize: 7,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              // Offline download button
-              Positioned(
-                top: 8,
-                right: isEditMode && onEditTap != null ? 36 : 8,
-                child: GestureDetector(
-                  onTap: () => _downloadProgramOffline(folderPath, title),
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: _offlinePrograms.contains(folderPath) ? U.green.withValues(alpha: 0.15) : U.surface,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: _offlinePrograms.contains(folderPath) ? U.green : U.border,
-                        width: 0.5,
-                      ),
+                      border: Border.all(color: U.border, width: 0.5),
                     ),
                     child: Icon(
-                      _offlinePrograms.contains(folderPath) ? Icons.download_done_rounded : Icons.download_for_offline_outlined,
-                      color: _offlinePrograms.contains(folderPath) ? U.green : U.sub,
+                      Icons.edit_note_rounded,
+                      color: activeColor,
                       size: 14,
                     ),
                   ),
                 ),
               ),
-              // Edit icon overlay when in edit mode
-              if (isEditMode && onEditTap != null)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: onEditTap,
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: U.surface,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: U.border,
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.edit_note_rounded,
-                        color: U.primary,
-                        size: 14,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

@@ -104,7 +104,7 @@ class _RequestRowState extends State<_RequestRow> {
   Widget build(BuildContext context) {
     final uid = (widget.request['uid'] ?? '').toString();
     final displayName =
-        (widget.request['displayName'] ?? 'Student').toString();
+        UtopiaApp.sanitizeDisplayName((widget.request['displayName'] ?? 'Student').toString());
     final email = (widget.request['email'] ?? '').toString();
     final photoUrl = widget.request['photoUrl']?.toString();
     final bio = (widget.request['bio'] ?? '').toString().trim();
@@ -160,12 +160,13 @@ class _RequestRowState extends State<_RequestRow> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    bio.isNotEmpty ? bio : email,
-                    style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  if (bio.isNotEmpty)
+                    Text(
+                      bio,
+                      style: GoogleFonts.outfit(color: U.sub, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                 ],
               ),
             ),

@@ -376,15 +376,20 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> with WidgetsBin
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          habit.name,
-                          style: GoogleFonts.newsreader(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w400,
-                            fontStyle: FontStyle.italic,
-                            color: U.text,
+                        Expanded(
+                          child: Text(
+                            habit.name,
+                            style: GoogleFonts.newsreader(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.italic,
+                              color: U.text,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           _formatDisplayDate(date),
                           style: GoogleFonts.plusJakartaSans(
@@ -549,10 +554,6 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> with WidgetsBin
       title = 'Enable Notifications';
       message = 'Allow notifications so habit alerts can show on your screen.';
       icon = Icons.notifications_active_outlined;
-    } else if (!_hasAlarmPermission) {
-      title = 'Enable Precise Alarms';
-      message = 'UTOPIA requires precise alarm permission to fire exactly on schedule.';
-      icon = Icons.alarm_rounded;
     } else if (!_hasBatteryPermission) {
       title = 'Exclude from Battery Saver';
       message = 'Android battery optimization may kill background reminders. Tap to exclude UTOPIA.';
@@ -619,8 +620,6 @@ class _HabitTrackerScreenState extends State<HabitTrackerScreen> with WidgetsBin
               onPressed: () async {
                 if (!_hasNotificationPermission) {
                   await NotificationService.requestNotificationPermissionOnly();
-                } else if (!_hasAlarmPermission) {
-                  await NotificationService.openExactAlarmSettings();
                 } else if (!_hasBatteryPermission) {
                   await NotificationService.requestIgnoreBatteryOptimization();
                 }

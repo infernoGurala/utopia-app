@@ -176,11 +176,47 @@ class FollowService {
   }
 
   /// Accept a follow request (doc identified by [requestDocId]).
+  /// Automatically creates mutual follow so both users follow each other and become friends.
   Future<void> acceptRequest(String requestDocId) async {
+    final requestDoc = await _db.collection('follows').doc(requestDocId).get();
+    if (!requestDoc.exists) return;
+
+    final data = requestDoc.data();
+    if (data == null) return;
+
+    final followerId = (data['followerId'] ?? '').toString();
+    final followingId = (data['followingId'] ?? '').toString();
+
+    // 1. Accept original follow request
     await _db
         .collection('follows')
         .doc(requestDocId)
         .update({'status': 'accepted', 'acceptedAt': FieldValue.serverTimestamp()});
+
+    // 2. Automatically create/update reverse follow so both users follow each other (mutual friends)
+    if (followerId.isNotEmpty && followingId.isNotEmpty) {
+      final reverseExisting = await _db
+          .collection('follows')
+          .where('followerId', isEqualTo: followingId)
+          .where('followingId', isEqualTo: followerId)
+          .limit(1)
+          .get();
+
+      if (reverseExisting.docs.isNotEmpty) {
+        await reverseExisting.docs.first.reference.update({
+          'status': 'accepted',
+          'acceptedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await _db.collection('follows').add({
+          'followerId': followingId,
+          'followingId': followerId,
+          'status': 'accepted',
+          'createdAt': FieldValue.serverTimestamp(),
+          'acceptedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
   }
 
   /// Decline / ignore a follow request.

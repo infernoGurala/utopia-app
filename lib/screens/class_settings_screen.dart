@@ -334,10 +334,6 @@ class _ClassSettingsScreenState extends State<ClassSettingsScreen> {
                             fontSize: 15,
                           ),
                         ),
-                        subtitle: Text(
-                          w['email'],
-                          style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

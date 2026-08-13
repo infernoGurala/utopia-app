@@ -128,8 +128,7 @@ service cloud.firestore {
 
       // Only the follower can create a follow request
       allow create: if isSignedIn() &&
-        request.auth.uid == request.resource.data.followerId &&
-        request.resource.data.status == 'pending';
+        request.auth.uid == request.resource.data.followerId;
 
       // Only the followingId (the target) can accept (update status to 'accepted')
       // The follower can update to cancel (delete is preferred but update is allowed)
@@ -156,7 +155,7 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read: if isSignedIn();
         allow create: if isSignedIn() && request.auth.uid == request.resource.data.senderId;
-        allow update, delete: if false;
+        allow update, delete: if isSignedIn() && request.auth.uid == resource.data.senderId;
       }
     }
 

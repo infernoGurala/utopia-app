@@ -10,10 +10,10 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart' hide Cookie;
 
 import 'attendance_service.dart';
 
-class AcetAttendanceService {
+class AecAttendanceService {
   static const String _portalHost = 'info.aec.edu.in';
   static const String _aesSecret = '8701661282118308';
-  static const String _prefix = '/acet';
+  static const String _prefix = '/aec';
   static const String _loginPath = '$_prefix/default.aspx';
   static const String _studentMasterPath = '$_prefix/StudentMaster.aspx';
   static const String _attendancePagePath =
@@ -866,27 +866,27 @@ class AcetAttendanceService {
     String rollNumber,
     String password,
   ) async {
-    print('[AcetAttendanceService] _loginViaWebView: started for $rollNumber');
+    print('[AecAttendanceService] _loginViaWebView: started for $rollNumber');
     final completer = Completer<Map<String, String>>();
     final encryptedPassword = await _encryptPassword(password);
-    print('[AcetAttendanceService] _loginViaWebView: password encrypted');
+    print('[AecAttendanceService] _loginViaWebView: password encrypted');
     
     HeadlessInAppWebView? headlessWebView;
     Timer? timeoutTimer;
 
     void cleanup() {
-      print('[AcetAttendanceService] _loginViaWebView: cleaning up...');
+      print('[AecAttendanceService] _loginViaWebView: cleaning up...');
       timeoutTimer?.cancel();
       try {
         headlessWebView?.dispose();
-        print('[AcetAttendanceService] _loginViaWebView: WebView disposed.');
+        print('[AecAttendanceService] _loginViaWebView: WebView disposed.');
       } catch (e) {
-        print('[AcetAttendanceService] _loginViaWebView: dispose error: $e');
+        print('[AecAttendanceService] _loginViaWebView: dispose error: $e');
       }
     }
 
     timeoutTimer = Timer(const Duration(seconds: 30), () {
-      print('[AcetAttendanceService] _loginViaWebView: 30s TIMEOUT reached!');
+      print('[AecAttendanceService] _loginViaWebView: 30s TIMEOUT reached!');
       cleanup();
       if (!completer.isCompleted) {
         completer.completeError(
@@ -895,7 +895,7 @@ class AcetAttendanceService {
       }
     });
 
-    print('[AcetAttendanceService] _loginViaWebView: constructing HeadlessInAppWebView');
+    print('[AecAttendanceService] _loginViaWebView: constructing HeadlessInAppWebView');
     headlessWebView = HeadlessInAppWebView(
       initialSize: const Size(360, 800),
       initialUrlRequest: URLRequest(
@@ -907,23 +907,22 @@ class AcetAttendanceService {
         databaseEnabled: true,
         thirdPartyCookiesEnabled: true,
         javaScriptCanOpenWindowsAutomatically: true,
-        userAgent: _userAgent,
       ),
       onLoadStart: (controller, url) {
-        print('[AcetAttendanceService] WebView LoadStart: $url');
+        print('[AecAttendanceService] WebView LoadStart: $url');
       },
       onLoadStop: (controller, url) async {
         final currentUrl = url?.toString() ?? '';
-        print('[AcetAttendanceService] WebView LoadStop: $currentUrl');
+        print('[AecAttendanceService] WebView LoadStop: $currentUrl');
         
         if (currentUrl.contains('default.aspx')) {
-          print('[AcetAttendanceService] WebView default.aspx detected. Waiting for DOM...');
+          print('[AecAttendanceService] WebView default.aspx detected. Waiting for DOM...');
           
           // 1. Wait for username input to be present in DOM
           bool isFormReady = false;
           for (int i = 0; i < 20; i++) {
             if (completer.isCompleted) {
-              print('[AcetAttendanceService] WebView: task completed/timed out during DOM check. Aborting.');
+              print('[AecAttendanceService] WebView: task completed/timed out during DOM check. Aborting.');
               return;
             }
             final checkForm = "document.querySelector('#txtUserId') !== null || document.querySelector('#txtId2') !== null";
@@ -934,50 +933,50 @@ class AcetAttendanceService {
             }
             await Future.delayed(const Duration(milliseconds: 300));
           }
-          print('[AcetAttendanceService] WebView form ready: $isFormReady');
+          print('[AecAttendanceService] WebView form ready: $isFormReady');
           
           if (!isFormReady) {
-            print('[AcetAttendanceService] WebView: Form elements not detected. Aborting.');
+            print('[AecAttendanceService] WebView: Form elements not detected. Aborting.');
             return;
           }
 
           // 2. Check if Turnstile captcha is actually present on the page
           final checkTurnstilePresence = "document.querySelector('.cf-turnstile') !== null || document.querySelector('[class*=\"cf-\"]') !== null || document.querySelector('iframe[src*=\"cloudflare\"]') !== null || document.querySelector('[name=\"cf-turnstile-response\"]') !== null";
           final hasTurnstile = await controller.evaluateJavascript(source: checkTurnstilePresence) == true;
-          print('[AcetAttendanceService] WebView hasTurnstile: $hasTurnstile');
+          print('[AecAttendanceService] WebView hasTurnstile: $hasTurnstile');
 
           if (hasTurnstile) {
-            print('[AcetAttendanceService] WebView polling for Turnstile token...');
+            print('[AecAttendanceService] WebView polling for Turnstile token...');
             String turnstileToken = '';
             for (int i = 0; i < 30; i++) {
               if (completer.isCompleted) {
-                print('[AcetAttendanceService] WebView: task completed/timed out during Turnstile check. Aborting.');
+                print('[AecAttendanceService] WebView: task completed/timed out during Turnstile check. Aborting.');
                 return;
               }
               final checkToken = "var el = document.querySelector('[name=\"cf-turnstile-response\"]'); el ? el.value : '';";
               final tokenRes = await controller.evaluateJavascript(source: checkToken);
               if (tokenRes != null && tokenRes.toString().isNotEmpty) {
                 turnstileToken = tokenRes.toString();
-                print('[AcetAttendanceService] WebView Turnstile solved! Token length: ${turnstileToken.length}');
+                print('[AecAttendanceService] WebView Turnstile solved! Token length: ${turnstileToken.length}');
                 break;
               }
-              print('[AcetAttendanceService] WebView Turnstile not solved yet (attempt ${i + 1}/30)...');
+              print('[AecAttendanceService] WebView Turnstile not solved yet (attempt ${i + 1}/30)...');
               await Future.delayed(const Duration(milliseconds: 500));
             }
 
             if (turnstileToken.isEmpty) {
-              print('[AcetAttendanceService] WebView WARNING: Turnstile token is still empty after 15s!');
+              print('[AecAttendanceService] WebView WARNING: Turnstile token is still empty after 15s!');
             }
           } else {
-            print('[AcetAttendanceService] WebView: No Turnstile detected. Skipping Turnstile token polling.');
+            print('[AecAttendanceService] WebView: No Turnstile detected. Skipping Turnstile token polling.');
           }
 
           if (completer.isCompleted) {
-            print('[AcetAttendanceService] WebView: task completed/timed out before JS injection. Aborting.');
+            print('[AecAttendanceService] WebView: task completed/timed out before JS injection. Aborting.');
             return;
           }
 
-          print('[AcetAttendanceService] WebView Injecting JS credentials...');
+          print('[AecAttendanceService] WebView Injecting JS credentials...');
           final jsCode = """
             (function() {
               // Populate all possible username inputs (txtId1, txtId2, txtId3) to support all ASP.NET tabs
@@ -1026,19 +1025,19 @@ class AcetAttendanceService {
 
           try {
             await controller.evaluateJavascript(source: jsCode);
-            print('[AcetAttendanceService] WebView JS credentials successfully injected and submitted.');
+            print('[AecAttendanceService] WebView JS credentials successfully injected and submitted.');
           } catch (e) {
-            print('[AcetAttendanceService] WebView JS evaluation error: $e');
+            print('[AecAttendanceService] WebView JS evaluation error: $e');
           }
         } else if (currentUrl.contains('StudentMaster.aspx')) {
           if (completer.isCompleted) return;
-          print('[AcetAttendanceService] WebView StudentMaster.aspx detected! Extracting cookies...');
+          print('[AecAttendanceService] WebView StudentMaster.aspx detected! Extracting cookies...');
           try {
             // Extract the actual WebView User-Agent to align all subsequent HttpClient requests
             final ua = await controller.evaluateJavascript(source: "navigator.userAgent");
             if (ua != null && ua.toString().isNotEmpty) {
               _userAgent = ua.toString();
-              print('[AcetAttendanceService] WebView resolved native User-Agent: $_userAgent');
+              print('[AecAttendanceService] WebView resolved native User-Agent: $_userAgent');
             }
             final cookieManager = CookieManager.instance();
             final cookiesList = await cookieManager.getCookies(
@@ -1048,7 +1047,7 @@ class AcetAttendanceService {
             for (final cookie in cookiesList) {
               extractedCookies[cookie.name] = cookie.value.toString();
             }
-            print('[AcetAttendanceService] WebView extracted cookies: ${extractedCookies.keys.toList()}');
+            print('[AecAttendanceService] WebView extracted cookies: ${extractedCookies.keys.toList()}');
 
             final sessionId = extractedCookies['ASP.NET_SessionId'];
             final frmAuth = extractedCookies['frmAuth'];
@@ -1057,18 +1056,18 @@ class AcetAttendanceService {
                 sessionId.isEmpty ||
                 frmAuth == null ||
                 frmAuth.isEmpty) {
-              print('[AcetAttendanceService] WebView error: SessionId or frmAuth missing/empty!');
+              print('[AecAttendanceService] WebView error: SessionId or frmAuth missing/empty!');
               if (!completer.isCompleted) {
                 completer.completeError(Exception('Invalid credentials'));
               }
             } else {
-              print('[AcetAttendanceService] WebView login successful! Resolving extracted cookies.');
+              print('[AecAttendanceService] WebView login successful! Resolving extracted cookies.');
               if (!completer.isCompleted) {
                 completer.complete(extractedCookies);
               }
             }
           } catch (e) {
-            print('[AcetAttendanceService] WebView cookie extraction exception: $e');
+            print('[AecAttendanceService] WebView cookie extraction exception: $e');
             if (!completer.isCompleted) {
               completer.completeError(e);
             }
@@ -1078,22 +1077,22 @@ class AcetAttendanceService {
         }
       },
       onReceivedError: (controller, request, error) {
-        print('[AcetAttendanceService] WebView Error: ${error.description} (code: ${error.type})');
+        print('[AecAttendanceService] WebView Error: ${error.description} (code: ${error.type})');
       },
       onReceivedHttpError: (controller, request, errorResponse) {
-        print('[AcetAttendanceService] WebView HTTP Error: ${errorResponse.statusCode} - ${errorResponse.reasonPhrase}');
+        print('[AecAttendanceService] WebView HTTP Error: ${errorResponse.statusCode} - ${errorResponse.reasonPhrase}');
       },
       onConsoleMessage: (controller, consoleMessage) {
-        print('[AcetAttendanceService] WebView Console: [${consoleMessage.messageLevel}] ${consoleMessage.message}');
+        print('[AecAttendanceService] WebView Console: [${consoleMessage.messageLevel}] ${consoleMessage.message}');
       },
     );
 
     try {
-      print('[AcetAttendanceService] WebView running headlessWebView...');
+      print('[AecAttendanceService] WebView running headlessWebView...');
       await headlessWebView.run();
-      print('[AcetAttendanceService] WebView headless run initiated.');
+      print('[AecAttendanceService] WebView headless run initiated.');
     } catch (e) {
-      print('[AcetAttendanceService] WebView run() error: $e');
+      print('[AecAttendanceService] WebView run() error: $e');
       cleanup();
       completer.completeError(e);
     }
@@ -1267,20 +1266,12 @@ class AcetAttendanceService {
       String formattedToDate;
 
       if (mode == AttendanceRangeMode.tillNow) {
-        final defaultFrom = _extractDefaultDate(attendancePageResponse.body, 'txtFromDate');
-        final defaultTo = _extractDefaultDate(attendancePageResponse.body, 'txtToDate');
-
-        if (defaultFrom.isNotEmpty && defaultTo.isNotEmpty) {
-          formattedFromDate = defaultFrom;
-          formattedToDate = defaultTo;
-        } else {
-          formattedFromDate = '';
-          formattedToDate = '';
-        }
+        formattedFromDate = '';
+        formattedToDate = '';
 
         if (!_isReleaseBuild) {
           // ignore: avoid_print
-          print('[$traceId][MODE] mode=tillNow from=$formattedFromDate to=$formattedToDate');
+          print('[$traceId][MODE] mode=tillNow from= to= (empty for till now)');
         }
       } else {
         DateTime fromDt;
@@ -2121,33 +2112,6 @@ class AcetAttendanceService {
       'has_hiddenTkn=${html.toLowerCase().contains('hidden') && html.toLowerCase().contains('tkn')} '
       'scriptSrcs=[${scriptSrcs.join(', ')}]',
     );
-  }
-
-  static String _extractDefaultDate(String html, String fieldKey) {
-    final inputPattern = RegExp(
-      r'<input\s+([^>]*?)>',
-      caseSensitive: false,
-      dotAll: true,
-    );
-    final matches = inputPattern.allMatches(html);
-    for (final match in matches) {
-      final tagContent = match.group(1) ?? '';
-      final hasFieldKey = tagContent.toLowerCase().contains(fieldKey.toLowerCase());
-      if (hasFieldKey) {
-        final valuePattern = RegExp(
-          r'''value\s*=\s*["']([^"']*)["']''',
-          caseSensitive: false,
-        );
-        final valMatch = valuePattern.firstMatch(tagContent);
-        if (valMatch != null) {
-          final val = valMatch.group(1)?.trim() ?? '';
-          if (val.isNotEmpty) {
-            return val;
-          }
-        }
-      }
-    }
-    return '';
   }
 
   static bool _looksLikeLoginPage(String body) {

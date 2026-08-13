@@ -290,12 +290,6 @@ class NotificationService {
 
       await _localNotifications
           .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestExactAlarmsPermission();
-
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin
           >()
           ?.requestPermissions(alert: true, badge: true, sound: true);
@@ -962,32 +956,12 @@ class NotificationService {
 
   /// Check if exact alarms are permitted (Android 12+)
   static Future<bool> canScheduleExactNotifications() async {
-    if (!PlatformSupport.isAndroid) return true;
-    try {
-      final result = await _localNotifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.canScheduleExactNotifications();
-      return result ?? true;
-    } catch (e) {
-      debugPrint("NOTIF: Error checking exact alarm permission: $e");
-      return false;
-    }
+    return true;
   }
 
   /// Open system settings for exact alarm permission (Android 12+)
   static Future<void> openExactAlarmSettings() async {
-    if (!PlatformSupport.isAndroid) return;
-    try {
-      await _localNotifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestExactAlarmsPermission();
-    } catch (e) {
-      debugPrint("NOTIF: Error opening exact alarm settings: $e");
-    }
+    return;
   }
 
   /// Check if battery optimization is ignored/disabled for the app.

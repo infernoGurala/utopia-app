@@ -427,7 +427,16 @@ class FocusReminder {
       case 'one_time':
         if (remindDate != null) {
           final parts = remindDate!.split('-');
+          final year = int.parse(parts[0]);
           final m = int.parse(parts[1]);
+          final day = int.parse(parts[2]);
+          final target = DateTime(year, m, day);
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final diff = today.difference(target).inDays;
+          if (diff == 0) return 'Today · $timeStr';
+          if (diff == 1) return 'Yesterday · $timeStr';
+          if (diff == -1) return 'Tomorrow · $timeStr';
           return '${parts[2]} ${monthNames[m]} ${parts[0]} · $timeStr';
         }
         return timeStr;

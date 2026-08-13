@@ -1,0 +1,339 @@
+import 'dart:async';
+import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../main.dart';
+
+class MinimalNewsPill extends StatefulWidget {
+  const MinimalNewsPill({super.key});
+
+  @override
+  State<MinimalNewsPill> createState() => _MinimalNewsPillState();
+}
+
+class _MinimalNewsPillState extends State<MinimalNewsPill> {
+  late final PageController _pageController;
+  Timer? _timer;
+  int _currentIndex = 0;
+
+  static const List<Map<String, String>> _fallbackNews = [
+    {
+      'title': 'Utopia Campus News & Updates',
+      'description': 'Stay connected with campus events, announcements, and academic updates right from your home screen.',
+    },
+    {
+      'title': 'Keep Your Attendance on Track',
+      'description': 'Target 75%+ attendance across all subjects to stay exam eligible.',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _startSlowScroll();
+  }
+
+  void _startSlowScroll() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
+      if (!mounted) return;
+      setState(() {
+        _currentIndex = _currentIndex + 1;
+      });
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          _currentIndex,
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+    });
+  }
+
+  double _calculatePillWidth(String title) {
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: title,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.1,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: 210.0);
+    return (textPainter.width + 46.0).clamp(80.0, 250.0);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _showNewsDetails(List<Map<String, String>> items, int index) {
+    if (items.isEmpty) return;
+    final item = items[index % items.length];
+    final isDark = appThemeNotifier.value.isDark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: U.card,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: U.border.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: U.border,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: U.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: U.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.newspaper_rounded, size: 12, color: U.primary),
+                        const SizedBox(width: 5),
+                        Text(
+                          'CAMPUS NEWS',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                            color: U.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                item['title'] ?? 'News Update',
+                style: GoogleFonts.newsreader(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontStyle: FontStyle.italic,
+                  color: U.text,
+                  height: 1.25,
+                ),
+              ),
+              if ((item['description'] ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  item['description']!,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    color: U.sub,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: U.primary.withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: U.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = appThemeNotifier.value.isDark;
+    final pillColor = U.primary;
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('config')
+          .doc('app_config')
+          .snapshots(),
+      builder: (context, snapshot) {
+        List<Map<String, String>> newsItems = [];
+
+        if (snapshot.hasData && snapshot.data != null && snapshot.data!.exists) {
+          final data = snapshot.data!.data();
+          if (data != null) {
+            final isEnabled = data['news_enabled'] as bool? ?? true;
+            if (isEnabled) {
+              final title = (data['news_title'] as String? ?? '').trim();
+              final desc = (data['news_description'] as String? ?? '').trim();
+              if (title.isNotEmpty) {
+                newsItems.add({'title': title, 'description': desc});
+              }
+
+              final rawList = data['news_items'] as List?;
+              if (rawList != null) {
+                for (final item in rawList) {
+                  if (item is Map) {
+                    final t = (item['title'] as String? ?? item['heading'] as String? ?? '').trim();
+                    final d = (item['description'] as String? ?? '').trim();
+                    if (t.isNotEmpty && !newsItems.any((e) => e['title'] == t)) {
+                      newsItems.add({'title': t, 'description': d});
+                    }
+                  } else if (item is String && item.trim().isNotEmpty) {
+                    final t = item.trim();
+                    if (!newsItems.any((e) => e['title'] == t)) {
+                      newsItems.add({'title': t, 'description': ''});
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (newsItems.isEmpty) {
+          newsItems = _fallbackNews;
+        }
+
+        final activeItem = newsItems[_currentIndex % newsItems.length];
+        final activeTitle = activeItem['title'] ?? '';
+        final pillWidth = _calculatePillWidth(activeTitle);
+
+        return GestureDetector(
+          onTap: () {
+            final activeIdx = _currentIndex % newsItems.length;
+            _showNewsDetails(newsItems, activeIdx);
+          },
+          behavior: HitTestBehavior.opaque,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOutCubic,
+                width: pillWidth,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? pillColor.withValues(alpha: 0.06)
+                      : pillColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isDark
+                        ? pillColor.withValues(alpha: 0.2)
+                        : pillColor.withValues(alpha: 0.25),
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                        Icon(
+                          Icons.newspaper_rounded,
+                          size: 14,
+                          color: isDark
+                              ? pillColor.withValues(alpha: 0.95)
+                              : pillColor.withValues(alpha: 0.85),
+                        ),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 16,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          scrollDirection: Axis.vertical,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemBuilder: (context, index) {
+                            final item = newsItems[index % newsItems.length];
+                            final headingOnly = item['title'] ?? '';
+
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                headingOnly,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? pillColor.withValues(alpha: 0.95)
+                                      : pillColor.withValues(alpha: 0.85),
+                                  letterSpacing: 0.1,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

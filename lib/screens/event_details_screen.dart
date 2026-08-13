@@ -526,7 +526,7 @@ class _EventDetailsScreenState extends State<EventDetailsScreen> {
           _buildInfoRow(
             Icons.calendar_month_rounded,
             '${_formatDate(_event.date)} • ${_event.startTime}${_event.endTime.isNotEmpty ? ' - ${_event.endTime}' : ''}',
-            'Add to calendar',
+            'Date & Time',
           ),
           _buildDivider(),
           _buildInfoRow(
