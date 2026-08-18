@@ -24,6 +24,7 @@ class AttendanceService {
     String fromDate = '',
     String toDate = '',
     AttendanceRangeMode mode = AttendanceRangeMode.period,
+    bool forceLive = false,
   }) async {
     debugPrint(
       '[AttendanceService] fetchAttendance: college=$college, '
@@ -73,6 +74,10 @@ class AttendanceService {
       debugPrint(
         'AttendanceService: live fetch failed ($liveError), trying cache…',
       );
+
+      if (forceLive) {
+        rethrow;
+      }
 
       // ── Cache fallback ──
       final cached = await AttendanceCacheService.load(rollNumber);

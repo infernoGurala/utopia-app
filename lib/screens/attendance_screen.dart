@@ -13,8 +13,7 @@ import '../services/attendance_service.dart';
 import '../services/secure_storage_service.dart';
 import '../widgets/utopia_snackbar.dart';
 import '../widgets/utopia_loader.dart';
-import '../widgets/hamster_loader.dart';
-import '../widgets/minecraft_world_loader.dart';
+import '../widgets/student_sprint_loader.dart';
 import '../models/user_timetable.dart';
 import '../services/user_timetable_service.dart';
 
@@ -47,7 +46,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   int _currentTabIndex = 0;
   DateTime _selectedCalendarDate = DateTime.now();
 
-  // ── Minecraft loader progress ──
+  // ── Attendance loader progress ──
   double _fetchProgress = 0.0;
   Timer? _progressTimer;
 
@@ -160,6 +159,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         password,
         college: college,
         mode: serviceMode,
+        forceLive: true,
       );
       if (saveCredentials) {
         await SecureStorageService.saveCredentials(
@@ -177,10 +177,24 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       if (!mounted) {
         return;
       }
-      // ── Snap progress to 100%, pause briefly to show full map, then show data ──
+      // ── Smoothly ramp progress to 100% so the approach and friends are clearly visible ──
       _progressTimer?.cancel();
-      if (mounted) setState(() => _fetchProgress = 1.0);
-      await Future.delayed(const Duration(milliseconds: 600));
+      final startProgress = _fetchProgress;
+      const rampDuration = Duration(milliseconds: 1400);
+      final startTime = DateTime.now();
+      while (mounted) {
+        final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+        final t = (elapsed / rampDuration.inMilliseconds).clamp(0.0, 1.0);
+        final eased = Curves.easeOutCubic.transform(t);
+        setState(() {
+          _fetchProgress = startProgress + (1.0 - startProgress) * eased;
+        });
+        if (t >= 1.0) break;
+        await Future.delayed(const Duration(milliseconds: 32));
+      }
+      if (!mounted) return;
+      // Pause on arrival celebration to let the user see the campus and 5 friends
+      await Future.delayed(const Duration(milliseconds: 1200));
       if (!mounted) return;
       setState(() {
         _attendanceData = result;
@@ -231,6 +245,27 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       keepFormOnFailure: false,
       mode: _AttendanceRangeMode.tillNow, // full semester, same as initial load
     );
+  }
+
+  Future<void> _loadCachedAttendance() async {
+    final roll = _savedCredentials?['rollNumber'] ?? _rollController.text.trim();
+    if (roll.isEmpty) return;
+
+    final cached = await AttendanceCacheService.load(roll);
+    if (cached != null && mounted) {
+      setState(() {
+        _attendanceData = cached.data;
+        _isFromCache = true;
+        _cacheAgeLabel = cached.ageLabel;
+        _state = _AttendanceViewState.loaded;
+      });
+    } else if (mounted) {
+      showUtopiaSnackBar(
+        context,
+        message: 'No saved offline attendance found for $roll',
+        tone: UtopiaSnackBarTone.info,
+      );
+    }
   }
 
   Future<void> _disconnect() async {
@@ -665,7 +700,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               password: _passwordController.text,
                               college: _selectedCollege,
                               saveCredentials: true,
-                              keepFormOnFailure: true,
+                              keepFormOnFailure: false,
                             ),
                       icon: const Icon(Icons.sync_lock_rounded, size: 18),
                       label: Text(
@@ -697,7 +732,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildLoadingState() {
     return Center(
       key: const ValueKey('attendance_loading'),
-      child: MinecraftWorldLoader(scale: 1.0, progress: _fetchProgress),
+      child: StudentSprintLoader(scale: 1.0, progress: _fetchProgress),
     );
   }
 
@@ -2687,63 +2722,14 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget _buildErrorState() {
     return Center(
       key: const ValueKey('attendance_error'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: U.card,
-                shape: BoxShape.circle,
-                border: Border.all(color: U.border),
-              ),
-              child: Icon(
-                Icons.wifi_tethering_error_rounded,
-                color: U.red,
-                size: 34,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              _errorMessage ?? 'Something went wrong while loading attendance',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(
-                color: U.text,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Try reconnecting or refresh in a moment.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(color: U.sub, fontSize: 13),
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _savedCredentials == null
-                  ? () => setState(() => _state = _AttendanceViewState.initial)
-                  : _refresh,
-              style: FilledButton.styleFrom(
-                backgroundColor: U.primary,
-                foregroundColor: U.bg,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-              ),
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(
-                'Retry',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
+      child: StudentSprintLoader(
+        scale: 1.0,
+        isError: true,
+        errorMessage: _errorMessage,
+        onRetry: _savedCredentials == null
+            ? () => setState(() => _state = _AttendanceViewState.initial)
+            : _refresh,
+        onViewSaved: _loadCachedAttendance,
       ),
     );
   }

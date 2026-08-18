@@ -1,7 +1,7 @@
 name: utopia_app
 description: UTOPIA student notes app.
 publish_to: 'none'
-version: 4.0.9+38
+version: 4.0.10+39
 
 environment:
   sdk: ^3.11.3
