@@ -90,8 +90,9 @@ class _TotalAttendanceScreenState extends State<TotalAttendanceScreen> {
     final totalClasses = (_data['totalClasses'] as num?)?.toInt() ?? 0;
     final totalAttended = (_data['totalAttended'] as num?)?.toInt() ?? 0;
     final studentName = (_data['studentName'] as String? ?? '').trim();
+    final rawCollege = widget.credentials['college'] ?? 'aus';
     final college =
-        (widget.credentials['college'] ?? 'aus').toUpperCase();
+        (rawCollege.toLowerCase() == 'aec' ? 'ACET' : rawCollege).toUpperCase();
     final color = _percentageColor(overall);
     final statusLabel = _statusLabel(overall);
 

@@ -15,11 +15,14 @@ import '../theme/image_overlay_colors.dart';
 import 'attendance_screen.dart';
 import 'people_screen.dart';
 import 'uni_chat_screen.dart';
+import 'community_notes_screen.dart';
 import '../widgets/minimal_news_pill.dart';
+import '../widgets/unread_indicator_dot.dart';
 import '../services/focus_supabase_service.dart';
 import '../services/cache_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/attendance_cache_service.dart';
+import '../services/uni_chat_service.dart';
 
 class FocusScreen extends StatefulWidget {
   const FocusScreen({super.key});
@@ -1021,119 +1024,113 @@ class _FocusScreenState extends State<FocusScreen> {
 
             const SizedBox(height: 16),
 
-            // ── People Card (Below Attendance) ──
+            // ── People & Chat to Utopia Square Cards ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: PressableCard(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PeopleScreen()),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDarkTheme
-                          ? [
-                              U.card.withValues(alpha: 0.95),
-                              U.card.withValues(alpha: 0.8),
-                            ]
-                          : [
-                              Colors.white,
-                              U.card.withValues(alpha: 0.95),
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDarkTheme
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.white.withValues(alpha: 0.5),
-                      width: 1.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDarkTheme ? 0.45 : 0.12,
-                        ),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                        spreadRadius: -2,
-                      ),
-                      BoxShadow(
-                        color: isDarkTheme
-                            ? Colors.white.withValues(alpha: 0.03)
-                            : Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                        spreadRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
+              child: Row(
+                children: [
+                  // People Card
+                  Expanded(
+                    child: PressableCard(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const PeopleScreen()),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: isDarkTheme
                                 ? [
-                                    U.card,
-                                    U.card.withValues(alpha: 0.7),
+                                    U.card.withValues(alpha: 0.95),
+                                    U.card.withValues(alpha: 0.8),
                                   ]
                                 : [
                                     Colors.white,
-                                    U.card.withValues(alpha: 0.9),
+                                    U.card.withValues(alpha: 0.95),
                                   ],
                           ),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: isDarkTheme
+                                ? Colors.white.withValues(alpha: 0.05)
+                                : Colors.white.withValues(alpha: 0.5),
+                            width: 1.0,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.08),
-                              blurRadius: 6,
-                              offset: const Offset(2, 3),
+                              color: Colors.black.withValues(
+                                alpha: isDarkTheme ? 0.45 : 0.12,
+                              ),
+                              blurRadius: 20,
+                              offset: const Offset(0, 8),
+                              spreadRadius: -2,
                             ),
                             BoxShadow(
                               color: isDarkTheme
-                                  ? Colors.white.withValues(alpha: 0.02)
-                                  : Colors.white,
-                              blurRadius: 4,
-                              offset: const Offset(-2, -2),
+                                  ? Colors.white.withValues(alpha: 0.03)
+                                  : Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                              spreadRadius: 0,
                             ),
                           ],
                         ),
-                        child: Center(
-                          child: Icon(
-                            Icons.groups_rounded,
-                            color: U.primary,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'People',
-                                  style: GoogleFonts.outfit(
-                                    color: U.text,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: isDarkTheme
+                                          ? [
+                                              U.card,
+                                              U.card.withValues(alpha: 0.7),
+                                            ]
+                                          : [
+                                              Colors.white,
+                                              U.card.withValues(alpha: 0.9),
+                                            ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.08),
+                                        blurRadius: 6,
+                                        offset: const Offset(2, 3),
+                                      ),
+                                      BoxShadow(
+                                        color: isDarkTheme
+                                            ? Colors.white.withValues(alpha: 0.02)
+                                            : Colors.white,
+                                        blurRadius: 4,
+                                        offset: const Offset(-2, -2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: Icon(
+                                      Icons.groups_rounded,
+                                      color: U.primary,
+                                      size: 20,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 7,
-                                    vertical: 2,
+                                    horizontal: 8,
+                                    vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
                                     color: U.primary.withValues(alpha: 0.12),
@@ -1150,9 +1147,18 @@ class _FocusScreenState extends State<FocusScreen> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'People',
+                              style: GoogleFonts.outfit(
+                                color: U.text,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 4),
                             Text(
-                              'Discover & connect with students',
+                              'Discover students',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 color: U.sub,
@@ -1163,15 +1169,203 @@ class _FocusScreenState extends State<FocusScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        color: U.sub,
-                        size: 16,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 14),
+                  // Chat to Utopia Card
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        final uniId = U.cachedUniversityId.isNotEmpty ? U.cachedUniversityId : 'support';
+                        return StreamBuilder<bool>(
+                          stream: UniChatService().unreadStatusStream(uniId),
+                          initialData: false,
+                          builder: (context, snapshot) {
+                            final hasUnread = snapshot.data ?? false;
+                            return PressableCard(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => UniChatScreen(universityId: uniId)),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(18),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: isDarkTheme
+                                        ? [
+                                            U.card.withValues(alpha: 0.95),
+                                            U.card.withValues(alpha: 0.8),
+                                          ]
+                                        : [
+                                            Colors.white,
+                                            U.card.withValues(alpha: 0.95),
+                                          ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: hasUnread
+                                        ? U.teal.withValues(alpha: isDarkTheme ? 0.4 : 0.45)
+                                        : (isDarkTheme
+                                            ? Colors.white.withValues(alpha: 0.05)
+                                            : Colors.white.withValues(alpha: 0.5)),
+                                    width: 1.0,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: hasUnread
+                                          ? U.teal.withValues(alpha: isDarkTheme ? 0.18 : 0.12)
+                                          : Colors.black.withValues(
+                                              alpha: isDarkTheme ? 0.45 : 0.12,
+                                            ),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 8),
+                                      spreadRadius: -2,
+                                    ),
+                                    BoxShadow(
+                                      color: isDarkTheme
+                                          ? Colors.white.withValues(alpha: 0.03)
+                                          : Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                      spreadRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Container(
+                                              width: 40,
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  begin: Alignment.topLeft,
+                                                  end: Alignment.bottomRight,
+                                                  colors: isDarkTheme
+                                                      ? [
+                                                          U.card,
+                                                          U.card.withValues(alpha: 0.7),
+                                                        ]
+                                                      : [
+                                                          Colors.white,
+                                                          U.card.withValues(alpha: 0.9),
+                                                        ],
+                                                ),
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: isDarkTheme ? 0.25 : 0.08),
+                                                    blurRadius: 6,
+                                                    offset: const Offset(2, 3),
+                                                  ),
+                                                  BoxShadow(
+                                                    color: isDarkTheme
+                                                        ? Colors.white.withValues(alpha: 0.02)
+                                                        : Colors.white,
+                                                    blurRadius: 4,
+                                                    offset: const Offset(-2, -2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.forum_rounded,
+                                                  color: U.teal,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                            ),
+                                            if (hasUnread)
+                                              const Positioned(
+                                                top: -1,
+                                                right: -1,
+                                                child: UnreadIndicatorDot(
+                                                  size: 10,
+                                                  color: Color(0xFF2DD4BF),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        AnimatedContainer(
+                                          duration: const Duration(milliseconds: 250),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: hasUnread
+                                                ? U.teal.withValues(alpha: 0.2)
+                                                : U.teal.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (hasUnread) ...[
+                                                Container(
+                                                  width: 5,
+                                                  height: 5,
+                                                  margin: const EdgeInsets.only(right: 4),
+                                                  decoration: const BoxDecoration(
+                                                    color: Color(0xFF2DD4BF),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                              ],
+                                              Text(
+                                                hasUnread ? 'New' : 'Global',
+                                                style: GoogleFonts.outfit(
+                                                  color: U.teal,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'Chat to Utopia',
+                                      style: GoogleFonts.outfit(
+                                        color: U.text,
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Campus chat',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 12,
+                                        color: U.sub,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ).animate()
                 .fadeIn(delay: 300.ms, duration: 500.ms)
@@ -1179,7 +1373,7 @@ class _FocusScreenState extends State<FocusScreen> {
 
             const SizedBox(height: 16),
 
-            // ── Chat to Utopia Card (Uni Chat) ──
+            // ── Community Notes Card (Rectangle) ──
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: PressableCard(
@@ -1187,7 +1381,7 @@ class _FocusScreenState extends State<FocusScreen> {
                   final uniId = U.cachedUniversityId.isNotEmpty ? U.cachedUniversityId : 'support';
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => UniChatScreen(universityId: uniId)),
+                    MaterialPageRoute(builder: (_) => CommunityNotesScreen(universityFolderName: uniId)),
                   );
                 },
                 child: Container(
@@ -1269,8 +1463,8 @@ class _FocusScreenState extends State<FocusScreen> {
                         ),
                         child: Center(
                           child: Icon(
-                            Icons.forum_rounded,
-                            color: U.primary,
+                            Icons.menu_book_rounded,
+                            color: U.blue,
                             size: 20,
                           ),
                         ),
@@ -1283,7 +1477,7 @@ class _FocusScreenState extends State<FocusScreen> {
                             Row(
                               children: [
                                 Text(
-                                  'Chat to Utopia',
+                                  'Community Notes',
                                   style: GoogleFonts.outfit(
                                     color: U.text,
                                     fontSize: 16,
@@ -1297,13 +1491,13 @@ class _FocusScreenState extends State<FocusScreen> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: U.teal.withValues(alpha: 0.12),
+                                    color: U.blue.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Global',
+                                    'Academics',
                                     style: GoogleFonts.outfit(
-                                      color: U.teal,
+                                      color: U.blue,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1313,7 +1507,7 @@ class _FocusScreenState extends State<FocusScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Chat with your campus',
+                              'Campus notes & study materials',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 12,
                                 color: U.sub,

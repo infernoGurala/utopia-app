@@ -5,8 +5,9 @@ import '../widgets/utopia_loader.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../services/uni_chat_service.dart';
+import '../widgets/unread_indicator_dot.dart';
 import 'user_profile_screen.dart';
 
 class UniChatScreen extends StatefulWidget {
@@ -24,10 +25,57 @@ class _UniChatScreenState extends State<UniChatScreen> {
   DateTime? _lastSent;
   String? _editingMessageId;
   Map<String, dynamic>? _replyingToMessage;
+  bool _showScrollDown = false;
+  bool _hasNewMessagesWhileScrolled = false;
+  String? _lastSeenTopDocId;
+  late final Stream<QuerySnapshot> _messagesStream;
 
   String get _currentUid => FirebaseAuth.instance.currentUser?.uid ?? '';
   String get _currentName => FirebaseAuth.instance.currentUser?.displayName ?? 'Student';
   String get _currentEmail => FirebaseAuth.instance.currentUser?.email ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _messagesStream = FirebaseFirestore.instance
+        .collection('uni_chats')
+        .doc(widget.universityId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
+    UniChatService().markAsSeen(widget.universityId);
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final offset = _scrollController.offset;
+    final show = offset > 140.0;
+    if (show != _showScrollDown) {
+      setState(() => _showScrollDown = show);
+    }
+    if (offset <= 30.0) {
+      if (_hasNewMessagesWhileScrolled) {
+        setState(() => _hasNewMessagesWhileScrolled = false);
+      }
+      UniChatService().markAsSeen(widget.universityId);
+    }
+  }
+
+  void _scrollToBottom() {
+    HapticFeedback.lightImpact();
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (_hasNewMessagesWhileScrolled) {
+      setState(() => _hasNewMessagesWhileScrolled = false);
+    }
+    UniChatService().markAsSeen(widget.universityId);
+  }
 
   Future<void> _send() async {
     final text = _controller.text.trim();
@@ -99,6 +147,8 @@ class _UniChatScreenState extends State<UniChatScreen> {
           .doc(widget.universityId)
           .collection('messages')
           .add(payload);
+
+      UniChatService().markAsSeen(widget.universityId);
 
       _controller.clear();
       _lastSent = DateTime.now();
@@ -264,21 +314,10 @@ class _UniChatScreenState extends State<UniChatScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _controller.dispose();
-    
-    SharedPreferences.getInstance().then((prefs) {
-      FirebaseFirestore.instance
-          .collection('uni_chats')
-          .doc(widget.universityId)
-          .collection('messages')
-          .count()
-          .get()
-          .then((aggregate) {
-        prefs.setInt('last_seen_unichat_count', aggregate.count ?? 0);
-      });
-    });
-    
+    UniChatService().markAsSeen(widget.universityId);
     super.dispose();
   }
 
@@ -326,6 +365,8 @@ class _UniChatScreenState extends State<UniChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkTheme = appThemeNotifier.value.isDark;
+
     return Scaffold(
       backgroundColor: U.bg,
       appBar: AppBar(
@@ -336,169 +377,255 @@ class _UniChatScreenState extends State<UniChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('uni_chats')
-                  .doc(widget.universityId)
-                  .collection('messages')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: UtopiaLoader(scale: 0.7));
-                }
-                final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Text('Be the first to say hi!', style: GoogleFonts.outfit(color: U.dim)),
-                  );
-                }
-                return ListView.builder(
-                  reverse: true,
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-                    final isMe = data['senderId'] == _currentUid;
-                    final ts = data['timestamp'] as Timestamp?;
-                    final showDateSep = _shouldShowDateSeparator(docs, index);
+            child: Stack(
+              children: [
+                StreamBuilder<QuerySnapshot>(
+                  stream: _messagesStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                      return const Center(child: UtopiaLoader(scale: 0.7));
+                    }
+                    final docs = snapshot.data?.docs ?? [];
+                    if (docs.isEmpty) {
+                      return Center(
+                        child: Text('Be the first to say hi!', style: GoogleFonts.outfit(color: U.dim)),
+                      );
+                    }
 
-                    return Column(
-                      children: [
-                        // Date separator (shown above in visual order, but below in reversed list)
-                        if (showDateSep && ts != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              children: [
-                                Expanded(child: Divider(color: U.border, thickness: 0.5)),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  child: Text(
-                                    _formatDateLabel(ts.toDate()),
-                                    style: GoogleFonts.outfit(
-                                      color: U.dim,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
+                    // Real-time unread synchronization & scroll badge trigger
+                    if (docs.isNotEmpty) {
+                      final topDoc = docs.first.data() as Map<String, dynamic>;
+                      final topSenderId = topDoc['senderId'] as String?;
+                      final topTs = topDoc['timestamp'] as Timestamp?;
+                      if (_lastSeenTopDocId != docs.first.id && topSenderId != _currentUid && topTs != null) {
+                        _lastSeenTopDocId = docs.first.id;
+                        if (_showScrollDown) {
+                          if (!_hasNewMessagesWhileScrolled) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) setState(() => _hasNewMessagesWhileScrolled = true);
+                            });
+                          }
+                        } else {
+                          UniChatService().markAsSeen(widget.universityId);
+                        }
+                      }
+                    }
+
+                    return ListView.builder(
+                      reverse: true,
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final data = docs[index].data() as Map<String, dynamic>;
+                        final isMe = data['senderId'] == _currentUid;
+                        final ts = data['timestamp'] as Timestamp?;
+                        final showDateSep = _shouldShowDateSeparator(docs, index);
+
+                        return Column(
+                          children: [
+                            // Date separator (shown above in visual order, but below in reversed list)
+                            if (showDateSep && ts != null)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(child: Divider(color: U.border, thickness: 0.5)),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      child: Text(
+                                        _formatDateLabel(ts.toDate()),
+                                        style: GoogleFonts.outfit(
+                                          color: U.dim,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                Expanded(child: Divider(color: U.border, thickness: 0.5)),
-                              ],
-                            ),
-                          ),
-                        Align(
-                          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                          child: _SwipeToReplyBubble(
-                            onReply: () => _startReply(data, docs[index].id),
-                            child: GestureDetector(
-                              onLongPress: () => _showMessageOptions(docs[index].id, data, isMe),
-                              onDoubleTap: () => _startReply(data, docs[index].id),
-                              child: Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isMe ? U.primary : U.card,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                                    Expanded(child: Divider(color: U.border, thickness: 0.5)),
+                                  ],
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                children: [
-                                  if (!isMe)
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 2),
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          if (data['senderId'] != null) {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) => UserProfileScreen(
-                                                  uid: data['senderId'],
-                                                  displayName: data['senderName'] ?? 'Student',
-                                                  email: data['senderEmail'] ?? '',
+                            Align(
+                              alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                              child: _SwipeToReplyBubble(
+                                onReply: () => _startReply(data, docs[index].id),
+                                child: GestureDetector(
+                                  onLongPress: () => _showMessageOptions(docs[index].id, data, isMe),
+                                  onDoubleTap: () => _startReply(data, docs[index].id),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: isMe ? U.primary : U.card,
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: const Radius.circular(16),
+                                        topRight: const Radius.circular(16),
+                                        bottomLeft: Radius.circular(isMe ? 16 : 4),
+                                        bottomRight: Radius.circular(isMe ? 4 : 16),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isMe)
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 2),
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                if (data['senderId'] != null) {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) => UserProfileScreen(
+                                                        uid: data['senderId'],
+                                                        displayName: data['senderName'] ?? 'Student',
+                                                        email: data['senderEmail'] ?? '',
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              },
+                                              child: Text(
+                                                data['senderName'] ?? 'Student',
+                                                style: GoogleFonts.outfit(color: isMe ? U.bg.withValues(alpha: 0.7) : U.primary, fontSize: 11, fontWeight: FontWeight.w600),
+                                              ),
+                                            ),
+                                          ),
+                                        if (data['replyTo'] != null) ...[
+                                          Container(
+                                            margin: const EdgeInsets.only(bottom: 6),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: isMe
+                                                  ? Colors.black.withValues(alpha: 0.15)
+                                                  : U.surface.withValues(alpha: 0.7),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border(
+                                                left: BorderSide(
+                                                  color: isMe ? Colors.white : U.primary,
+                                                  width: 3,
                                                 ),
                                               ),
-                                            );
-                                          }
-                                        },
-                                        child: Text(
-                                          data['senderName'] ?? 'Student',
-                                          style: GoogleFonts.outfit(color: isMe ? U.bg.withValues(alpha: 0.7) : U.primary, fontSize: 11, fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                    ),
-                                  if (data['replyTo'] != null) ...[
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 6),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: isMe
-                                            ? Colors.black.withValues(alpha: 0.15)
-                                            : U.surface.withValues(alpha: 0.7),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border(
-                                          left: BorderSide(
-                                            color: isMe ? Colors.white : U.primary,
-                                            width: 3,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            data['replyTo']['senderName'] ?? 'Student',
-                                            style: GoogleFonts.outfit(
-                                              color: isMe ? Colors.white.withValues(alpha: 0.9) : U.primary,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
                                             ),
-                                          ),
-                                          const SizedBox(height: 1),
-                                          Text(
-                                            data['replyTo']['text'] ?? '',
-                                            style: GoogleFonts.outfit(
-                                              color: isMe ? Colors.white.withValues(alpha: 0.75) : U.sub,
-                                              fontSize: 12,
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  data['replyTo']['senderName'] ?? 'Student',
+                                                  style: GoogleFonts.outfit(
+                                                    color: isMe ? Colors.white.withValues(alpha: 0.9) : U.primary,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 1),
+                                                Text(
+                                                  data['replyTo']['text'] ?? '',
+                                                  style: GoogleFonts.outfit(
+                                                    color: isMe ? Colors.white.withValues(alpha: 0.75) : U.sub,
+                                                    fontSize: 12,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
                                             ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
-                                      ),
+                                        Text(
+                                          data['text'] ?? '',
+                                          style: GoogleFonts.outfit(color: isMe ? U.bg : U.text, fontSize: 15),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${_formatTime(ts)}${data['isEdited'] == true ? ' • edited' : ''}',
+                                          style: GoogleFonts.outfit(
+                                            color: isMe ? U.bg.withValues(alpha: 0.55) : U.dim,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                  Text(
-                                    data['text'] ?? '',
-                                    style: GoogleFonts.outfit(color: isMe ? U.bg : U.text, fontSize: 15),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_formatTime(ts)}${data['isEdited'] == true ? ' • edited' : ''}',
-                                    style: GoogleFonts.outfit(
-                                      color: isMe ? U.bg.withValues(alpha: 0.55) : U.dim,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
+
+                // ── Floating Scroll-to-Bottom Button ──
+                Positioned(
+                  bottom: 12,
+                  right: 16,
+                  child: AnimatedSlide(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    offset: _showScrollDown ? Offset.zero : const Offset(0, 1.5),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _showScrollDown ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_showScrollDown,
+                        child: GestureDetector(
+                          onTap: _scrollToBottom,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: isDarkTheme
+                                  ? U.card.withValues(alpha: 0.95)
+                                  : Colors.white.withValues(alpha: 0.95),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDarkTheme
+                                    ? Colors.white.withValues(alpha: 0.12)
+                                    : U.border,
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: isDarkTheme ? 0.45 : 0.15,
+                                  ),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              alignment: Alignment.center,
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: U.primary,
+                                  size: 26,
+                                ),
+                                if (_hasNewMessagesWhileScrolled)
+                                  const Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: UnreadIndicatorDot(
+                                      size: 9,
+                                      color: Color(0xFF2DD4BF),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
                       ),
-                    ],
-                    );
-                  },
-                );
-              },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           if (_replyingToMessage != null)

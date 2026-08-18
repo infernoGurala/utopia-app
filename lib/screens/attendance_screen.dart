@@ -85,8 +85,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       _rollController.text = credentials['rollNumber'] ?? '';
       _passwordController.text = credentials['password'] ?? '';
       final timetable = await UserTimetableService.getTimetable();
+      final storedCollege = credentials['college'] ?? 'aus';
+      final activeCollege = storedCollege == 'aec' ? 'acet' : storedCollege;
       setState(() {
-        _selectedCollege = credentials['college'] ?? 'aus';
+        _selectedCollege = activeCollege;
         _userTimetable = timetable;
       });
       await _fetchAttendance(
@@ -146,7 +148,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
 
     try {
-      final serviceMode = college == 'aec'
+      final isAcet = college == 'acet' || college == 'aec';
+      final serviceMode = isAcet
           ? (mode == _AttendanceRangeMode.tillNow
                 ? AttendanceRangeMode.tillNow
                 : AttendanceRangeMode.period)
@@ -598,21 +601,21 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                         Expanded(
                           child: InkWell(
                             onTap: () =>
-                                setState(() => _selectedCollege = 'aec'),
+                                setState(() => _selectedCollege = 'acet'),
                             child: Container(
                               height: 44,
-                              color: _selectedCollege == 'aec'
+                              color: (_selectedCollege == 'acet' || _selectedCollege == 'aec')
                                   ? U.primary
                                   : U.surface,
                               child: Center(
                                 child: Text(
-                                  'AEC',
+                                  'ACET',
                                   style: GoogleFonts.outfit(
-                                    color: _selectedCollege == 'aec'
+                                    color: (_selectedCollege == 'acet' || _selectedCollege == 'aec')
                                         ? U.bg
                                         : U.sub,
                                     fontSize: 14,
-                                    fontWeight: _selectedCollege == 'aec'
+                                    fontWeight: (_selectedCollege == 'acet' || _selectedCollege == 'aec')
                                         ? FontWeight.w700
                                         : FontWeight.w500,
                                   ),
@@ -949,7 +952,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     }
 
     final portalDate = _formatPortalDateForPortal(_selectedCalendarDate);
-    final serviceMode = credentials['college'] == 'aec'
+    final isAcet = credentials['college'] == 'acet' || credentials['college'] == 'aec';
+    final serviceMode = isAcet
         ? AttendanceRangeMode.period
         : AttendanceRangeMode.period;
 
@@ -3160,7 +3164,8 @@ class _AttendanceDateSheetState extends State<_AttendanceDateSheet> {
       '[DEBUG][Sheet] _loadData: title=${widget.title}, portalDate=$portalDate, mode=${widget.mode}',
     );
 
-    final serviceMode = widget.credentials['college'] == 'aec'
+    final isAcet = widget.credentials['college'] == 'acet' || widget.credentials['college'] == 'aec';
+    final serviceMode = isAcet
         ? (widget.mode == _AttendanceRangeMode.tillNow
               ? AttendanceRangeMode.tillNow
               : AttendanceRangeMode.period)

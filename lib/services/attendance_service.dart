@@ -34,7 +34,7 @@ class AttendanceService {
       Map<String, dynamic> result;
 
       debugPrint('[AttendanceService] Scraping via In-App service…');
-      if (college == 'aec') {
+      if (college == 'acet' || college == 'aec') {
         result = await AecAttendanceService.fetchAttendance(
           rollNumber,
           password,

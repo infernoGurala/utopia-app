@@ -955,13 +955,104 @@ class _NoteViewerScreenState extends State<NoteViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppFlowyNoteScreen(
-      title: widget.title,
-      filePath: widget.filePath,
-      folderPath: widget.folderPath,
-      overrideContent: widget.overrideContent,
-      isEditable: widget.isEditable,
-      useGlobalRepo: widget.useGlobalRepo,
+    return Scaffold(
+      backgroundColor: U.bg,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 12, 8, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      color: U.sub,
+                      size: 18,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: U.text,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Community notes: everyone can edit (gated by Edit Mode toggle).
+                  // Class notes: writers can edit (raw markdown).
+                  // Non-community notes: only super users can edit.
+                  if (widget.useGlobalRepo
+                      ? widget.isEditable
+                      : widget.filePath.contains('/Community/')
+                          ? widget.isEditable
+                          : _isSuperUser)
+                    IconButton(
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        color: U.primary,
+                        size: 20,
+                      ),
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditorScreen(
+                              title: widget.title,
+                              filePath: widget.filePath,
+                              initialContent: _rawContent,
+                              useGlobalRepo: widget.useGlobalRepo,
+                            ),
+                          ),
+                        );
+                        if (result is String) {
+                          // Immediately show the saved content,
+                          // then re-fetch from GitHub to confirm push landed.
+                          setState(() {
+                            _rawContent = result;
+                            _segments = _parseSegments(result);
+                            _loading = false;
+                          });
+                          _load(); // Re-sync from GitHub
+                        } else if (result == true) {
+                          _load();
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+            Divider(color: U.border, height: 1, thickness: 0.5),
+            Expanded(
+              child: _loading
+                  ? Center(
+                      child: const UtopiaLoader(scale: 0.5),
+                    )
+                  : RefreshIndicator(
+                      color: U.primary,
+                      backgroundColor: U.card,
+                      onRefresh: () async {
+                        setState(() => _loading = true);
+                        await _load();
+                      },
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+                        itemCount: _contentItemCount(),
+                        itemBuilder: (context, index) =>
+                            _buildContentItem(index),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

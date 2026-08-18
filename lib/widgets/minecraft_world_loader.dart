@@ -28,10 +28,7 @@ class _MinecraftWorldLoaderState extends State<MinecraftWorldLoader>
   void initState() {
     super.initState();
     _seed = DateTime.now().microsecondsSinceEpoch;
-    final rng = math.Random(_seed);
-    final designs = _PixelArt.all;
-    final index = widget.forcedDesignIndex ?? rng.nextInt(designs.length);
-    _selectedDesign = designs[index];
+    _selectedDesign = _PixelArt.nextRandom(widget.forcedDesignIndex);
 
     _controller = AnimationController(
       vsync: this,
@@ -144,14 +141,186 @@ class _PixelArt {
   final List<String> rows;
   const _PixelArt(this.subtitle, this.palette, this.rows);
 
+  static final math.Random _rng = math.Random();
+  static final List<int> _deck = <int>[];
+  static int? _lastIndex;
+
+  /// Returns the next design using a fair shuffled deck to guarantee
+  /// diverse variety across loads without consecutive duplicates.
+  static _PixelArt nextRandom([int? forcedIndex]) {
+    final designs = all;
+    if (forcedIndex != null && forcedIndex >= 0 && forcedIndex < designs.length) {
+      return designs[forcedIndex];
+    }
+    if (_deck.isEmpty) {
+      final newDeck = List.generate(designs.length, (i) => i)..shuffle(_rng);
+      // Ensure the first item of a new cycle is not identical to the last shown item
+      if (newDeck.isNotEmpty && newDeck.first == _lastIndex && newDeck.length > 1) {
+        final swapIdx = 1 + _rng.nextInt(newDeck.length - 1);
+        final tmp = newDeck[0];
+        newDeck[0] = newDeck[swapIdx];
+        newDeck[swapIdx] = tmp;
+      }
+      _deck.addAll(newDeck);
+    }
+    final chosenIndex = _deck.removeAt(0);
+    _lastIndex = chosenIndex;
+    return designs[chosenIndex];
+  }
+
   /// All available designs. Complex ones (yin-yang) are generated mathematically.
   static List<_PixelArt> get all => [
-    _creeper, _heart, _indianFlag, _smiley,
-    _skull, _emc2, _cryingEmoji, _yinYang(),
+    _inferno, _peacockFeather, _doctorDoom, _breakingBad, _creeper, _heart, _yinYang(),
   ];
 
-  // 1. CREEPER — canonical 2x scale of Minecraft 8×8 face texture
-  static const _creeper = _PixelArt('Loading Creeper Realm...', {
+  // 0. INFERNO — Mythical Serpentine Flame Dragon
+  static const _inferno = _PixelArt('Unleashing Inferno...', {
+    'W': Color(0xFFFFFDE7), // White-Hot Core / Piercing Eye
+    'Y': Color(0xFFFFD600), // Blazing Solar Yellow
+    'O': Color(0xFFFF6D00), // Intense Flame Orange
+    'R': Color(0xFFD50000), // Crimson Fire Body & Contour
+    '.': Color(0xFF0E0406), // Obsidian Night Ambient BG
+  }, [
+    '.......ROOY......RO.....',
+    '......ROYYOW...RROYYO...',
+    '....RROYYWOYYOOYYYYOR...',
+    '..RROYYWWYYWOYYWYYOR....',
+    '...RROYYOYYYYWYORR.RO...',
+    '.R..ROYYO...ROYYOR..OR..',
+    '..R.ROYYO....ROYYOR.....',
+    '....RROYYO....ROYYOR....',
+    '.....RROYYO...ROYYOR....',
+    '....RROYYYYOOYYYYOR.....',
+    '..RROYYWWYYYYYYORR......',
+    '.ROYYWOYYO..ROYYOR......',
+    '.OYYWR.ROO...ROYYOR.....',
+    '..OYYOR..R...ROYYOR.....',
+    '...OYYOOYYYYYYYYOR......',
+    '....RROYYYYYYYORR.......',
+    '......RROYYORR..........',
+    '........ROYYO...ROYYOR..',
+    '......RROYYYYOOYYYYWYO..',
+    '....RROYYYYWWYYYYYORR...',
+    '.....ROYYO.ROYYORR......',
+    '...ROYYOR....RRO........',
+    '..ROYYOR................',
+    '.ROOR...................',
+  ]);
+
+  // 1. PEACOCK FEATHER (MOR PANKH) — Sacred Shimmering Feather of Divinity
+  static const _peacockFeather = _PixelArt('Yada Yada Hi Dharmasya...', {
+    'E': Color(0xFF00C853), // Lush Emerald Green
+    'L': Color(0xFF76FF03), // Radiant Lime Green Barb Tips
+    'G': Color(0xFFFFB300), // Iridescent Warm Gold / Bronze Ring
+    'P': Color(0xFF00E5FF), // Electric Turquoise / Cyan Ring
+    'B': Color(0xFF1A1B6B), // Royal Sapphire / Indigo Velvet
+    'K': Color(0xFF090524), // Deep Midnight Purple/Black Pupil
+    'W': Color(0xFFFFFDE7), // Ivory / Pale Gold Stem & Light Glint
+    '.': Color(0xFF060810), // Deep Obsidian Navy
+  }, [
+    '.........L.EE.L.........',
+    '.......L.E.EE.E.L.......',
+    '.....L.E.E.GG.E.E.L.....',
+    '....L.E.GGGGGGGG.E.L....',
+    '...L.E.GPPPEEPPPG.E.L...',
+    '..L.E.GPPBBGGBBPPG.E.L..',
+    '.L.E.GPBBKKKKKKBBPG.E.L.',
+    'L.E.GPBBKKKWWKKKBBPG.E.L',
+    '.L.E.GPBBKKKKKKBBPG.E.L.',
+    '..L.E.GPBBBBBBBBPG.E.L..',
+    '...L.E.GPPPPPPPPG.E.L...',
+    '....L.E.GGGGGGGG.E.L....',
+    '.....L.E.EEEEEE.E.L.....',
+    '......L.E..WW..E.L......',
+    '....L..E...WW...E..L....',
+    '..L...E....WW....E...L..',
+    '.L...E.....WW.....E...L.',
+    '....L..E...WW...E..L....',
+    '..L...E....WW....E...L..',
+    '....L..E...WW...E..L....',
+    '......L..E.WW.E..L......',
+    '........L..WW..L........',
+    '...........WW...........',
+    '...........WW...........',
+  ]);
+
+  // 2. DR DOOM — Iconic Latverian Monarch in Hood & Titanium Mask
+  static const _doctorDoom = _PixelArt('Kneel Before Doom...', {
+    'G': Color(0xFF1E6B38), // Latverian Emerald Green (Hood & Cloak)
+    'L': Color(0xFF389E58), // Light Green Hood Highlight Rim
+    'D': Color(0xFF0F3E1E), // Dark Forest Hood Depth & Shadow
+    'H': Color(0xFFE2E8F0), // Chrome Titanium Highlight
+    'M': Color(0xFF94A3B8), // Titanium Steel Midtone Mask
+    'S': Color(0xFF475569), // Dark Steel Shading & Brow
+    'K': Color(0xFF0B0F19), // Shadow Void Black
+    'Y': Color(0xFF00E676), // Glowing Latverian Green Eyes
+    'O': Color(0xFFFFC107), // Polished Gold Medallion Clasps
+    'B': Color(0xFFB45309), // Bronze Gold Shadow
+    '.': Color(0xFF070B10), // Ambient Dark BG
+  }, [
+    '...........LL...........',
+    '.........LLGGDD.........',
+    '.......LLGGGGGGDD.......',
+    '.....LLGGGGGGGGGGDD.....',
+    '....LGGGGGGGGGGGGGGD....',
+    '...LGGDDDDDDDDDDDDGGD...',
+    '..LGGDDSHHHHHHMMMMSDDGGD',
+    '..LGGDDSMMMMMMMMMMSDDGGD',
+    '..LGDDSKKMMMMMMMMKKSDDGD',
+    '..LGDDSSKKYYMMYYKKSSDDGD',
+    '..LGDDSSMMKKMMKKMMSSDDGD',
+    '..LGDDSMMMMMSSMMMMMSDDGD',
+    '..LGDDSMMMMMMMMMMMMSDDGD',
+    '..LGDDSSKKKMKMKMKKKSSDDG',
+    '..LGDDSSKMKMKMKMKMSSDDGD',
+    '..LGDDSMMMMMMMMMMMMSDDGD',
+    '...LGDDSSMMMMMMMMSSDDGD.',
+    '....LGDDDSHHHHHMSSDDGGD.',
+    '....LLGGDDDDDDDDDDGGDD..',
+    '...LLGGGBBOOBBOOBBGGGDD.',
+    '..LGGGGGBOOOOOOOOBGGGGGD',
+    '.LGGGGGGBBBOOOOBBBGGGGGD',
+    'LGGGGGGGGGBBOOBBGGGGGGGD',
+    'DDDDDDDDDDDDDDDDDDDDDDDD',
+  ]);
+
+  // 3. BREAKING BAD — Exact Heisenberg Full-Body Pixel Art Character
+  static const _breakingBad = _PixelArt('Say My Name...', {
+    'K': Color(0xFF111111), // Pitch Black Hat, Glasses, Suit
+    'S': Color(0xFFE5B282), // Skin Tone
+    'B': Color(0xFF5C3D2E), // Goatee & Brown Trousers
+    'P': Color(0xFF8844AA), // Purple Shirt
+    'W': Color(0xFFFFFFFF), // White Collar & Buttons & Shoes
+    '.': Color(0xFF0C161D), // Ambient Meth Lab Dark BG
+  }, [
+    '........................',
+    '.......KKKKKKKKKK.......',
+    '......KKKKKKKKKKKK......',
+    '......KKKKKKKKKKKK......',
+    '.....KKKKKKKKKKKKKK.....',
+    '....KKKKKKKKKKKKKKKK....',
+    '.....SSSSSSSSSSSSSS.....',
+    '....SSKKKKKKSSKKKKKKSS..',
+    '....SSKKKKKKSSKKKKKKSS..',
+    '.....SSSSSSSSSSSSSS.....',
+    '.....SSSSSSSSSSSSSS.....',
+    '.......SSBBBBBBSS.......',
+    '.......SSBBBBBBSS.......',
+    '.......SSBBBBBBSS.......',
+    '....KKKKKKWWWKKKKKK.....',
+    '...KKKKKKKPPPKKKKKKK....',
+    '...KKKKKKKPWPKKKKKKK....',
+    '...KKKKKKKPPPKKKKKKK....',
+    '...SKKKKKKPWPKKKKKKS....',
+    '..KKSKKKKKPPPKKKKKKKS...',
+    '..KK..BBBBWWWWBBBB......',
+    '..KK..BBBBWWWWBBBB......',
+    '......KKKKKKKKKKKK......',
+    '........................',
+  ]);
+
+  // 1. CREEPER / OVERWORLD
+  static const _creeper = _PixelArt('Generating Overworld...', {
     'G': Color(0xFF4AAD31), 'K': Color(0xFF222222),
   }, [
     'GGGGGGGGGGGGGGGG', 'GGGGGGGGGGGGGGGG',
@@ -164,7 +333,7 @@ class _PixelArt {
     'GGGGGGGGGGGGGGGG', 'GGGGGGGGGGGGGGGG',
   ]);
 
-  // 2. HEART — symmetric pixel heart, dark crimson BG
+  // 5. HEART — symmetric pixel heart, dark crimson BG
   static const _heart = _PixelArt('Generating Love...', {
     'R': Color(0xFFFF2255), '.': Color(0xFF1A0A10),
   }, [
@@ -178,79 +347,9 @@ class _PixelArt {
     '................', '................',
   ]);
 
-  // 3. INDIAN FLAG — Tiranga with Ashoka Chakra
-  static const _indianFlag = _PixelArt('Loading Bharat...', {
-    'O': Color(0xFFFF9933), 'W': Color(0xFFF0F0F0),
-    'G': Color(0xFF138808), 'N': Color(0xFF000080),
-  }, [
-    'OOOOOOOOOOOOOOOO', 'OOOOOOOOOOOOOOOO',
-    'OOOOOOOOOOOOOOOO', 'OOOOOOOOOOOOOOOO',
-    'OOOOOOOOOOOOOOOO', 'WWWWWWNNNWWWWWWW',
-    'WWWWWNWWWNWWWWWW', 'WWWWWNNNNNWWWWWW',
-    'WWWWWNWWWNWWWWWW', 'WWWWWWNNNWWWWWWW',
-    'WWWWWWWWWWWWWWWW', 'GGGGGGGGGGGGGGGG',
-    'GGGGGGGGGGGGGGGG', 'GGGGGGGGGGGGGGGG',
-    'GGGGGGGGGGGGGGGG', 'GGGGGGGGGGGGGGGG',
-  ]);
 
-  // 4. SMILEY — yellow circle, eyes, smile, warm dark BG
-  static const _smiley = _PixelArt('Generating Vibes...', {
-    'Y': Color(0xFFFFCC00), 'K': Color(0xFF442200), '.': Color(0xFF1A140E),
-  }, [
-    '....YYYYYYYY....', '..YYYYYYYYYYYY..',
-    '.YYYYYYYYYYYYYY.', 'YYYYYYYYYYYYYYYY',
-    'YYYKKYYYYYYKKYYY', 'YYYKKYYYYYYKKYYY',
-    'YYYYYYYYYYYYYYYY', 'YYYYYYYYYYYYYYYY',
-    'YYYYKYYYYYYKYYYY', 'YYYYYKKKKKKYYYYY',
-    '.YYYYYYYYYYYYYY.', '.YYYYYYYYYYYYYY.',
-    '..YYYYYYYYYYYY..', '....YYYYYYYY....',
-    '................', '................',
-  ]);
 
-  // 5. SKULL — white skull, deep purple BG
-  static const _skull = _PixelArt('Entering Danger Zone...', {
-    'W': Color(0xFFFFFFFF), 'K': Color(0xFF111111), '.': Color(0xFF1C101A),
-  }, [
-    '................', '....KKKKKKKK....',
-    '..KKWWWWWWWWKK..', '..KWWWWWWWWWWK..',
-    '..KWWWWWWWWWWK..', '..KWWKKWWKKWWK..',
-    '..KWWKKWWKKWWK..', '..KWWWWWWWWWWK..',
-    '..KWWWWKKWWWWK..', '..KKWWWWWWWWKK..',
-    '....KWKWWKWK....', '....KKKKKKKK....',
-    '................', '................',
-    '................', '................',
-  ]);
-
-  // 6. E=mc² — pixel font on chalkboard green
-  static const _emc2 = _PixelArt('Calculating E=mc\u00B2...', {
-    'K': Color(0xFFFFFFFF), 'R': Color(0xFFDD1111), '.': Color(0xFF0D1B0E),
-  }, [
-    '................', '................',
-    '................', '................',
-    '..............RR', '...............R',
-    'KKK.....K.KKKKRR', 'K...KKK.KKKK....',
-    'KKK.....K.KK....', 'K...KKK.K.KK....',
-    'KKK.....K.KKKK..', '................',
-    '................', '................',
-    '................', '................',
-  ]);
-
-  // 7. CRYING EMOJI — yellow face, blue tears, dark BG
-  static const _cryingEmoji = _PixelArt('Fetching Attendance...', {
-    'Y': Color(0xFFFFCC00), 'O': Color(0xFFFF8C00), 'K': Color(0xFF442200),
-    'B': Color(0xFF0099FF), 'W': Color(0xFFFFFFFF), '.': Color(0xFF1A140E),
-  }, [
-    '....OOOOOOOO....', '..OOYYYYYYYYOO..',
-    '.OYYYYYYYYYYYYO.', 'YYYYYYYYYYYYYYYY',
-    'YYYKKYYYYYYKKYYY', 'YYYKKYYYYYYKKYYY',
-    'YYYBBYYYYYYBBYYY', 'YYYBBYYYYYYBBYYY',
-    'YYYBBYKKKKYBBYYY', 'YYYBBYKWWKYBBYYY',
-    '.YYBBYYYYYYBBYY.', '.YYBBYYYYYYBBYY.',
-    '..YYYYYYYYYYYY..', '....YYYYYYYY....',
-    '................', '................',
-  ]);
-
-  // 8. YIN-YANG — generated mathematically for perfect S-curve
+  // 5. YIN-YANG — generated mathematically for perfect S-curve
   static _PixelArt _yinYang() {
     const n = 16;
     const cx = 7.5, cy = 7.5, r = 7.0, sr = 3.5;

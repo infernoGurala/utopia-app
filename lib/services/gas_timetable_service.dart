@@ -10,7 +10,8 @@ class GasTimetableService {
     String college,
   ) async {
     final trimmedRoll = rollNumber.trim();
-    final query = '?rollNumber=$trimmedRoll&password=${Uri.encodeComponent(password)}&college=${Uri.encodeComponent(college)}';
+    final effectiveCollege = college == 'acet' ? 'aec' : college;
+    final query = '?rollNumber=$trimmedRoll&password=${Uri.encodeComponent(password)}&college=${Uri.encodeComponent(effectiveCollege)}';
     
     final response = await http.get(Uri.parse('$_url$query'));
     if (response.statusCode != 200) {

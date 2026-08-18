@@ -20,6 +20,8 @@ import 'event_notifications_screen.dart';
 import '../services/cache_service.dart';
 import '../services/event_service.dart';
 import '../models/event_model.dart';
+import 'community_notes_screen.dart';
+import 'classes_screen.dart';
 
 class UniversityScreen extends StatefulWidget {
   const UniversityScreen({super.key});
@@ -212,19 +214,32 @@ class _UniversityScreenState extends State<UniversityScreen> {
         ),
       ),
       _CardItem(
-        title: 'Map',
-        subtitle: 'Feature disabled',
-        icon: Icons.map_outlined,
-        color: Colors.grey,
-        isDisabled: true,
+        title: 'Community Notes',
+        subtitle: 'Campus notes &\nstudy materials',
+        icon: Icons.menu_book_outlined,
+        color: theme.blue,
         delay: 450,
-        onTap: () {
-          showUtopiaSnackBar(
-            context,
-            message: 'Map feature is currently muted & disabled.',
-            tone: UtopiaSnackBarTone.info,
-          );
+        onTap: () async {
+          if (_universityId.isNotEmpty) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CommunityNotesScreen(universityFolderName: _universityId),
+              ),
+            );
+          }
         },
+      ),
+      _CardItem(
+        title: 'My Classes',
+        subtitle: 'Study groups &\nshared folders',
+        icon: Icons.groups_2_outlined,
+        color: theme.peach,
+        delay: 500,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ClassesScreen()),
+        ),
       ),
       _CardItem(
         title: 'Timetable',
@@ -232,7 +247,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
         icon: Icons.calendar_month_rounded,
         color: Colors.grey,
         isDisabled: true,
-        delay: 500,
+        delay: 550,
         onTap: () {
           showUtopiaSnackBar(
             context,
